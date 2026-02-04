@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\AttributeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,3 +29,4 @@ Route::get('/health', function () {
 
 Route::post('/players', [PlayerController::class, 'store']);
 Route::get('/players/{player}', [PlayerController::class, 'show']);
+Route::get('/attributes', [AttributeController::class, 'index']);
