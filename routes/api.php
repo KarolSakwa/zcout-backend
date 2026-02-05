@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\AttributeController;
 use App\Http\Controllers\Api\DuelController;
+use App\Http\Controllers\Api\VoteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,3 +33,4 @@ Route::post('/players', [PlayerController::class, 'store']);
 Route::get('/players/{player}', [PlayerController::class, 'show']);
 Route::get('/attributes', [AttributeController::class, 'index']);
 Route::get('/duels/next', [DuelController::class, 'next']);
+Route::post('/votes', [VoteController::class, 'store']);
