@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
-use App\Models\Player;
 use App\Models\Vote;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Models\Duel;
 
 class VoteController extends Controller
 {
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -23,10 +24,16 @@ class VoteController extends Controller
 
         $attributeId = Attribute::where('key', $data['attribute_key'])->value('id');
 
+        $duel = Duel::firstOrCreate(
+            [
+                'attribute_id' => $attributeId,
+                'player_a_id' => min($data['player_a_id'], $data['player_b_id']),
+                'player_b_id' => max($data['player_a_id'], $data['player_b_id']),
+            ]
+        );
+
         $vote = Vote::create([
-            'attribute_id' => $attributeId,
-            'player_a_id' => $data['player_a_id'],
-            'player_b_id' => $data['player_b_id'],
+            'duel_id' => $duel->id,
             'winner_id' => $data['winner_id'],
             'voter_hash' => $data['voter_hash'] ?? null,
         ]);
