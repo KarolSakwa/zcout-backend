@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\Player;
+use App\Models\Duel;
 
 class DuelController extends Controller
 {
@@ -26,7 +27,15 @@ class DuelController extends Controller
             return response()->json(['error' => 'Not enough players'], 422);
         }
 
-        // Minimalny payload na start (bez Resource, żeby szybciej ruszyć)
+        $playerA = min($players[0]->id, $players[1]->id);
+        $playerB = max($players[0]->id, $players[1]->id);
+
+        $duel = Duel::firstOrCreate([
+            'attribute_id' => $attribute->id,
+            'player_a_id' => $playerA,
+            'player_b_id' => $playerB,
+        ]);
+
         return response()->json([
             'attribute' => [
                 'id' => $attribute->id,
@@ -52,6 +61,7 @@ class DuelController extends Controller
                     'position' => $players[1]->position,
                 ],
             ],
+            'duel_id' => $duel->id,
         ]);
     }
 }
