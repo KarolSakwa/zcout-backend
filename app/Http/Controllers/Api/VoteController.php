@@ -8,6 +8,7 @@ use App\Models\Vote;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\Duel;
+use App\Services\RatingService;
 
 class VoteController extends Controller
 {
@@ -37,6 +38,16 @@ class VoteController extends Controller
             'winner_id' => $data['winner_id'],
             'voter_hash' => $data['voter_hash'] ?? null,
         ]);
+
+        $loserId = $data['winner_id'] == $data['player_a_id']
+            ? $data['player_b_id']
+            : $data['player_a_id'];
+
+        app(RatingService::class)->applyVote(
+            $data['winner_id'],
+            $loserId,
+            $attributeId
+        );
 
         return response()->json(['id' => $vote->id], 201);
     }
