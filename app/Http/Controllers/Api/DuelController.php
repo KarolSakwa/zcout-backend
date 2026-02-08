@@ -22,7 +22,7 @@ class DuelController extends Controller
         }
 
 
-        $players = Player::inRandomOrder()->limit(2)->get();
+        $players = Player::with('clubRel')->inRandomOrder()->limit(2)->get();
         if ($players->count() < 2) {
             return response()->json(['error' => 'Not enough players'], 422);
         }
@@ -49,16 +49,26 @@ class DuelController extends Controller
                     'name' => $players[0]->name,
                     'slug' => $players[0]->slug,
                     'country' => $players[0]->country,
-                    'club' => $players[0]->club,
+                    'club' => $players[0]->clubRel ? [
+                        'name' => $players[0]->clubRel->name,
+                        'color_primary' => $players[0]->clubRel->color_primary,
+                        'color_secondary' => $players[0]->clubRel->color_secondary,
+                    ] : null,
                     'position' => $players[0]->position,
+                    'number' => $players[0]->number,
                 ],
                 [
                     'id' => $players[1]->id,
                     'name' => $players[1]->name,
                     'slug' => $players[1]->slug,
                     'country' => $players[1]->country,
-                    'club' => $players[1]->club,
+                    'club' => $players[1]->clubRel ? [
+                        'name' => $players[1]->clubRel->name,
+                        'color_primary' => $players[1]->clubRel->color_primary,
+                        'color_secondary' => $players[1]->clubRel->color_secondary,
+                    ] : null,
                     'position' => $players[1]->position,
+                    'number' => $players[1]->number,
                 ],
             ],
             'duel_id' => $duel->id,

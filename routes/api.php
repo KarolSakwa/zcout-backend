@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AttributeController;
 use App\Http\Controllers\Api\DuelController;
 use App\Http\Controllers\Api\VoteController;
 use App\Services\RatingService;
+use App\Http\Controllers\Api\AttributeRankingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -49,3 +50,5 @@ Route::get('/ratings/demo', function (RatingService $svc) {
         'delta' => round($delta, 3),
     ];
 });
+Route::get('/attributes/{key}/ranking', [AttributeRankingController::class, 'index']);
+

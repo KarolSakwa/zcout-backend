@@ -15,7 +15,13 @@ class Player extends Model
         'country',
         'club',
         'position',
+        'club_id',
     ];
+
+    public function clubRel()
+    {
+        return $this->belongsTo(\App\Models\Club::class, 'club_id');
+    }
 
     protected static function booted()
     {
