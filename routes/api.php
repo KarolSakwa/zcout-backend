@@ -36,19 +36,6 @@ Route::get('/players/{player}', [PlayerController::class, 'show']);
 Route::get('/attributes', [AttributeController::class, 'index']);
 Route::get('/duels/next', [DuelController::class, 'next']);
 Route::post('/votes', [VoteController::class, 'store']);
-Route::get('/ratings/demo', function (RatingService $svc) {
-    [$newA, $newB, $delta] = $svc->updateRatingsFromDuel(
-        70.0, 70.0,   // ratingA, ratingB
-        'LW', 'LW',   // posA, posB
-        0.60,         // pA
-        100           // n
-    );
-
-    return [
-        'newA' => round($newA, 3),
-        'newB' => round($newB, 3),
-        'delta' => round($delta, 3),
-    ];
-});
+Route::post('/votes/direct', [VoteController::class, 'storeDirect']);
 Route::get('/attributes/{key}/ranking', [AttributeRankingController::class, 'index']);
 

@@ -11,28 +11,64 @@ use App\Models\Vote;
 use App\Services\RatingService;
 use App\Support\Seed;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class VoteController extends Controller
 {
     public function store(Request $request, RatingService $ratingService)
     {
-        $data = $request->validate([
+        $payload = $this->payload($request);
+
+        $v = Validator::make($payload, [
             'attribute_key' => ['required', 'string'],
-            'player_a_id'   => ['required', 'integer'],
-            'player_b_id'   => ['required', 'integer'],
-            'winner_id'     => ['required', 'integer'],
+            'player_a_id' => ['required', 'integer'],
+            'player_b_id' => ['required', 'integer', 'different:player_a_id'],
+            'winner_id' => ['required', 'integer'],
         ]);
 
-        $attribute = Attribute::where('key', $data['attribute_key'])->firstOrFail();
+        if ($v->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $v->errors(),
+            ], 422);
+        }
 
-        $playerA = min($data['player_a_id'], $data['player_b_id']);
-        $playerB = max($data['player_a_id'], $data['player_b_id']);
+        $data = $v->validated();
 
-        $duel = Duel::firstOrCreate([
-            'attribute_id' => $attribute->id,
-            'player_a_id'  => $playerA,
-            'player_b_id'  => $playerB,
-        ]);
+        $attribute = Attribute::query()
+            ->select('id', 'key')
+            ->where('key', $data['attribute_key'])
+            ->first();
+
+        if (!$attribute) {
+            return response()->json(['message' => 'Attribute not found.'], 404);
+        }
+
+        $reqA = (int) $data['player_a_id'];
+        $reqB = (int) $data['player_b_id'];
+        $winnerId = (int) $data['winner_id'];
+
+        if ($winnerId !== $reqA && $winnerId !== $reqB) {
+            return response()->json(['message' => 'winner_id must be one of the duel players.'], 422);
+        }
+
+        $playerA = min($reqA, $reqB);
+        $playerB = max($reqA, $reqB);
+
+        $players = Player::query()
+            ->select('id', 'position_id')
+            ->with(['positionRef:id,short_label'])
+            ->whereIn('id', [$playerA, $playerB])
+            ->get()
+            ->keyBy('id');
+
+        if (!isset($players[$playerA]) || !isset($players[$playerB])) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $posA = strtoupper((string) ($players[$playerA]->positionRef?->short_label ?? ''));
+        $posB = strtoupper((string) ($players[$playerB]->positionRef?->short_label ?? ''));
 
         $beforeRows = PlayerAttributeRating::query()
             ->where('attribute_id', $attribute->id)
@@ -40,42 +76,71 @@ class VoteController extends Controller
             ->get()
             ->keyBy('player_id');
 
-        $meta = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label'])
-            ->whereIn('id', [$playerA, $playerB])
-            ->get()
-            ->keyBy('id');
+        $beforeA = (float) ($beforeRows[$playerA]->rating ?? Seed::for($posA, $attribute->key));
+        $beforeB = (float) ($beforeRows[$playerB]->rating ?? Seed::for($posB, $attribute->key));
 
-        $seed = function (int $pid) use ($meta, $attribute): float {
-            $pos = strtoupper((string) ($meta[$pid]->positionRef?->short_label ?? ''));
-            $attrKey = strtoupper((string) $attribute->key);
-            return Seed::for($pos, $attrKey);
-        };
-
-        $before = [
-            $playerA => [
-                'rating'      => (float) ($beforeRows[$playerA]->rating ?? $seed($playerA)),
-                'votes_count' => (int) ($beforeRows[$playerA]->votes_count ?? 0),
-            ],
-            $playerB => [
-                'rating'      => (float) ($beforeRows[$playerB]->rating ?? $seed($playerB)),
-                'votes_count' => (int) ($beforeRows[$playerB]->votes_count ?? 0),
-            ],
-        ];
-
-        Vote::create([
-            'duel_id'    => $duel->id,
-            'winner_id'  => $data['winner_id'],
-            'voter_hash' => null,
+        $duel = Duel::firstOrCreate([
+            'attribute_id' => $attribute->id,
+            'player_a_id' => $playerA,
+            'player_b_id' => $playerB,
         ]);
 
-        $winnerId = (int) $data['winner_id'];
-        $loserId = $winnerId === (int) $data['player_a_id']
-            ? (int) $data['player_b_id']
-            : (int) $data['player_a_id'];
+        $loserId = $winnerId === $reqA ? $reqB : $reqA;
 
-        $ratingService->applyVote($winnerId, $loserId, $attribute->id);
+        $vote = null;
+        $afterA = $beforeA;
+        $afterB = $beforeB;
+
+        $voterHash = (string) ($request->header('X-Voter-Hash') ?? $request->ip());
+
+        DB::transaction(function () use (
+            $attribute,
+            $duel,
+            $playerA,
+            $playerB,
+            $winnerId,
+            $ratingService,
+            $loserId,
+            $beforeA,
+            $beforeB,
+            $voterHash,
+            &$vote,
+            &$afterA,
+            &$afterB
+        ) {
+            $vote = new Vote();
+            $vote->source = 'duel';
+            $vote->attribute_id = $attribute->id;
+            $vote->duel_id = $duel->id;
+            $vote->player_a_id = $playerA;
+            $vote->player_b_id = $playerB;
+            $vote->winner_id = $winnerId;
+            $vote->user_id = null;
+            $vote->voter_hash = $voterHash;
+            $vote->weight_applied = 1.0;
+            $vote->weight_version = 1;
+            $vote->reputation_at_vote = null;
+            $vote->risk_score_at_vote = null;
+            $vote->value = null;
+            $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
+            $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
+            $vote->save();
+
+            $ratingService->applyVote($winnerId, $loserId, $attribute->id);
+
+            $afterRows = PlayerAttributeRating::query()
+                ->where('attribute_id', $attribute->id)
+                ->whereIn('player_id', [$playerA, $playerB])
+                ->get()
+                ->keyBy('player_id');
+
+            $afterA = (float) ($afterRows[$playerA]->rating ?? $beforeA);
+            $afterB = (float) ($afterRows[$playerB]->rating ?? $beforeB);
+
+            $vote->post_rating_a = number_format($afterA, 3, '.', '');
+            $vote->post_rating_b = number_format($afterB, 3, '.', '');
+            $vote->save();
+        });
 
         $afterRows = PlayerAttributeRating::query()
             ->where('attribute_id', $attribute->id)
@@ -83,28 +148,100 @@ class VoteController extends Controller
             ->get()
             ->keyBy('player_id');
 
-        $players = [$playerA, $playerB];
+        $playersPayload = [];
+        foreach ([$playerA, $playerB] as $pid) {
+            $before = $pid === $playerA ? $beforeA : $beforeB;
+            $afterRow = $afterRows[$pid] ?? null;
+            $after = (float) ($afterRow?->rating ?? $before);
 
-        $payloadPlayers = array_map(function ($pid) use ($before, $afterRows, $seed) {
-            $afterRating  = (float) ($afterRows[$pid]->rating ?? $seed((int) $pid));
-            $afterVotes   = (int) ($afterRows[$pid]->votes_count ?? 0);
-            $beforeRating = (float) $before[$pid]['rating'];
-
-            return [
-                'id'            => (int) $pid,
-                'rating'        => $afterRating,
-                'rating_before' => $beforeRating,
-                'rating_after'  => $afterRating,
-                'delta'         => $afterRating - $beforeRating,
-                'votes_count'   => $afterVotes,
+            $playersPayload[] = [
+                'id' => (int) $pid,
+                'rating_before' => $before,
+                'rating_after' => $after,
+                'delta' => $after - $before,
+                'votes_count' => (int) ($afterRow?->votes_count ?? 0),
+                'weight_sum' => (float) ($afterRow?->weight_sum ?? 0),
+                'confidence' => (float) ($afterRow?->confidence ?? 0),
+                'last_vote_at' => $afterRow?->last_vote_at,
             ];
-        }, $players);
+        }
 
         return response()->json([
-            'id'           => null,
-            'duel_id'      => $duel->id,
+            'vote_id' => $vote?->id,
+            'duel_id' => $duel->id,
             'attribute_id' => $attribute->id,
-            'players'      => $payloadPlayers,
+            'players' => $playersPayload,
         ]);
+    }
+
+    public function storeDirect(Request $request)
+    {
+        $payload = $this->payload($request);
+
+        $v = Validator::make($payload, [
+            'attribute_key' => ['required', 'string'],
+            'player_id' => ['required', 'integer'],
+            'user_id' => ['required', 'integer'],
+            'value' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        if ($v->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $v->errors(),
+            ], 422);
+        }
+
+        $data = $v->validated();
+
+        $attribute = Attribute::query()
+            ->select('id', 'key')
+            ->where('key', $data['attribute_key'])
+            ->first();
+
+        if (!$attribute) {
+            return response()->json(['message' => 'Attribute not found.'], 404);
+        }
+
+        $vote = new Vote();
+        $vote->source = 'direct';
+        $vote->attribute_id = $attribute->id;
+        $vote->duel_id = null;
+        $vote->player_a_id = (int) $data['player_id'];
+        $vote->player_b_id = null;
+        $vote->winner_id = null;
+        $vote->user_id = (int) $data['user_id'];
+        $vote->voter_hash = null;
+        $vote->weight_applied = 1.0;
+        $vote->weight_version = 1;
+        $vote->reputation_at_vote = null;
+        $vote->risk_score_at_vote = null;
+        $vote->value = (int) $data['value'];
+        $vote->created_at = now();
+        $vote->save();
+
+        return response()->json([
+            'vote_id' => $vote->id,
+            'attribute_id' => $attribute->id,
+            'player_id' => (int) $data['player_id'],
+            'value' => (int) $data['value'],
+        ], 201);
+    }
+
+    private function payload(Request $request): array
+    {
+        $json = $request->json()->all();
+        if (is_array($json) && count($json) > 0) {
+            return $json;
+        }
+
+        $raw = $request->getContent();
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        $all = $request->all();
+        return is_array($all) ? $all : [];
     }
 }

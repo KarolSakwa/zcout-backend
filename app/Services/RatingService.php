@@ -20,24 +20,21 @@ class RatingService
         return strtoupper((string) $code);
     }
 
-    public function applyVote(int $winnerId, int $loserId, int $attributeId): array
+    public function applyVote(int $winnerId, int $loserId, int $attributeId, float $weight = 1.0): array
     {
         $attr = Attribute::select('id', 'key')->findOrFail($attributeId);
 
-        /** @var \App\Models\Player $winnerPlayer */
         $winnerPlayer = Player::query()
             ->select('id', 'position_id')
             ->with(['positionRef:id,short_label,key,label,group'])
             ->whereKey($winnerId)
             ->firstOrFail();
 
-        /** @var \App\Models\Player $loserPlayer */
         $loserPlayer = Player::query()
             ->select('id', 'position_id')
             ->with(['positionRef:id,short_label,key,label,group'])
             ->whereKey($loserId)
             ->firstOrFail();
-
 
         $winnerPos = strtoupper((string) ($winnerPlayer->positionRef?->short_label ?? ''));
         $loserPos  = strtoupper((string) ($loserPlayer->positionRef?->short_label ?? ''));
@@ -70,12 +67,21 @@ class RatingService
         $afterW = (float) ($updated['ratingA'] ?? $updated[0] ?? $beforeW);
         $afterL = (float) ($updated['ratingB'] ?? $updated[1] ?? $beforeL);
 
+        $weight = max(0.0, (float) $weight);
+        $now = now();
+
         $w->rating = $afterW;
         $w->votes_count = ((int) $w->votes_count) + 1;
+        $w->weight_sum = ((float) ($w->weight_sum ?? 0)) + $weight;
+        $w->confidence = min(100.0, round((float) $w->weight_sum, 2));
+        $w->last_vote_at = $now;
         $w->save();
 
         $l->rating = $afterL;
         $l->votes_count = ((int) $l->votes_count) + 1;
+        $l->weight_sum = ((float) ($l->weight_sum ?? 0)) + $weight;
+        $l->confidence = min(100.0, round((float) $l->weight_sum, 2));
+        $l->last_vote_at = $now;
         $l->save();
 
         Log::info('rating.applyVote.timing', [
@@ -83,9 +89,9 @@ class RatingService
             'loser_id' => $loserId,
             'attribute_id' => $attributeId,
             'n' => $n,
-
-            'kEff' => isset($updated['kEff']) ? round((float)$updated['kEff'], 6) : null,
-            'expectedA' => isset($updated['expectedA']) ? round((float)$updated['expectedA'], 6) : null,
+            'weight' => $weight,
+            'kEff' => isset($updated['kEff']) ? round((float) $updated['kEff'], 6) : null,
+            'expectedA' => isset($updated['expectedA']) ? round((float) $updated['expectedA'], 6) : null,
         ]);
 
         return [
