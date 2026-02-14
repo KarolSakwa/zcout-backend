@@ -1,180 +1,248 @@
 <?php
 
+$default = 65.0;
+
+$attrs = [
+    'acceleration','aggression','agility','anticipation','balance','bravery','composure','concentration',
+    'corners','crossing','decisions','determination','dribbling','finishing','first_touch','flair',
+    'free_kick_taking','heading','jumping_reach','leadership','long_shots','long_throws','marking',
+    'natural_fitness','off_the_ball','pace','passing','penalty_taking','positioning','stamina','strength',
+    'tackling','teamwork','technique','vision','work_rate',
+];
+
+$base = array_fill_keys($attrs, $default);
+
+$GK = array_merge($base, [
+    'pace' => 45, 'acceleration' => 48, 'agility' => 50, 'stamina' => 45, 'strength' => 55,
+    'dribbling' => 30, 'first_touch' => 38, 'passing' => 40, 'vision' => 38, 'crossing' => 30,
+    'finishing' => 25, 'long_shots' => 30, 'heading' => 30,
+    'tackling' => 30, 'marking' => 35, 'positioning' => 55,
+    'aggression' => 45, 'bravery' => 55, 'composure' => 65, 'concentration' => 70,
+    'decisions' => 66, 'determination' => 60, 'leadership' => 60, 'off_the_ball' => 35,
+    'teamwork' => 62, 'work_rate' => 60,
+
+    'anticipation' => 60,
+    'balance' => 48,
+    'corners' => 20,
+    'flair' => 20,
+    'free_kick_taking' => 20,
+    'jumping_reach' => 35,
+    'long_throws' => 60,
+    'natural_fitness' => 47,
+    'penalty_taking' => 20,
+    'technique' => 36,
+]);
+
+$CB = array_merge($base, [
+    'pace' => 60, 'acceleration' => 60, 'agility' => 58, 'stamina' => 62, 'strength' => 78,
+    'dribbling' => 45, 'first_touch' => 55, 'passing' => 58, 'vision' => 54, 'crossing' => 40,
+    'finishing' => 40, 'long_shots' => 45, 'heading' => 78,
+    'tackling' => 76, 'marking' => 78, 'positioning' => 78,
+    'aggression' => 70, 'bravery' => 75, 'composure' => 60, 'concentration' => 68,
+    'decisions' => 60, 'determination' => 65, 'leadership' => 62, 'off_the_ball' => 50,
+    'teamwork' => 62, 'work_rate' => 65,
+
+    'anticipation' => 64,
+    'balance' => 56,
+    'corners' => 35,
+    'flair' => 35,
+    'free_kick_taking' => 35,
+    'jumping_reach' => 80,
+    'long_throws' => 55,
+    'natural_fitness' => 64,
+    'penalty_taking' => 35,
+    'technique' => 53,
+]);
+
+$RB = array_merge($base, [
+    'pace' => 75, 'acceleration' => 77, 'agility' => 72, 'stamina' => 78, 'strength' => 65,
+    'dribbling' => 62, 'first_touch' => 62, 'passing' => 64, 'vision' => 60, 'crossing' => 68,
+    'finishing' => 45, 'long_shots' => 52, 'heading' => 55,
+    'tackling' => 70, 'marking' => 68, 'positioning' => 68,
+    'aggression' => 60, 'bravery' => 60, 'composure' => 62, 'concentration' => 64,
+    'decisions' => 62, 'determination' => 64, 'leadership' => 55, 'off_the_ball' => 62,
+    'teamwork' => 64, 'work_rate' => 72,
+
+    'anticipation' => 62,
+    'balance' => 70,
+    'corners' => 65,
+    'flair' => 55,
+    'free_kick_taking' => 45,
+    'jumping_reach' => 58,
+    'long_throws' => 70,
+    'natural_fitness' => 80,
+    'penalty_taking' => 45,
+    'technique' => 63,
+]);
+
+$LB = $RB;
+
+$DM = array_merge($base, [
+    'pace' => 66, 'acceleration' => 68, 'agility' => 66, 'stamina' => 76, 'strength' => 70,
+    'dribbling' => 60, 'first_touch' => 64, 'passing' => 68, 'vision' => 66, 'crossing' => 45,
+    'finishing' => 45, 'long_shots' => 56, 'heading' => 62,
+    'tackling' => 72, 'marking' => 70, 'positioning' => 72,
+    'aggression' => 60, 'bravery' => 65, 'composure' => 64, 'concentration' => 68,
+    'decisions' => 66, 'determination' => 66, 'leadership' => 58, 'off_the_ball' => 58,
+    'teamwork' => 66, 'work_rate' => 70,
+
+    'anticipation' => 66,
+    'balance' => 64,
+    'corners' => 40,
+    'flair' => 50,
+    'free_kick_taking' => 50,
+    'jumping_reach' => 65,
+    'long_throws' => 55,
+    'natural_fitness' => 78,
+    'penalty_taking' => 50,
+    'technique' => 64,
+]);
+
+$CM = array_merge($base, [
+    'pace' => 68, 'acceleration' => 70, 'agility' => 70, 'stamina' => 78, 'strength' => 68,
+    'dribbling' => 68, 'first_touch' => 70, 'passing' => 72, 'vision' => 72, 'crossing' => 48,
+    'finishing' => 58, 'long_shots' => 62, 'heading' => 58,
+    'tackling' => 64, 'marking' => 62, 'positioning' => 66,
+    'aggression' => 55, 'bravery' => 58, 'composure' => 66, 'concentration' => 64,
+    'decisions' => 68, 'determination' => 64, 'leadership' => 58, 'off_the_ball' => 62,
+    'teamwork' => 68, 'work_rate' => 66,
+
+    'anticipation' => 66,
+    'balance' => 68,
+    'corners' => 50,
+    'flair' => 60,
+    'free_kick_taking' => 60,
+    'jumping_reach' => 60,
+    'long_throws' => 50,
+    'natural_fitness' => 80,
+    'penalty_taking' => 55,
+    'technique' => 70,
+]);
+
+$RM = array_merge($base, [
+    'pace' => 76, 'acceleration' => 78, 'agility' => 76, 'stamina' => 78, 'strength' => 62,
+    'dribbling' => 72, 'first_touch' => 70, 'passing' => 68, 'vision' => 66, 'crossing' => 72,
+    'finishing' => 60, 'long_shots' => 60, 'heading' => 55,
+    'tackling' => 56, 'marking' => 54, 'positioning' => 56,
+    'aggression' => 55, 'bravery' => 55, 'composure' => 62, 'concentration' => 60,
+    'decisions' => 60, 'determination' => 62, 'leadership' => 52, 'off_the_ball' => 70,
+    'teamwork' => 64, 'work_rate' => 66,
+
+    'anticipation' => 60,
+    'balance' => 74,
+    'corners' => 70,
+    'flair' => 68,
+    'free_kick_taking' => 65,
+    'jumping_reach' => 55,
+    'long_throws' => 55,
+    'natural_fitness' => 80,
+    'penalty_taking' => 60,
+    'technique' => 70,
+]);
+
+$LM = $RM;
+
+$RW = array_merge($base, [
+    'pace' => 85, 'acceleration' => 86, 'agility' => 84, 'stamina' => 76, 'strength' => 60,
+    'dribbling' => 82, 'first_touch' => 78, 'passing' => 72, 'vision' => 72, 'crossing' => 75,
+    'finishing' => 68, 'long_shots' => 70, 'heading' => 55,
+    'tackling' => 50, 'marking' => 48, 'positioning' => 52,
+    'aggression' => 55, 'bravery' => 55, 'composure' => 64, 'concentration' => 58,
+    'decisions' => 60, 'determination' => 60, 'leadership' => 50, 'off_the_ball' => 78,
+    'teamwork' => 62, 'work_rate' => 64,
+
+    'anticipation' => 62,
+    'balance' => 82,
+    'corners' => 72,
+    'flair' => 78,
+    'free_kick_taking' => 70,
+    'jumping_reach' => 55,
+    'long_throws' => 45,
+    'natural_fitness' => 78,
+    'penalty_taking' => 62,
+    'technique' => 77,
+]);
+
+$LW = $RW;
+
+$AM = array_merge($base, [
+    'pace' => 74, 'acceleration' => 76, 'agility' => 78, 'stamina' => 74, 'strength' => 62,
+    'dribbling' => 78, 'first_touch' => 78, 'passing' => 78, 'vision' => 80, 'crossing' => 60,
+    'finishing' => 68, 'long_shots' => 70, 'heading' => 55,
+    'tackling' => 55, 'marking' => 52, 'positioning' => 56,
+    'aggression' => 55, 'bravery' => 55, 'composure' => 66, 'concentration' => 62,
+    'decisions' => 68, 'determination' => 62, 'leadership' => 54, 'off_the_ball' => 76,
+    'teamwork' => 64, 'work_rate' => 64,
+
+    'anticipation' => 68,
+    'balance' => 76,
+    'corners' => 60,
+    'flair' => 80,
+    'free_kick_taking' => 72,
+    'jumping_reach' => 56,
+    'long_throws' => 40,
+    'natural_fitness' => 76,
+    'penalty_taking' => 68,
+    'technique' => 78,
+]);
+
+$ST = array_merge($base, [
+    'pace' => 78, 'acceleration' => 80, 'agility' => 75, 'stamina' => 76, 'strength' => 78,
+    'dribbling' => 70, 'first_touch' => 70, 'passing' => 60, 'vision' => 60, 'crossing' => 45,
+    'finishing' => 84, 'long_shots' => 72, 'heading' => 78,
+    'tackling' => 48, 'marking' => 46, 'positioning' => 54,
+    'aggression' => 60, 'bravery' => 60, 'composure' => 66, 'concentration' => 56,
+    'decisions' => 58, 'determination' => 62, 'leadership' => 52, 'off_the_ball' => 80,
+    'teamwork' => 60, 'work_rate' => 64,
+
+    'anticipation' => 64,
+    'balance' => 73,
+    'corners' => 40,
+    'flair' => 65,
+    'free_kick_taking' => 62,
+    'jumping_reach' => 80,
+    'long_throws' => 35,
+    'natural_fitness' => 78,
+    'penalty_taking' => 78,
+    'technique' => 67,
+]);
+
+$avg = function (array ...$roles) use ($attrs): array {
+    $out = [];
+    foreach ($attrs as $k) {
+        $sum = 0.0;
+        $n = 0;
+        foreach ($roles as $r) {
+            if (array_key_exists($k, $r)) { $sum += (float) $r[$k]; $n++; }
+        }
+        $out[$k] = $n ? round($sum / $n, 2) : 65.0;
+    }
+    return $out;
+};
+
+$DEF = $avg($CB, $LB, $RB);
+$MID = $avg($DM, $CM, $AM, $LM, $RM);
+$ATT = $avg($LW, $RW, $ST);
+
 return [
-    'default_seed' => 65.0,
-
-    'attr_key_to_code' => [
-        // physical
-        'pace' => 'PAC',
-        'acceleration' => 'ACC',
-        'agility' => 'AGI',
-        'stamina' => 'STA',
-        'strength' => 'STR',
-
-        'dribbling' => 'DRI',
-        'first_touch' => 'FTO',
-        'passing' => 'PAS',
-        'vision' => 'VIS',
-        'crossing' => 'CRO',
-        'finishing' => 'FIN',
-        'long_shots' => 'LON',
-        'heading' => 'HEA',
-
-        'tackling' => 'TCK',
-        'marking' => 'MAR',
-        'positioning' => 'POS',
-        'interceptions' => 'INT',
-
-        'handling' => 'HAN',
-        'reflexes' => 'REF',
-        'one_on_ones' => 'ONE',
-        'kicking' => 'KIC',
-
-        'aggression' => 'AGR',
-        'bravery' => 'BRV',
-        'composure' => 'CMP',
-        'concentration' => 'CON',
-        'decisions' => 'DEC',
-        'determination' => 'DET',
-        'leadership' => 'LDR',
-        'off_the_ball' => 'OTB',
-        'teamwork' => 'TMW',
-        'work_rate' => 'WRK',
-    ],
-
-    'pos_aliases' => [
-        'ST' => 'STC',
-        'CF' => 'STC',
-        'AM' => 'AMC',
-        'CAM' => 'AMC',
-        'RW' => 'AMR',
-        'LW' => 'AML',
-        'RM' => 'MR',
-        'LM' => 'ML',
-        'CM' => 'MC',
-        'CDM' => 'DM',
-        'CB' => 'DC',
-        'RB' => 'DR',
-        'LB' => 'DL',
-        'RWB' => 'WBR',
-        'LWB' => 'WBL',
-    ],
-
+    'default_seed' => $default,
     'matrix' => [
-        "GK" => [
-            "PAC" => 45, "ACC" => 48, "AGI" => 50, "STA" => 45, "STR" => 55,
-            "DRI" => 30, "FTO" => 38, "PAS" => 40, "VIS" => 38, "CRO" => 30, "FIN" => 25, "LON" => 30, "HEA" => 30,
-            "TCK" => 30, "MAR" => 35, "POS" => 55, "INT" => 40,
-            "HAN" => 70, "REF" => 72, "ONE" => 70, "KIC" => 65,
-            "AGR" => 45, "BRV" => 55, "CMP" => 65, "CON" => 70, "DEC" => 66, "DET" => 60, "LDR" => 60, "OTB" => 35, "TMW" => 62, "WRK" => 60,
-        ],
-        "SW" => [
-            "PAC" => 58, "ACC" => 60, "AGI" => 58, "STA" => 62, "STR" => 75,
-            "DRI" => 45, "FTO" => 55, "PAS" => 60, "VIS" => 55, "CRO" => 40, "FIN" => 40, "LON" => 45, "HEA" => 78,
-            "TCK" => 75, "MAR" => 76, "POS" => 76, "INT" => 72,
-            "AGR" => 68, "BRV" => 74, "CMP" => 60, "CON" => 68, "DEC" => 60, "DET" => 65, "LDR" => 62, "OTB" => 50, "TMW" => 62, "WRK" => 65,
-        ],
-        "DC" => [
-            "PAC" => 60, "ACC" => 60, "AGI" => 58, "STA" => 62, "STR" => 78,
-            "DRI" => 45, "FTO" => 55, "PAS" => 58, "VIS" => 54, "CRO" => 40, "FIN" => 40, "LON" => 45, "HEA" => 78,
-            "TCK" => 76, "MAR" => 78, "POS" => 78, "INT" => 72,
-            "AGR" => 70, "BRV" => 75, "CMP" => 60, "CON" => 68, "DEC" => 60, "DET" => 65, "LDR" => 62, "OTB" => 50, "TMW" => 62, "WRK" => 65,
-        ],
-        "DCR" => [
-            "PAC" => 61, "ACC" => 61, "AGI" => 59, "STA" => 63, "STR" => 78,
-            "DRI" => 46, "FTO" => 55, "PAS" => 59, "VIS" => 55, "CRO" => 41, "FIN" => 40, "LON" => 46, "HEA" => 78,
-            "TCK" => 76, "MAR" => 78, "POS" => 78, "INT" => 73,
-            "AGR" => 70, "BRV" => 75, "CMP" => 60, "CON" => 68, "DEC" => 60, "DET" => 65, "LDR" => 62, "OTB" => 50, "TMW" => 62, "WRK" => 65,
-        ],
-        "DCL" => [
-            "PAC" => 61, "ACC" => 61, "AGI" => 59, "STA" => 63, "STR" => 78,
-            "DRI" => 46, "FTO" => 55, "PAS" => 59, "VIS" => 55, "CRO" => 41, "FIN" => 40, "LON" => 46, "HEA" => 78,
-            "TCK" => 76, "MAR" => 78, "POS" => 78, "INT" => 73,
-            "AGR" => 70, "BRV" => 75, "CMP" => 60, "CON" => 68, "DEC" => 60, "DET" => 65, "LDR" => 62, "OTB" => 50, "TMW" => 62, "WRK" => 65,
-        ],
-        "DR" => [
-            "PAC" => 75, "ACC" => 77, "AGI" => 72, "STA" => 78, "STR" => 65,
-            "DRI" => 62, "FTO" => 62, "PAS" => 64, "VIS" => 60, "CRO" => 68, "FIN" => 45, "LON" => 52, "HEA" => 55,
-            "TCK" => 70, "MAR" => 68, "POS" => 68, "INT" => 66,
-            "AGR" => 60, "BRV" => 60, "CMP" => 62, "CON" => 64, "DEC" => 62, "DET" => 64, "LDR" => 55, "OTB" => 62, "TMW" => 64, "WRK" => 72,
-        ],
-        "DL" => [
-            "PAC" => 75, "ACC" => 77, "AGI" => 72, "STA" => 78, "STR" => 65,
-            "DRI" => 62, "FTO" => 62, "PAS" => 64, "VIS" => 60, "CRO" => 68, "FIN" => 45, "LON" => 52, "HEA" => 55,
-            "TCK" => 70, "MAR" => 68, "POS" => 68, "INT" => 66,
-            "AGR" => 60, "BRV" => 60, "CMP" => 62, "CON" => 64, "DEC" => 62, "DET" => 64, "LDR" => 55, "OTB" => 62, "TMW" => 64, "WRK" => 72,
-        ],
-        "WBR" => [
-            "PAC" => 78, "ACC" => 80, "AGI" => 74, "STA" => 82, "STR" => 66,
-            "DRI" => 65, "FTO" => 64, "PAS" => 66, "VIS" => 62, "CRO" => 70, "FIN" => 48, "LON" => 54, "HEA" => 56,
-            "TCK" => 68, "MAR" => 66, "POS" => 66, "INT" => 66,
-            "AGR" => 60, "BRV" => 60, "CMP" => 62, "CON" => 64, "DEC" => 62, "DET" => 66, "LDR" => 55, "OTB" => 64, "TMW" => 66, "WRK" => 76,
-        ],
-        "WBL" => [
-            "PAC" => 78, "ACC" => 80, "AGI" => 74, "STA" => 82, "STR" => 66,
-            "DRI" => 65, "FTO" => 64, "PAS" => 66, "VIS" => 62, "CRO" => 70, "FIN" => 48, "LON" => 54, "HEA" => 56,
-            "TCK" => 68, "MAR" => 66, "POS" => 66, "INT" => 66,
-            "AGR" => 60, "BRV" => 60, "CMP" => 62, "CON" => 64, "DEC" => 62, "DET" => 66, "LDR" => 55, "OTB" => 64, "TMW" => 66, "WRK" => 76,
-        ],
-        "DM" => [
-            "PAC" => 66, "ACC" => 68, "AGI" => 66, "STA" => 76, "STR" => 70,
-            "DRI" => 60, "FTO" => 64, "PAS" => 68, "VIS" => 66, "CRO" => 45, "FIN" => 45, "LON" => 56, "HEA" => 62,
-            "TCK" => 72, "MAR" => 70, "POS" => 72, "INT" => 74,
-            "AGR" => 60, "BRV" => 65, "CMP" => 64, "CON" => 68, "DEC" => 66, "DET" => 66, "LDR" => 58, "OTB" => 58, "TMW" => 66, "WRK" => 70,
-        ],
-        "MC" => [
-            "PAC" => 68, "ACC" => 70, "AGI" => 70, "STA" => 78, "STR" => 68,
-            "DRI" => 68, "FTO" => 70, "PAS" => 72, "VIS" => 72, "CRO" => 48, "FIN" => 58, "LON" => 62, "HEA" => 58,
-            "TCK" => 64, "MAR" => 62, "POS" => 66, "INT" => 66,
-            "AGR" => 55, "BRV" => 58, "CMP" => 66, "CON" => 64, "DEC" => 68, "DET" => 64, "LDR" => 58, "OTB" => 62, "TMW" => 68, "WRK" => 66,
-        ],
-        "MCR" => [
-            "PAC" => 68, "ACC" => 70, "AGI" => 70, "STA" => 78, "STR" => 68,
-            "DRI" => 68, "FTO" => 70, "PAS" => 72, "VIS" => 72, "CRO" => 48, "FIN" => 58, "LON" => 62, "HEA" => 58,
-            "TCK" => 64, "MAR" => 62, "POS" => 66, "INT" => 66,
-            "AGR" => 55, "BRV" => 58, "CMP" => 66, "CON" => 64, "DEC" => 68, "DET" => 64, "LDR" => 58, "OTB" => 62, "TMW" => 68, "WRK" => 66,
-        ],
-        "MCL" => [
-            "PAC" => 68, "ACC" => 70, "AGI" => 70, "STA" => 78, "STR" => 68,
-            "DRI" => 68, "FTO" => 70, "PAS" => 72, "VIS" => 72, "CRO" => 48, "FIN" => 58, "LON" => 62, "HEA" => 58,
-            "TCK" => 64, "MAR" => 62, "POS" => 66, "INT" => 66,
-            "AGR" => 55, "BRV" => 58, "CMP" => 66, "CON" => 64, "DEC" => 68, "DET" => 64, "LDR" => 58, "OTB" => 62, "TMW" => 68, "WRK" => 66,
-        ],
-        "MR" => [
-            "PAC" => 76, "ACC" => 78, "AGI" => 76, "STA" => 78, "STR" => 62,
-            "DRI" => 72, "FTO" => 70, "PAS" => 68, "VIS" => 66, "CRO" => 72, "FIN" => 60, "LON" => 60, "HEA" => 55,
-            "TCK" => 56, "MAR" => 54, "POS" => 56, "INT" => 56,
-            "AGR" => 55, "BRV" => 55, "CMP" => 62, "CON" => 60, "DEC" => 60, "DET" => 62, "LDR" => 52, "OTB" => 70, "TMW" => 64, "WRK" => 66,
-        ],
-        "ML" => [
-            "PAC" => 76, "ACC" => 78, "AGI" => 76, "STA" => 78, "STR" => 62,
-            "DRI" => 72, "FTO" => 70, "PAS" => 68, "VIS" => 66, "CRO" => 72, "FIN" => 60, "LON" => 60, "HEA" => 55,
-            "TCK" => 56, "MAR" => 54, "POS" => 56, "INT" => 56,
-            "AGR" => 55, "BRV" => 55, "CMP" => 62, "CON" => 60, "DEC" => 60, "DET" => 62, "LDR" => 52, "OTB" => 70, "TMW" => 64, "WRK" => 66,
-        ],
-        "AMR" => [
-            "PAC" => 85, "ACC" => 86, "AGI" => 84, "STA" => 76, "STR" => 60,
-            "DRI" => 82, "FTO" => 78, "PAS" => 72, "VIS" => 72, "CRO" => 75, "FIN" => 68, "LON" => 70, "HEA" => 55,
-            "TCK" => 50, "MAR" => 48, "POS" => 52, "INT" => 52,
-            "AGR" => 55, "BRV" => 55, "CMP" => 64, "CON" => 58, "DEC" => 60, "DET" => 60, "LDR" => 50, "OTB" => 78, "TMW" => 62, "WRK" => 64,
-        ],
-        "AML" => [
-            "PAC" => 85, "ACC" => 86, "AGI" => 84, "STA" => 76, "STR" => 60,
-            "DRI" => 82, "FTO" => 78, "PAS" => 72, "VIS" => 72, "CRO" => 75, "FIN" => 68, "LON" => 70, "HEA" => 55,
-            "TCK" => 50, "MAR" => 48, "POS" => 52, "INT" => 52,
-            "AGR" => 55, "BRV" => 55, "CMP" => 64, "CON" => 58, "DEC" => 60, "DET" => 60, "LDR" => 50, "OTB" => 78, "TMW" => 62, "WRK" => 64,
-        ],
-        "AMC" => [
-            "PAC" => 74, "ACC" => 76, "AGI" => 78, "STA" => 74, "STR" => 62,
-            "DRI" => 78, "FTO" => 78, "PAS" => 78, "VIS" => 80, "CRO" => 60, "FIN" => 68, "LON" => 70, "HEA" => 55,
-            "TCK" => 55, "MAR" => 52, "POS" => 56, "INT" => 58,
-            "AGR" => 55, "BRV" => 55, "CMP" => 66, "CON" => 62, "DEC" => 68, "DET" => 62, "LDR" => 54, "OTB" => 76, "TMW" => 64, "WRK" => 64,
-        ],
-        "STC" => [
-            "PAC" => 78, "ACC" => 80, "AGI" => 75, "STA" => 76, "STR" => 78,
-            "DRI" => 70, "FTO" => 70, "PAS" => 60, "VIS" => 60, "CRO" => 45, "FIN" => 84, "LON" => 72, "HEA" => 78,
-            "TCK" => 48, "MAR" => 46, "POS" => 54, "INT" => 54,
-            "AGR" => 60, "BRV" => 60, "CMP" => 66, "CON" => 56, "DEC" => 58, "DET" => 62, "LDR" => 52, "OTB" => 80, "TMW" => 60, "WRK" => 64,
-        ],
+        'GK' => $GK,
+        'CB' => $CB,
+        'LB' => $LB,
+        'RB' => $RB,
+        'DEF' => $DEF,
+
+        'DM' => $DM,
+        'CM' => $CM,
+        'AM' => $AM,
+        'LM' => $LM,
+        'RM' => $RM,
+        'MID' => $MID,
+
+        'LW' => $LW,
+        'RW' => $RW,
+        'ST' => $ST,
+        'ATT' => $ATT,
     ],
 ];

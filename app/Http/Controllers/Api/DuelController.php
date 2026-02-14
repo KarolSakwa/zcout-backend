@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
-use App\Models\Player;
 use App\Models\Duel;
+use App\Models\Player;
 
 class DuelController extends Controller
 {
@@ -21,8 +21,17 @@ class DuelController extends Controller
             return response()->json(['error' => 'Unknown attribute'], 422);
         }
 
+        $players = Player::query()
+            ->select(['id', 'name', 'slug', 'number', 'club_id', 'country_id', 'position_id'])
+            ->with([
+                'clubRel:id,name,color_primary,color_secondary,color_tertiary',
+                'countryRef:id,name,iso2',
+                'positionRef:id,short_label,label,key',
+            ])
+            ->inRandomOrder()
+            ->limit(2)
+            ->get();
 
-        $players = Player::with('clubRel')->inRandomOrder()->limit(2)->get();
         if ($players->count() < 2) {
             return response()->json(['error' => 'Not enough players'], 422);
         }
@@ -32,9 +41,36 @@ class DuelController extends Controller
 
         $duel = Duel::firstOrCreate([
             'attribute_id' => $attribute->id,
-            'player_a_id' => $playerA,
-            'player_b_id' => $playerB,
+            'player_a_id'  => $playerA,
+            'player_b_id'  => $playerB,
         ]);
+
+        $toApi = function (Player $p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'slug' => $p->slug,
+                'number' => $p->number,
+
+                'position' => $p->positionRef?->short_label
+                    ?? $p->positionRef?->key
+                    ?? $p->positionRef?->label
+                    ?? null,
+
+                'country' => $p->countryRef ? [
+                    'id' => $p->countryRef->id,
+                    'name' => $p->countryRef->name,
+                    'iso2' => $p->countryRef->iso2,
+                ] : null,
+
+                'club' => $p->clubRel ? [
+                    'name' => $p->clubRel->name,
+                    'color_primary' => $p->clubRel->color_primary,
+                    'color_secondary' => $p->clubRel->color_secondary,
+                    'color_tertiary' => $p->clubRel->color_tertiary,
+                ] : null,
+            ];
+        };
 
         return response()->json([
             'attribute' => [
@@ -43,34 +79,7 @@ class DuelController extends Controller
                 'label' => $attribute->label,
                 'group' => $attribute->group,
             ],
-            'players' => [
-                [
-                    'id' => $players[0]->id,
-                    'name' => $players[0]->name,
-                    'slug' => $players[0]->slug,
-                    'country' => $players[0]->country,
-                    'club' => $players[0]->clubRel ? [
-                        'name' => $players[0]->clubRel->name,
-                        'color_primary' => $players[0]->clubRel->color_primary,
-                        'color_secondary' => $players[0]->clubRel->color_secondary,
-                    ] : null,
-                    'position' => $players[0]->position,
-                    'number' => $players[0]->number,
-                ],
-                [
-                    'id' => $players[1]->id,
-                    'name' => $players[1]->name,
-                    'slug' => $players[1]->slug,
-                    'country' => $players[1]->country,
-                    'club' => $players[1]->clubRel ? [
-                        'name' => $players[1]->clubRel->name,
-                        'color_primary' => $players[1]->clubRel->color_primary,
-                        'color_secondary' => $players[1]->clubRel->color_secondary,
-                    ] : null,
-                    'position' => $players[1]->position,
-                    'number' => $players[1]->number,
-                ],
-            ],
+            'players' => [$toApi($players[0]), $toApi($players[1])],
             'duel_id' => $duel->id,
         ]);
     }

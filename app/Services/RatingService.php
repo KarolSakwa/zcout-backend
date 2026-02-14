@@ -2,49 +2,96 @@
 
 namespace App\Services;
 
-use App\Models\PlayerAttributeRating;
+use App\Models\Attribute;
 use App\Models\Player;
+use App\Models\PlayerAttributeRating;
+use App\Support\Seed;
+use Illuminate\Support\Facades\Log;
 
 class RatingService
 {
-    public function applyVote(int $winnerId, int $loserId, int $attributeId): void
+    private function posCode(Player $p): string
     {
-        $winner = Player::findOrFail($winnerId);
-        $loser = Player::findOrFail($loserId);
+        $code = $p->positionRef?->short_label
+            ?? $p->positionRef?->key
+            ?? $p->positionRef?->label
+            ?? 'ST';
+
+        return strtoupper((string) $code);
+    }
+
+    public function applyVote(int $winnerId, int $loserId, int $attributeId): array
+    {
+        $attr = Attribute::select('id', 'key')->findOrFail($attributeId);
+
+        /** @var \App\Models\Player $winnerPlayer */
+        $winnerPlayer = Player::query()
+            ->select('id', 'position_id')
+            ->with(['positionRef:id,short_label,key,label,group'])
+            ->whereKey($winnerId)
+            ->firstOrFail();
+
+        /** @var \App\Models\Player $loserPlayer */
+        $loserPlayer = Player::query()
+            ->select('id', 'position_id')
+            ->with(['positionRef:id,short_label,key,label,group'])
+            ->whereKey($loserId)
+            ->firstOrFail();
+
+
+        $winnerPos = strtoupper((string) ($winnerPlayer->positionRef?->short_label ?? ''));
+        $loserPos  = strtoupper((string) ($loserPlayer->positionRef?->short_label ?? ''));
 
         $w = PlayerAttributeRating::firstOrCreate(
             ['player_id' => $winnerId, 'attribute_id' => $attributeId],
-            ['rating' => 50, 'votes_count' => 0]
+            ['rating' => Seed::for($winnerPos, $attr->key), 'votes_count' => 0]
         );
 
         $l = PlayerAttributeRating::firstOrCreate(
             ['player_id' => $loserId, 'attribute_id' => $attributeId],
-            ['rating' => 50, 'votes_count' => 0]
+            ['rating' => Seed::for($loserPos, $attr->key), 'votes_count' => 0]
         );
 
-        // n = liczba dotychczasowych głosów na ten atrybut dla tej pary (prosty MVP: min z obu)
-        $n = max(10, min($w->votes_count, $l->votes_count) + 1);
+        $beforeW = (float) $w->rating;
+        $beforeL = (float) $l->rating;
 
-        // pA w MVP: zwycięzca=1.0 (z czasem będzie z UI 0.55/0.60 itd.)
-        $pA = 0.99;
+        $n = ((int) $w->votes_count + (int) $l->votes_count) + 1;
 
-        [$newWinner, $newLoser] = $this->updateRatingsFromDuel(
-            (float) $w->rating,
-            (float) $l->rating,
-            $winner->position ?? 'LW',
-            $loser->position ?? 'LW',
-            $pA,
-            $n
+        $updated = $this->updateRatingsFromVote(
+            $beforeW,
+            $beforeL,
+            $winnerPos,
+            $loserPos,
+            1,
+            $n,
+            null
         );
 
-        $w->rating = (int) round($newWinner);
-        $l->rating = (int) round($newLoser);
+        $afterW = (float) ($updated['ratingA'] ?? $updated[0] ?? $beforeW);
+        $afterL = (float) ($updated['ratingB'] ?? $updated[1] ?? $beforeL);
 
-        $w->votes_count += 1;
-        $l->votes_count += 1;
-
+        $w->rating = $afterW;
+        $w->votes_count = ((int) $w->votes_count) + 1;
         $w->save();
+
+        $l->rating = $afterL;
+        $l->votes_count = ((int) $l->votes_count) + 1;
         $l->save();
+
+        Log::info('rating.applyVote.timing', [
+            'winner_id' => $winnerId,
+            'loser_id' => $loserId,
+            'attribute_id' => $attributeId,
+            'n' => $n,
+
+            'kEff' => isset($updated['kEff']) ? round((float)$updated['kEff'], 6) : null,
+            'expectedA' => isset($updated['expectedA']) ? round((float)$updated['expectedA'], 6) : null,
+        ]);
+
+        return [
+            'winner_seed_pos' => $winnerPos,
+            'loser_seed_pos'  => $loserPos,
+        ];
     }
 
     private function clamp(float $x, float $L, float $U): float
@@ -57,15 +104,90 @@ class RatingService
         return 1.0 / (1.0 + exp(-$z));
     }
 
+    private function logit(float $p): float
+    {
+        $eps = 1e-9;
+        $p = max($eps, min(1.0 - $eps, $p));
+        return log($p / (1.0 - $p));
+    }
+
     private function expectedProb(float $rA, float $rB, float $S_exp = 14.0): float
     {
-        // ΔR≈30 → E≈0.90
+        // ΔR≈30 → E≈0.90 (dla S_exp~14)
         return $this->sigmoid(($rA - $rB) / $S_exp);
+    }
+
+    private function posRange(string $pos): array
+    {
+        // MVP ranges
+        $map = [
+            'LW' => [50.0, 99.0], 'RW' => [50.0, 99.0], 'ST' => [40.0, 95.0],
+            'CM' => [35.0, 92.0], 'CB' => [10.0, 80.0], 'GK' => [5.0, 70.0],
+        ];
+
+        return $map[$pos] ?? [0.0, 99.0];
+    }
+
+    public function updateRatingsFromVote(
+        float $ratingA,
+        float $ratingB,
+        string $posA,
+        string $posB,
+        int $scoreA,
+        int $n,
+        ?float $pCrowdA = null
+    ): array {
+        $Sexp = 14.0;
+
+        // K schedule: małe przy dużym n, większe przy małym n
+        // Kalibracja: przy n~1000 K~0.095 => majority win ~0.014, upset ~0.08 (dla 85/15)
+        $K0   = 3.0;
+        $n0   = 5.0;
+        $kMin = 0.02;
+        $kMax = 1.50;
+
+        $nn = max(1, $n);
+        $kEff = $K0 / sqrt($nn + $n0);
+        $kEff = $this->clamp($kEff, $kMin, $kMax);
+
+        $E = $this->expectedProb($ratingA, $ratingB, $Sexp);
+
+        // klasyczny Elo krok (symetryczny)
+        $delta = $kEff * ((float)$scoreA - $E);
+
+        // update różnicy przy stałej średniej
+        $Dold = $ratingA - $ratingB;
+        $Dnew = $Dold + (2.0 * $delta); // bo ratingA += delta, ratingB -= delta => gap rośnie o 2*delta
+        $mean = 0.5 * ($ratingA + $ratingB);
+
+        [$L_A, $U_A] = $this->posRange($posA);
+        [$L_B, $U_B] = $this->posRange($posB);
+
+        $newA = $this->clamp($mean + 0.5 * $Dnew, $L_A, $U_A);
+        $newB = $this->clamp($mean - 0.5 * $Dnew, $L_B, $U_B);
+
+        $gapTarget = null;
+        if ($pCrowdA !== null) {
+            $gapTarget = $Sexp * $this->logit($pCrowdA);
+        }
+
+        return [
+            0 => $newA,
+            1 => $newB,
+            2 => (2.0 * $delta), // delta gap (żeby było czytelne w logach/symulatorze)
+            'ratingA' => $newA,
+            'ratingB' => $newB,
+            'deltaChange' => (2.0 * $delta),
+            'kEff' => $kEff,
+            'expectedA' => $E,
+            'gapBefore' => $Dold,
+            'gapAfter' => $Dnew,
+            'gapTarget' => $gapTarget,
+        ];
     }
 
     private function kappaGap(float $gap, float $rK = 8.0, float $betaK = 2.0): float
     {
-        // 0..1
         $x = pow($gap / $rK, $betaK);
         return $x / (1.0 + $x);
     }
@@ -97,21 +219,6 @@ class RatingService
         return max($floor, $val);
     }
 
-    private function posRange(string $pos): array
-    {
-        // MVP ranges
-        $map = [
-            'LW' => [50.0, 99.0], 'RW' => [50.0, 99.0], 'ST' => [40.0, 95.0],
-            'CM' => [35.0, 92.0], 'CB' => [10.0, 80.0], 'GK' => [5.0, 70.0],
-        ];
-
-        return $map[$pos] ?? [0.0, 99.0];
-    }
-
-    /**
-     * Port 1:1 z Python update_ratings_from_duel().
-     * Zwraca: [newA, newB, deltaChange]
-     */
     public function updateRatingsFromDuel(
         float $ratingA,
         float $ratingB,
@@ -120,7 +227,6 @@ class RatingService
         float $pA,
         int $n
     ): array {
-        // domyślne gałki jak w Pythonie
         $S0 = 45.0; $r0 = 10.0; $beta = 1.2;
         $capMin = 6.0; $capMax = 16.0; $capAlpha = 1.2; $L0Surprise = 2.0;
 
@@ -130,7 +236,6 @@ class RatingService
 
         $q0 = 60.0; $rQ = 10.0; $betaQ = 1.5;
 
-        // 1) logity: surowy i oczekiwany
         $eps = 1e-9;
         $pA_c = max($eps, min(1.0 - $eps, $pA));
         $rawLog = log($pA_c / (1.0 - $pA_c));
@@ -139,34 +244,27 @@ class RatingService
         $E_c = max($eps, min(1.0 - $eps, $E));
         $expLog = log($E_c / (1.0 - $E_c));
 
-        // 2) odejmowanie oczekiwań wg luki
         $gap = abs($ratingA - $ratingB);
         $kappa = $this->kappaGap($gap, $rK, $betaK) * $expectKBase;
         $logEff = $rawLog - $kappa * $expLog;
 
-        // 3) skala i cap zależne od luki
         $wScale = 1.0 / (1.0 + pow($gap / $r0, $beta));
         $Seff = $S0 * $wScale;
         $capBase = $capMin + ($capMax - $capMin) * $wScale;
 
-        // 3b) opponent-quality damping
         $rOpp = ($pA >= 0.5) ? $ratingB : $ratingA;
         $mOpp = $this->oppQualityMultiplier($rOpp, $q0, $rQ, $betaQ);
         $Seff *= $mOpp;
         $capBase *= $mOpp;
 
-        // 4) cap z boostem „szoku”
         $s = $this->surpriseStrength($rawLog, $expLog, $L0Surprise);
         $cap = $capBase * (1.0 + $capAlpha * $s);
 
-        // 5) tłumiki n
         $deltaChange = $Seff * $logEff * $this->fSqrt($n, $C) * $this->fBlocks($n, $aBlocks, $floorBlocks);
 
-        // 6) cap symetryczny
         if ($deltaChange > $cap) $deltaChange = $cap;
         if ($deltaChange < -$cap) $deltaChange = -$cap;
 
-        // 7) addytywny update różnicy i finalne ratingi (z widełkami pozycyjnymi)
         $Dold = $ratingA - $ratingB;
         $Dnew = $Dold + $deltaChange;
         $mean = 0.5 * ($ratingA + $ratingB);

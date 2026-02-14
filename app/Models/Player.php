@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class Player extends Model
@@ -18,9 +19,19 @@ class Player extends Model
         'club_id',
     ];
 
-    public function clubRel()
+    public function clubRel(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Club::class, 'club_id');
+        return $this->belongsTo(Club::class, 'club_id', 'id');
+    }
+
+    public function countryRef(): BelongsTo
+    {
+        return $this->belongsTo(Country::class, 'country_id', 'id');
+    }
+
+    public function positionRef(): BelongsTo
+    {
+        return $this->belongsTo(Position::class, 'position_id', 'id');
     }
 
     protected static function booted()
