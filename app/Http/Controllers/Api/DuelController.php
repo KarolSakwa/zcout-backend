@@ -23,68 +23,24 @@ class DuelController extends Controller
         }
 
         $cfg = config('zcout_matchmaking', []);
-        $debug = (string) request('debug') === '1';
+        $mm = $this->resolveMatchmakingInputs($cfg);
 
-        $longTailShare = (float) ($cfg['long_tail_share'] ?? 0.0);
+        $debug = $mm['debug'];
+        $useLongTail = $mm['use_long_tail'];
 
-        $mix = $cfg['duel_mix'] ?? [
-                'positional' => 0.55,
-                'close' => 0.30,
-                'medium' => 0.10,
-                'obvious' => 0.05,
-            ];
+        $category = $mm['category'];
+        $positionScope = $mm['position_scope'];
+        $positionalMode = $mm['positional_mode'];
 
-        $posMix = $cfg['position_mix'] ?? [
-                'same_pos' => 0.70,
-                'same_line' => 0.25,
-                'any' => 0.05,
-            ];
+        $positionalAdjacent = $mm['positional_adjacent'];
+        $positionalSides = $mm['positional_sides'];
+        $gaps = $mm['rating_gap'];
 
-        $positionalMix = $cfg['positional_mix'] ?? [
-                'exact' => 0.30,
-                'adjacent' => 0.50,
-                'same_side' => 0.15,
-                'any' => 0.05,
-            ];
+        $repPow = $mm['rep_pow'];
+        $needPow = $mm['need_pow'];
 
-        $positionalAdjacent = $cfg['positional_adjacent'] ?? [];
-
-        $positionalSides = $cfg['positional_sides'] ?? [
-                'def' => ['GK','CB','LB','RB','LWB','RWB','WB','DM'],
-                'off' => ['CM','AM','LM','RM','LW','RW','ST','CF'],
-            ];
-
-        $gaps = $cfg['rating_gap'] ?? [
-                'close_max' => 6,
-                'medium_min' => 7,
-                'medium_max' => 16,
-                'obvious_min' => 25,
-            ];
-
-        $repPow = (float) (($cfg['weights']['rep_pow'] ?? 1.0));
-        $needPow = (float) (($cfg['weights']['need_pow'] ?? 1.2));
-
-        $requestedCategory = request('category');
-        $category = in_array($requestedCategory, ['positional', 'close', 'medium', 'obvious'], true)
-            ? $requestedCategory
-            : $this->rollFromMix($mix, 'positional', ['positional', 'close', 'medium', 'obvious']);
-
-        $requestedPool = request('pool');
-        $useLongTail = $requestedPool === 'long_tail' || !($requestedPool === 'normal') && $this->rollBool($longTailShare);
-
-        $requestedScope = request('position_scope');
-        if ($category === 'obvious') {
-            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true) ? $requestedScope : 'any';
-        } else {
-            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true)
-                ? $requestedScope
-                : $this->rollFromMix($posMix, 'same_pos', ['same_pos', 'same_line', 'any']);
-        }
-
-        $requestedPositionalMode = request('positional_mode');
-        $positionalMode = in_array($requestedPositionalMode, ['exact', 'adjacent', 'same_side', 'any'], true)
-            ? $requestedPositionalMode
-            : $this->rollFromMix($positionalMix, 'adjacent', ['exact', 'adjacent', 'same_side', 'any']);
+        $requested = $mm['requested'];
+        $picked = $mm['picked'];
 
         $rows = DB::table('players as p')
             ->join('player_reputation_stats as prs', 'prs.player_id', '=', 'p.id')
@@ -95,7 +51,7 @@ class DuelController extends Controller
             })
             ->where('prs.is_long_tail', '=', $useLongTail)
             ->whereNotNull('p.position_id')
-            ->selectRaw('p.id, pos.short_label as pos_short, prs.player_rep, COALESCE(par.confidence, 0) as attr_confidence, par.rating as attr_rating, COALESCE(prs.fpl_now_cost, 0) as fpl_cost, COALESCE(prs.fpl_selected_by_percent, 0) as fpl_sel')
+            ->selectRaw('p.id, pos.short_label as pos_short, prs.player_rep, (COALESCE(par.confidence, 0) / 100.0) as attr_confidence, par.rating as attr_rating, COALESCE(prs.fpl_now_cost, 0) as fpl_cost, COALESCE(prs.fpl_selected_by_percent, 0) as fpl_sel')
             ->get();
 
         if ($rows->count() < 2) {
@@ -406,19 +362,8 @@ class DuelController extends Controller
 
         if ($debug) {
             $payload['debug'] = [
-                'requested' => [
-                    'attribute' => $requestedAttr,
-                    'category' => $requestedCategory,
-                    'pool' => $requestedPool,
-                    'position_scope' => $requestedScope,
-                    'positional_mode' => $requestedPositionalMode,
-                ],
-                'picked' => [
-                    'category' => $selectedCategory,
-                    'pool' => $useLongTail ? 'long_tail' : 'normal',
-                    'position_scope' => $selectedCategory === 'positional' ? null : $selectedScope,
-                    'positional_mode' => $selectedCategory === 'positional' ? $selectedPositionalMode : null,
-                ],
+                'requested' => $requested,
+                'picked' => $picked,
                 'fallbacks' => $fallbacks,
                 'tries_used' => $triesUsed,
                 'player_a' => [
@@ -770,4 +715,101 @@ class DuelController extends Controller
 
         return $out;
     }
+
+    private function resolveMatchmakingInputs(array $cfg): array
+    {
+        $debug = (string) request('debug') === '1';
+
+        $longTailShare = (float) ($cfg['long_tail_share'] ?? 0.0);
+
+        $mix = $cfg['duel_mix'] ?? [
+                'positional' => 0.55,
+                'close' => 0.30,
+                'medium' => 0.10,
+                'obvious' => 0.05,
+            ];
+
+        $posMix = $cfg['position_mix'] ?? [
+                'same_pos' => 0.70,
+                'same_line' => 0.25,
+                'any' => 0.05,
+            ];
+
+        $positionalMix = $cfg['positional_mix'] ?? [
+                'exact' => 0.30,
+                'adjacent' => 0.50,
+                'same_side' => 0.15,
+                'any' => 0.05,
+            ];
+
+        $positionalAdjacent = $cfg['positional_adjacent'] ?? [];
+
+        $positionalSides = $cfg['positional_sides'] ?? [
+                'def' => ['GK','CB','LB','RB','LWB','RWB','WB','DM'],
+                'off' => ['CM','AM','LM','RM','LW','RW','ST','CF'],
+            ];
+
+        $gaps = $cfg['rating_gap'] ?? [
+                'close_max' => 6,
+                'medium_min' => 7,
+                'medium_max' => 16,
+                'obvious_min' => 25,
+            ];
+
+        $repPow = (float) ($cfg['weights']['rep_pow'] ?? 1.0);
+        $needPow = (float) ($cfg['weights']['need_pow'] ?? 1.2);
+
+        $requestedCategory = request('category');
+        $category = in_array($requestedCategory, ['positional', 'close', 'medium', 'obvious'], true)
+            ? $requestedCategory
+            : $this->rollFromMix($mix, 'positional', ['positional', 'close', 'medium', 'obvious']);
+
+        $requestedPool = request('pool');
+        $useLongTail = $requestedPool === 'long_tail' || !($requestedPool === 'normal') && $this->rollBool($longTailShare);
+
+        $requestedScope = request('position_scope');
+        if ($category === 'obvious') {
+            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true) ? $requestedScope : 'any';
+        } else {
+            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true)
+                ? $requestedScope
+                : $this->rollFromMix($posMix, 'same_pos', ['same_pos', 'same_line', 'any']);
+        }
+
+        $requestedPositionalMode = request('positional_mode');
+        $positionalMode = in_array($requestedPositionalMode, ['exact', 'adjacent', 'same_side', 'any'], true)
+            ? $requestedPositionalMode
+            : $this->rollFromMix($positionalMix, 'adjacent', ['exact', 'adjacent', 'same_side', 'any']);
+
+        return [
+            'debug' => $debug,
+            'use_long_tail' => $useLongTail,
+
+            'category' => $category,
+            'position_scope' => $positionScope,
+            'positional_mode' => $positionalMode,
+
+            'positional_adjacent' => $positionalAdjacent,
+            'positional_sides' => $positionalSides,
+            'rating_gap' => $gaps,
+
+            'rep_pow' => $repPow,
+            'need_pow' => $needPow,
+
+            'requested' => [
+                'attribute' => request('attribute'),
+                'category' => $requestedCategory,
+                'pool' => $requestedPool,
+                'position_scope' => $requestedScope,
+                'positional_mode' => $requestedPositionalMode,
+            ],
+            'picked' => [
+                'category' => $category,
+                'pool' => $useLongTail ? 'long_tail' : 'normal',
+                'position_scope' => $category === 'positional' ? null : $positionScope,
+                'positional_mode' => $category === 'positional' ? $positionalMode : null,
+            ],
+        ];
+    }
+
 }

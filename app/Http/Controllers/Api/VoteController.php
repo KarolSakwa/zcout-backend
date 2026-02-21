@@ -166,11 +166,30 @@ class VoteController extends Controller
             ];
         }
 
+        $pop = DB::table('votes')
+            ->select('winner_id', DB::raw('COUNT(*) as c'))
+            ->where('duel_id', $duel->id)
+            ->whereIn('winner_id', [$reqA, $reqB])
+            ->groupBy('winner_id')
+            ->pluck('c', 'winner_id');
+
+        $votesA = (int) ($pop[$reqA] ?? 0);
+        $votesB = (int) ($pop[$reqB] ?? 0);
+        $votesTotal = $votesA + $votesB;
+
         return response()->json([
             'vote_id' => $vote?->id,
             'duel_id' => $duel->id,
             'attribute_id' => $attribute->id,
             'players' => $playersPayload,
+            'popularity' => [
+                'player_a_id' => $reqA,
+                'player_b_id' => $reqB,
+                'votes_a' => $votesA,
+                'votes_b' => $votesB,
+                'votes_total' => $votesTotal,
+            ],
+
         ]);
     }
 
