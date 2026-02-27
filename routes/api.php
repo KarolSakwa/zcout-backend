@@ -38,3 +38,19 @@ Route::get('/rankings/{attributeKey}', [RankingController::class, 'attribute']);
 
 Route::get('/database/clubs', [DatabaseController::class, 'clubs']);
 Route::get('/database/clubs/{slug}', [DatabaseController::class, 'club']);
+
+Route::middleware('auth:sanctum')->post('/auth/claim-anon', function (\Illuminate\Http\Request $request) {
+    $anonId = trim((string) $request->header('X-Zcout-Anon'));
+    if ($anonId === '') {
+        return response()->json(['message' => 'Missing X-Zcout-Anon header.'], 422);
+    }
+
+    $voterHash = hash_hmac('sha256', $anonId, (string) config('app.key'));
+
+    $claimed = \Illuminate\Support\Facades\DB::table('votes')
+        ->whereNull('user_id')
+        ->where('voter_hash', $voterHash)
+        ->update(['user_id' => $request->user()->id]);
+
+    return response()->json(['claimed' => (int) $claimed]);
+});

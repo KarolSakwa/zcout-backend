@@ -91,7 +91,12 @@ class VoteController extends Controller
         $afterA = $beforeA;
         $afterB = $beforeB;
 
-        $voterHash = (string) ($request->header('X-Voter-Hash') ?? $request->ip());
+        $currentUserId = auth()->id();
+
+        $anonId = trim((string) $request->header('X-Zcout-Anon'));
+        $voterHash = $anonId !== ''
+            ? hash_hmac('sha256', $anonId, (string) config('app.key'))
+            : (string) ($request->header('X-Voter-Hash') ?? $request->ip());
 
         DB::transaction(function () use (
             $attribute,
@@ -106,7 +111,8 @@ class VoteController extends Controller
             $voterHash,
             &$vote,
             &$afterA,
-            &$afterB
+            &$afterB,
+            $currentUserId
         ) {
             $vote = new Vote();
             $vote->source = 'duel';
@@ -115,7 +121,7 @@ class VoteController extends Controller
             $vote->player_a_id = $playerA;
             $vote->player_b_id = $playerB;
             $vote->winner_id = $winnerId;
-            $vote->user_id = null;
+            $vote->user_id = $currentUserId;
             $vote->voter_hash = $voterHash;
             $vote->weight_applied = 1.0;
             $vote->weight_version = 1;
