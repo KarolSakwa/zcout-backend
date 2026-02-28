@@ -92,61 +92,83 @@ class VoteController extends Controller
         $afterB = $beforeB;
 
         $currentUserId = auth()->id();
+        $isAuthed = $currentUserId !== null;
+
+        $ratingWeight = $isAuthed ? 1.0 : 0.5;
+        $confidenceWeight = $isAuthed ? 1.0 : 0.1;
 
         $anonId = trim((string) $request->header('X-Zcout-Anon'));
-        $voterHash = $anonId !== ''
-            ? hash_hmac('sha256', $anonId, (string) config('app.key'))
-            : (string) ($request->header('X-Voter-Hash') ?? $request->ip());
 
-        DB::transaction(function () use (
-            $attribute,
-            $duel,
-            $playerA,
-            $playerB,
-            $winnerId,
-            $ratingService,
-            $loserId,
-            $beforeA,
-            $beforeB,
-            $voterHash,
-            &$vote,
-            &$afterA,
-            &$afterB,
-            $currentUserId
-        ) {
-            $vote = new Vote();
-            $vote->source = 'duel';
-            $vote->attribute_id = $attribute->id;
-            $vote->duel_id = $duel->id;
-            $vote->player_a_id = $playerA;
-            $vote->player_b_id = $playerB;
-            $vote->winner_id = $winnerId;
-            $vote->user_id = $currentUserId;
-            $vote->voter_hash = $voterHash;
-            $vote->weight_applied = 1.0;
-            $vote->weight_version = 1;
-            $vote->reputation_at_vote = null;
-            $vote->risk_score_at_vote = null;
-            $vote->value = null;
-            $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
-            $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
-            $vote->save();
+        if (!$isAuthed && $anonId === '') {
+            return response()->json([
+                'message' => 'Missing X-Zcout-Anon header.',
+            ], 400);
+        }
 
-            $ratingService->applyVote($winnerId, $loserId, $attribute->id);
+        $voterHash = hash_hmac('sha256', $anonId, (string) config('app.key'));
 
-            $afterRows = PlayerAttributeRating::query()
-                ->where('attribute_id', $attribute->id)
-                ->whereIn('player_id', [$playerA, $playerB])
-                ->get()
-                ->keyBy('player_id');
+        try {
+            DB::transaction(function () use (
+                $attribute,
+                $duel,
+                $playerA,
+                $playerB,
+                $winnerId,
+                $ratingService,
+                $loserId,
+                $beforeA,
+                $beforeB,
+                $voterHash,
+                &$vote,
+                &$afterA,
+                &$afterB,
+                $currentUserId,
+                $ratingWeight,
+                $confidenceWeight
+            ) {
+                $vote = new Vote();
+                $vote->source = 'duel';
+                $vote->attribute_id = $attribute->id;
+                $vote->duel_id = $duel->id;
+                $vote->player_a_id = $playerA;
+                $vote->player_b_id = $playerB;
+                $vote->winner_id = $winnerId;
+                $vote->user_id = $currentUserId;
+                $vote->voter_hash = $voterHash;
+                $vote->weight_applied = $ratingWeight;
+                $vote->confidence_weight_applied = $confidenceWeight;
+                $vote->weight_version = 1;
+                $vote->reputation_at_vote = null;
+                $vote->risk_score_at_vote = null;
+                $vote->value = null;
+                $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
+                $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
+                $vote->save();
 
-            $afterA = (float) ($afterRows[$playerA]->rating ?? $beforeA);
-            $afterB = (float) ($afterRows[$playerB]->rating ?? $beforeB);
+                $ratingService->applyVote($winnerId, $loserId, $attribute->id, $ratingWeight, $confidenceWeight);
 
-            $vote->post_rating_a = number_format($afterA, 3, '.', '');
-            $vote->post_rating_b = number_format($afterB, 3, '.', '');
-            $vote->save();
-        });
+                $afterRows = PlayerAttributeRating::query()
+                    ->where('attribute_id', $attribute->id)
+                    ->whereIn('player_id', [$playerA, $playerB])
+                    ->get()
+                    ->keyBy('player_id');
+
+                $afterA = (float) ($afterRows[$playerA]->rating ?? $beforeA);
+                $afterB = (float) ($afterRows[$playerB]->rating ?? $beforeB);
+
+                $vote->post_rating_a = number_format($afterA, 3, '.', '');
+                $vote->post_rating_b = number_format($afterB, 3, '.', '');
+                $vote->save();
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            $msg = (string) $e->getMessage();
+            if (stripos($msg, 'votes_unique_duel_voterhash') !== false) {
+                return response()->json([
+                    'message' => 'You already voted on this duel.',
+                ], 409);
+            }
+            throw $e;
+        }
 
         $afterRows = PlayerAttributeRating::query()
             ->where('attribute_id', $attribute->id)
@@ -195,7 +217,6 @@ class VoteController extends Controller
                 'votes_b' => $votesB,
                 'votes_total' => $votesTotal,
             ],
-
         ]);
     }
 
@@ -206,7 +227,6 @@ class VoteController extends Controller
         $v = Validator::make($payload, [
             'attribute_key' => ['required', 'string'],
             'player_id' => ['required', 'integer'],
-            'user_id' => ['required', 'integer'],
             'value' => ['required', 'integer', 'min:0', 'max:100'],
         ]);
 
@@ -235,9 +255,10 @@ class VoteController extends Controller
         $vote->player_a_id = (int) $data['player_id'];
         $vote->player_b_id = null;
         $vote->winner_id = null;
-        $vote->user_id = (int) $data['user_id'];
+        $vote->user_id = auth()->id();
         $vote->voter_hash = null;
         $vote->weight_applied = 1.0;
+        $vote->confidence_weight_applied = 1.0;
         $vote->weight_version = 1;
         $vote->reputation_at_vote = null;
         $vote->risk_score_at_vote = null;

@@ -20,7 +20,7 @@ class RatingService
         return strtoupper((string) $code);
     }
 
-    public function applyVote(int $winnerId, int $loserId, int $attributeId, float $weight = 1.0): array
+    public function applyVote(int $winnerId, int $loserId, int $attributeId, float $ratingWeight = 1.0, float $confidenceWeight = 1.0): array
     {
         $attr = Attribute::select('id', 'key')->findOrFail($attributeId);
 
@@ -54,6 +54,9 @@ class RatingService
 
         $n = ((int) $w->votes_count + (int) $l->votes_count) + 1;
 
+        $ratingWeight = max(0.0, (float) $ratingWeight);
+        $confidenceWeight = max(0.0, (float) $confidenceWeight);
+
         $updated = $this->updateRatingsFromVote(
             $beforeW,
             $beforeL,
@@ -61,26 +64,26 @@ class RatingService
             $loserPos,
             1,
             $n,
-            null
+            null,
+            $ratingWeight
         );
 
         $afterW = (float) ($updated['ratingA'] ?? $updated[0] ?? $beforeW);
         $afterL = (float) ($updated['ratingB'] ?? $updated[1] ?? $beforeL);
 
-        $weight = max(0.0, (float) $weight);
         $now = now();
 
         $w->rating = $afterW;
         $w->votes_count = ((int) $w->votes_count) + 1;
-        $w->weight_sum = ((float) ($w->weight_sum ?? 0)) + $weight;
-        $w->confidence = min(100.0, round((float) $w->weight_sum, 2));
+        $w->weight_sum = ((float) ($w->weight_sum ?? 0)) + $ratingWeight;
+        $w->confidence = min(100.0, round(((float) ($w->confidence ?? 0)) + $confidenceWeight, 2));
         $w->last_vote_at = $now;
         $w->save();
 
         $l->rating = $afterL;
         $l->votes_count = ((int) $l->votes_count) + 1;
-        $l->weight_sum = ((float) ($l->weight_sum ?? 0)) + $weight;
-        $l->confidence = min(100.0, round((float) $l->weight_sum, 2));
+        $l->weight_sum = ((float) ($l->weight_sum ?? 0)) + $ratingWeight;
+        $l->confidence = min(100.0, round(((float) ($l->confidence ?? 0)) + $confidenceWeight, 2));
         $l->last_vote_at = $now;
         $l->save();
 
@@ -89,7 +92,8 @@ class RatingService
             'loser_id' => $loserId,
             'attribute_id' => $attributeId,
             'n' => $n,
-            'weight' => $weight,
+            'ratingWeight' => $ratingWeight,
+            'confidenceWeight' => $confidenceWeight,
             'kEff' => isset($updated['kEff']) ? round((float) $updated['kEff'], 6) : null,
             'expectedA' => isset($updated['expectedA']) ? round((float) $updated['expectedA'], 6) : null,
         ]);
@@ -97,6 +101,64 @@ class RatingService
         return [
             'winner_seed_pos' => $winnerPos,
             'loser_seed_pos'  => $loserPos,
+        ];
+    }
+
+    public function updateRatingsFromVote(
+        float $ratingA,
+        float $ratingB,
+        string $posA,
+        string $posB,
+        int $scoreA,
+        int $n,
+        ?float $pCrowdA = null,
+        float $ratingWeight = 1.0
+    ): array {
+        $Sexp = 14.0;
+
+        $K0   = 3.0;
+        $n0   = 5.0;
+        $kMin = 0.02;
+        $kMax = 1.50;
+
+        $nn = max(1, $n);
+        $baseKEff = $K0 / sqrt($nn + $n0);
+        $baseKEff = $this->clamp($baseKEff, $kMin, $kMax);
+
+        $ratingWeight = max(0.0, (float) $ratingWeight);
+        $kEff = $this->clamp($baseKEff * $ratingWeight, 0.0, $kMax);
+
+        $E = $this->expectedProb($ratingA, $ratingB, $Sexp);
+
+        $delta = $kEff * ((float) $scoreA - $E);
+
+        $Dold = $ratingA - $ratingB;
+        $Dnew = $Dold + (2.0 * $delta);
+        $mean = 0.5 * ($ratingA + $ratingB);
+
+        [$L_A, $U_A] = $this->posRange($posA);
+        [$L_B, $U_B] = $this->posRange($posB);
+
+        $newA = $this->clamp($mean + 0.5 * $Dnew, $L_A, $U_A);
+        $newB = $this->clamp($mean - 0.5 * $Dnew, $L_B, $U_B);
+
+        $gapTarget = null;
+        if ($pCrowdA !== null) {
+            $gapTarget = $Sexp * $this->logit($pCrowdA);
+        }
+
+        return [
+            0 => $newA,
+            1 => $newB,
+            2 => (2.0 * $delta),
+            'ratingA' => $newA,
+            'ratingB' => $newB,
+            'deltaChange' => (2.0 * $delta),
+            'kEff' => $kEff,
+            'expectedA' => $E,
+            'gapBefore' => $Dold,
+            'gapAfter' => $Dnew,
+            'gapTarget' => $gapTarget,
         ];
     }
 
@@ -132,64 +194,6 @@ class RatingService
         ];
 
         return $map[$pos] ?? [0.0, 99.0];
-    }
-
-    public function updateRatingsFromVote(
-        float $ratingA,
-        float $ratingB,
-        string $posA,
-        string $posB,
-        int $scoreA,
-        int $n,
-        ?float $pCrowdA = null
-    ): array {
-        $Sexp = 14.0;
-
-        // K schedule: małe przy dużym n, większe przy małym n
-        // Kalibracja: przy n~1000 K~0.095 => majority win ~0.014, upset ~0.08 (dla 85/15)
-        $K0   = 3.0;
-        $n0   = 5.0;
-        $kMin = 0.02;
-        $kMax = 1.50;
-
-        $nn = max(1, $n);
-        $kEff = $K0 / sqrt($nn + $n0);
-        $kEff = $this->clamp($kEff, $kMin, $kMax);
-
-        $E = $this->expectedProb($ratingA, $ratingB, $Sexp);
-
-        // klasyczny Elo krok (symetryczny)
-        $delta = $kEff * ((float)$scoreA - $E);
-
-        // update różnicy przy stałej średniej
-        $Dold = $ratingA - $ratingB;
-        $Dnew = $Dold + (2.0 * $delta); // bo ratingA += delta, ratingB -= delta => gap rośnie o 2*delta
-        $mean = 0.5 * ($ratingA + $ratingB);
-
-        [$L_A, $U_A] = $this->posRange($posA);
-        [$L_B, $U_B] = $this->posRange($posB);
-
-        $newA = $this->clamp($mean + 0.5 * $Dnew, $L_A, $U_A);
-        $newB = $this->clamp($mean - 0.5 * $Dnew, $L_B, $U_B);
-
-        $gapTarget = null;
-        if ($pCrowdA !== null) {
-            $gapTarget = $Sexp * $this->logit($pCrowdA);
-        }
-
-        return [
-            0 => $newA,
-            1 => $newB,
-            2 => (2.0 * $delta), // delta gap (żeby było czytelne w logach/symulatorze)
-            'ratingA' => $newA,
-            'ratingB' => $newB,
-            'deltaChange' => (2.0 * $delta),
-            'kEff' => $kEff,
-            'expectedA' => $E,
-            'gapBefore' => $Dold,
-            'gapAfter' => $Dnew,
-            'gapTarget' => $gapTarget,
-        ];
     }
 
     private function kappaGap(float $gap, float $rK = 8.0, float $betaK = 2.0): float

@@ -54,3 +54,4 @@ Route::middleware('auth:sanctum')->post('/auth/claim-anon', function (\Illuminat
 
     return response()->json(['claimed' => (int) $claimed]);
 });
+Route::post('/votes/direct', [VoteController::class, 'storeDirect'])->middleware('auth:sanctum');
