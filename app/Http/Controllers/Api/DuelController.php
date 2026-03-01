@@ -16,11 +16,13 @@ class DuelController extends Controller
 
         $attribute = $requestedAttr
             ? Attribute::where('key', $requestedAttr)->first()
-            : Attribute::inRandomOrder()->first();
+            : Attribute::query()->where('scope', 'both')->inRandomOrder()->first();
 
         if (!$attribute) {
             return response()->json(['error' => 'Unknown attribute'], 422);
         }
+
+        $forceGK = ($attribute->scope ?? 'both') === 'gk';
 
         $cfg = config('zcout_matchmaking', []);
         $mm = $this->resolveMatchmakingInputs($cfg);
@@ -42,7 +44,13 @@ class DuelController extends Controller
         $requested = $mm['requested'];
         $picked = $mm['picked'];
 
-        $rows = DB::table('players as p')
+        $forcedCategoryNote = null;
+        if ($forceGK && $category === 'positional') {
+            $category = 'close';
+            $forcedCategoryNote = 'gk_attr_forced_close';
+        }
+
+        $rowsQ = DB::table('players as p')
             ->join('player_reputation_stats as prs', 'prs.player_id', '=', 'p.id')
             ->leftJoin('positions as pos', 'pos.id', '=', 'p.position_id')
             ->leftJoin('player_attribute_ratings as par', function ($join) use ($attribute) {
@@ -50,7 +58,13 @@ class DuelController extends Controller
                     ->where('par.attribute_id', '=', $attribute->id);
             })
             ->where('prs.is_long_tail', '=', $useLongTail)
-            ->whereNotNull('p.position_id')
+            ->whereNotNull('p.position_id');
+
+        if ($forceGK) {
+            $rowsQ->where('pos.short_label', '=', 'GK');
+        }
+
+        $rows = $rowsQ
             ->selectRaw('p.id, pos.short_label as pos_short, prs.player_rep, (COALESCE(par.confidence, 0) / 100.0) as attr_confidence, par.rating as attr_rating, COALESCE(prs.fpl_now_cost, 0) as fpl_cost, COALESCE(prs.fpl_selected_by_percent, 0) as fpl_sel')
             ->get();
 
@@ -103,6 +117,10 @@ class DuelController extends Controller
         }
 
         $fallbacks = [];
+        if ($forcedCategoryNote) {
+            $fallbacks[] = $forcedCategoryNote;
+        }
+
         $triesUsed = 0;
 
         $pickedA = null;
@@ -118,7 +136,7 @@ class DuelController extends Controller
 
         $baseCandidates = $candidates;
 
-        if ($category === 'obvious') {
+        if (!$forceGK && $category === 'obvious') {
             $tmp = [];
             foreach ($candidates as $c) {
                 if (($c['pos'] ?? null) !== 'GK') $tmp[] = $c;
@@ -349,6 +367,7 @@ class DuelController extends Controller
                 'key' => $attribute->key,
                 'label' => $attribute->label,
                 'group' => $attribute->group,
+                'scope' => $attribute->scope ?? 'both',
             ],
             'players' => [$toApi($pA), $toApi($pB)],
             'duel_id' => $duel->id,
@@ -394,6 +413,7 @@ class DuelController extends Controller
                 'pool_size' => count($candidates),
                 'max_cost' => $maxCost,
                 'max_sel' => $maxSel,
+                'force_gk' => $forceGK,
             ];
         }
 
