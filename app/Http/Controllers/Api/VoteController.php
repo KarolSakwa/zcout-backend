@@ -99,13 +99,19 @@ class VoteController extends Controller
 
         $anonId = trim((string) $request->header('X-Zcout-Anon'));
 
-        if (!$isAuthed && $anonId === '') {
+        $lockKeys = [];
+        if ($anonId !== '') $lockKeys[] = $anonId;
+        if ($isAuthed) $lockKeys[] = 'user:' . $currentUserId;
+
+        $lockKey = $anonId !== '' ? $anonId : ($isAuthed ? ('user:' . $currentUserId) : null);
+
+        if (!$lockKey) {
             return response()->json([
-                'message' => 'Missing X-Zcout-Anon header.',
+                'message' => 'Missing voter id.',
             ], 400);
         }
 
-        $voterHash = hash_hmac('sha256', $anonId, (string) config('app.key'));
+        $voterHash = hash_hmac('sha256', $lockKey, (string) config('app.key'));
 
         try {
             DB::transaction(function () use (
@@ -162,11 +168,16 @@ class VoteController extends Controller
             });
         } catch (\Illuminate\Database\QueryException $e) {
             $msg = (string) $e->getMessage();
-            if (stripos($msg, 'votes_unique_duel_voterhash') !== false) {
+            $code = (string) $e->getCode();
+
+            if ($code === '23505' || stripos($msg, 'votes_unique_duel_voterhash') !== false) {
+                DB::table('voter_duel_locks')->whereIn('voter_hash', $lockKeys)->delete();
+
                 return response()->json([
                     'message' => 'You already voted on this duel.',
                 ], 409);
             }
+
             throw $e;
         }
 
@@ -204,6 +215,8 @@ class VoteController extends Controller
         $votesA = (int) ($pop[$reqA] ?? 0);
         $votesB = (int) ($pop[$reqB] ?? 0);
         $votesTotal = $votesA + $votesB;
+
+        DB::table('voter_duel_locks')->whereIn('voter_hash', $lockKeys)->delete();
 
         return response()->json([
             'vote_id' => $vote?->id,
