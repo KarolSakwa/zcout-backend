@@ -18,3 +18,11 @@ BACKLOG.md
 /.fleet
 /.idea
 /.vscode
+
+cookies.txt
+cookies_auth.txt
+payload.json
+pl_players_snapshot.json
+img.png
+
+cookies_next.txt
