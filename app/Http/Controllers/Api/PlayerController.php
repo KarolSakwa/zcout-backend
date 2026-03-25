@@ -8,6 +8,7 @@ use App\Models\Player;
 use App\Models\PlayerAttributeRating;
 use App\Support\Seed;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PlayerController extends Controller
 {
@@ -78,6 +79,7 @@ class PlayerController extends Controller
         }
 
         $overallConfidence = (float) min(100.0, round($totalWeight, 2));
+        $radarAxes = $this->buildRadarAxesPayload($posCode, $payloadAttrs);
 
         return response()->json([
             'id' => (int) $player->id,
@@ -100,7 +102,41 @@ class PlayerController extends Controller
                 'iso2' => $player->countryRef->iso2,
             ] : null,
             'overall_confidence' => $overallConfidence,
+            'radar_axes' => $radarAxes,
             'attributes' => $payloadAttrs,
         ]);
+    }
+
+    private function buildRadarAxesPayload(string $posCode, array $payloadAttrs): array
+    {
+        $axisConfigKey = $posCode === 'GK'
+            ? 'zcout_attributes.gk_axes'
+            : 'zcout_attributes.outfield_axes';
+
+        $ratingsByKey = collect($payloadAttrs)
+            ->mapWithKeys(fn (array $attr) => [
+                (string) $attr['key'] => (float) $attr['rating'],
+            ]);
+
+        return collect(config($axisConfigKey, []))
+            ->map(function (array $attributeKeys, string $key) use ($ratingsByKey) {
+                $values = collect($attributeKeys)
+                    ->map(fn (string $attributeKey) => $ratingsByKey->get($attributeKey))
+                    ->filter(fn ($value) => is_numeric($value))
+                    ->values();
+
+                $value = $values->isNotEmpty()
+                    ? round((float) $values->avg(), 1)
+                    : 0.0;
+
+                return [
+                    'key' => $key,
+                    'label' => Str::of($key)->replace('_', ' ')->upper()->toString(),
+                    'attribute_keys' => $attributeKeys,
+                    'value' => (float) $value,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }
