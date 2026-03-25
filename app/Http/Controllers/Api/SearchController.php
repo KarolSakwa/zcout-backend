@@ -41,6 +41,15 @@ class SearchController extends Controller
                 'clubs.name as club_name',
                 'positions.short_label as position'
             )
+            ->selectRaw(
+                "CASE
+                    WHEN LOWER(players.name) = ? THEN 0
+                    WHEN LOWER(players.name) LIKE ? THEN 1
+                    WHEN LOWER(players.slug) LIKE ? THEN 2
+                    ELSE 3
+                END as match_rank",
+                [$needle, $prefix, $prefix]
+            )
             ->leftJoin('clubs', 'clubs.id', '=', 'players.club_id')
             ->leftJoin('positions', 'positions.id', '=', 'players.position_id')
             ->where(function ($query) use ($contains) {
@@ -48,15 +57,7 @@ class SearchController extends Controller
                     ->whereRaw('LOWER(players.name) LIKE ?', [$contains])
                     ->orWhereRaw('LOWER(players.slug) LIKE ?', [$contains]);
             })
-            ->orderByRaw(
-                "CASE
-                    WHEN LOWER(players.name) = ? THEN 0
-                    WHEN LOWER(players.name) LIKE ? THEN 1
-                    WHEN LOWER(players.slug) LIKE ? THEN 2
-                    ELSE 3
-                END",
-                [$needle, $prefix, $prefix]
-            )
+            ->orderBy('match_rank')
             ->orderBy('players.name')
             ->limit(8)
             ->get();
@@ -102,6 +103,7 @@ class SearchController extends Controller
                 foreach ($attributes as $attr) {
                     $aid = (int) $attr->id;
                     $key = $attributeKeysById[$aid] ?? null;
+
                     if ($key === null) {
                         continue;
                     }
@@ -120,9 +122,28 @@ class SearchController extends Controller
                     'position' => $player->position ? (string) $player->position : null,
                     'club' => $player->club_name ? (string) $player->club_name : null,
                     'overall' => $overall,
+                    'match_rank' => (int) $player->match_rank,
                 ];
             })
-            ->values();
+            ->sort(function ($a, $b) {
+                if ($a['match_rank'] !== $b['match_rank']) {
+                    return $a['match_rank'] <=> $b['match_rank'];
+                }
+
+                $aOverall = $a['overall'] ?? -1;
+                $bOverall = $b['overall'] ?? -1;
+
+                if ($aOverall !== $bOverall) {
+                    return $bOverall <=> $aOverall;
+                }
+
+                return strcmp($a['name'], $b['name']);
+            })
+            ->values()
+            ->map(function ($player) {
+                unset($player['match_rank']);
+                return $player;
+            });
 
         $clubs = Club::query()
             ->select('id', 'name', 'slug')
