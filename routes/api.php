@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\VoteController;
 use App\Http\Controllers\Api\AttributeRankingController;
 use App\Http\Controllers\Api\RankingController;
 use App\Http\Controllers\Api\DatabaseController;
+use App\Http\Controllers\Api\SearchController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -56,3 +57,4 @@ Route::middleware('auth:sanctum')->post('/auth/claim-anon', function (\Illuminat
 });
 Route::post('/votes/direct', [VoteController::class, 'storeDirect'])->middleware('auth:sanctum');
 Route::post('/duels/skip', [\App\Http\Controllers\Api\DuelController::class, 'skip']);
+Route::get('/search', [SearchController::class, 'index']);
