@@ -9,6 +9,7 @@ use App\Models\PlayerAttributeRating;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use App\Support\OverallConfig;
 
 class PlayerController extends Controller
 {
@@ -80,6 +81,7 @@ class PlayerController extends Controller
 
         $overallConfidence = (float) min(100.0, round($totalWeight, 2));
         $radarAxes = $this->buildRadarAxesPayload($posCode, $payloadAttrs);
+        $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
 
         return response()->json([
             'id' => (int) $player->id,
@@ -104,6 +106,7 @@ class PlayerController extends Controller
             'overall_confidence' => $overallConfidence,
             'radar_axes' => $radarAxes,
             'attributes' => $payloadAttrs,
+            'overall' => $overall,
         ]);
     }
 

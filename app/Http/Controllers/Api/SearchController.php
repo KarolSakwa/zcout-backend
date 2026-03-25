@@ -7,6 +7,7 @@ use App\Models\Attribute;
 use App\Models\Club;
 use App\Models\Player;
 use App\Models\PlayerAttributeRating;
+use App\Support\OverallConfig;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 
@@ -97,8 +98,7 @@ class SearchController extends Controller
                 $pid = (int) $player->id;
                 $posCode = strtoupper((string) ($player->position ?? ''));
 
-                $sum = 0.0;
-                $count = 0;
+                $ratingsByKey = [];
 
                 foreach ($attributes as $attr) {
                     $aid = (int) $attr->id;
@@ -108,12 +108,31 @@ class SearchController extends Controller
                         continue;
                     }
 
-                    $rating = $ratingsByPlayer[$pid][$aid] ?? (float) Seed::for($posCode, $key);
-                    $sum += $rating;
-                    $count++;
+                    $ratingsByKey[$key] = $ratingsByPlayer[$pid][$aid] ?? (float) Seed::for($posCode, $key);
                 }
 
-                $overall = $count > 0 ? (int) round($sum / $count) : null;
+                $axisConfigKey = $posCode === 'GK'
+                    ? 'zcout_attributes.gk_axes'
+                    : 'zcout_attributes.outfield_axes';
+
+                $radarAxes = collect(config($axisConfigKey, []))
+                    ->map(function (array $attributeKeys, string $axisKey) use ($ratingsByKey) {
+                        $values = collect($attributeKeys)
+                            ->map(fn (string $attributeKey) => $ratingsByKey[$attributeKey] ?? null)
+                            ->filter(fn ($value) => is_numeric($value))
+                            ->values();
+
+                        return [
+                            'key' => $axisKey,
+                            'value' => $values->isNotEmpty()
+                                ? round((float) $values->avg(), 1)
+                                : 0.0,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
 
                 return [
                     'id' => $pid,
