@@ -41,12 +41,26 @@ class RatingService
 
         $w = PlayerAttributeRating::firstOrCreate(
             ['player_id' => $winnerId, 'attribute_id' => $attributeId],
-            ['rating' => Seed::for($winnerPos, $attr->key), 'votes_count' => 0]
+            [
+                'rating' => Seed::for($winnerPos, $attr->key),
+                'rating_weight_sum' => 0,
+                'confidence_weight_sum' => 0,
+                'confidence' => 0,
+                'votes_count' => 0,
+                'last_vote_at' => null,
+            ]
         );
 
         $l = PlayerAttributeRating::firstOrCreate(
             ['player_id' => $loserId, 'attribute_id' => $attributeId],
-            ['rating' => Seed::for($loserPos, $attr->key), 'votes_count' => 0]
+            [
+                'rating' => Seed::for($loserPos, $attr->key),
+                'rating_weight_sum' => 0,
+                'confidence_weight_sum' => 0,
+                'confidence' => 0,
+                'votes_count' => 0,
+                'last_vote_at' => null,
+            ]
         );
 
         $beforeW = (float) $w->rating;
@@ -75,15 +89,17 @@ class RatingService
 
         $w->rating = $afterW;
         $w->votes_count = ((int) $w->votes_count) + 1;
-        $w->weight_sum = ((float) ($w->weight_sum ?? 0)) + $ratingWeight;
-        $w->confidence = min(100.0, round(((float) ($w->confidence ?? 0)) + $confidenceWeight, 2));
+        $w->rating_weight_sum = ((float) ($w->rating_weight_sum ?? 0)) + $ratingWeight;
+        $w->confidence_weight_sum = ((float) ($w->confidence_weight_sum ?? 0)) + $confidenceWeight;
+        $w->confidence = min(100.0, round((float) $w->confidence_weight_sum, 2));
         $w->last_vote_at = $now;
         $w->save();
 
         $l->rating = $afterL;
         $l->votes_count = ((int) $l->votes_count) + 1;
-        $l->weight_sum = ((float) ($l->weight_sum ?? 0)) + $ratingWeight;
-        $l->confidence = min(100.0, round(((float) ($l->confidence ?? 0)) + $confidenceWeight, 2));
+        $l->rating_weight_sum = ((float) ($l->rating_weight_sum ?? 0)) + $ratingWeight;
+        $l->confidence_weight_sum = ((float) ($l->confidence_weight_sum ?? 0)) + $confidenceWeight;
+        $l->confidence = min(100.0, round((float) $l->confidence_weight_sum, 2));
         $l->last_vote_at = $now;
         $l->save();
 
@@ -181,13 +197,11 @@ class RatingService
 
     private function expectedProb(float $rA, float $rB, float $S_exp = 14.0): float
     {
-        // ΔR≈30 → E≈0.90 (dla S_exp~14)
         return $this->sigmoid(($rA - $rB) / $S_exp);
     }
 
     private function posRange(string $pos): array
     {
-        // MVP ranges
         $map = [
             'LW' => [50.0, 99.0], 'RW' => [50.0, 99.0], 'ST' => [40.0, 95.0],
             'CM' => [35.0, 92.0], 'CB' => [10.0, 80.0], 'GK' => [5.0, 70.0],
@@ -237,14 +251,26 @@ class RatingService
         float $pA,
         int $n
     ): array {
-        $S0 = 45.0; $r0 = 10.0; $beta = 1.2;
-        $capMin = 6.0; $capMax = 16.0; $capAlpha = 1.2; $L0Surprise = 2.0;
+        $S0 = 45.0;
+        $r0 = 10.0;
+        $beta = 1.2;
+        $capMin = 6.0;
+        $capMax = 16.0;
+        $capAlpha = 1.2;
+        $L0Surprise = 2.0;
 
-        $C = 5.0; $aBlocks = 0.08; $floorBlocks = 0.70;
+        $C = 5.0;
+        $aBlocks = 0.08;
+        $floorBlocks = 0.70;
 
-        $Sexp = 14.0; $expectKBase = 1.0; $rK = 8.0; $betaK = 2.0;
+        $Sexp = 14.0;
+        $expectKBase = 1.0;
+        $rK = 8.0;
+        $betaK = 2.0;
 
-        $q0 = 60.0; $rQ = 10.0; $betaQ = 1.5;
+        $q0 = 60.0;
+        $rQ = 10.0;
+        $betaQ = 1.5;
 
         $eps = 1e-9;
         $pA_c = max($eps, min(1.0 - $eps, $pA));

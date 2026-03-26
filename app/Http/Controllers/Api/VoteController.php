@@ -8,6 +8,7 @@ use App\Models\Duel;
 use App\Models\Player;
 use App\Models\PlayerAttributeRating;
 use App\Models\Vote;
+use App\Models\VoteWeightLog;
 use App\Services\RatingService;
 use App\Support\Seed;
 use Illuminate\Http\Request;
@@ -16,6 +17,19 @@ use Illuminate\Support\Facades\Validator;
 
 class VoteController extends Controller
 {
+    private const WEIGHT_VERSION = 1;
+    private const RATING_ALGORITHM_VERSION = 1;
+    private const BASE_DUEL_WEIGHT = 1.0;
+    private const AUTH_FACTOR_ANON = 0.5;
+    private const AUTH_FACTOR_AUTHED = 1.0;
+    private const TRUST_RATING_FACTOR_DEFAULT = 1.0;
+    private const TRUST_CONFIDENCE_FACTOR_ANON = 0.2;
+    private const TRUST_CONFIDENCE_FACTOR_AUTHED = 1.0;
+    private const INTEGRITY_FACTOR_DEFAULT = 1.0;
+    private const BIAS_FACTOR_DEFAULT = 1.0;
+    private const ACTIVITY_FACTOR_DEFAULT = 1.0;
+    private const ROLE_FACTOR_DEFAULT = 1.0;
+
     public function store(Request $request, RatingService $ratingService)
     {
         $payload = $this->payload($request);
@@ -94,8 +108,32 @@ class VoteController extends Controller
         $currentUserId = auth()->id();
         $isAuthed = $currentUserId !== null;
 
-        $ratingWeight = $isAuthed ? 1.0 : 0.5;
-        $confidenceWeight = $isAuthed ? 1.0 : 0.1;
+        $weightVersion = self::WEIGHT_VERSION;
+        $ratingAlgorithmVersion = self::RATING_ALGORITHM_VERSION;
+        $baseDuelWeight = self::BASE_DUEL_WEIGHT;
+        $authFactor = $isAuthed ? self::AUTH_FACTOR_AUTHED : self::AUTH_FACTOR_ANON;
+        $trustRatingFactor = self::TRUST_RATING_FACTOR_DEFAULT;
+        $trustConfidenceFactor = $isAuthed ? self::TRUST_CONFIDENCE_FACTOR_AUTHED : self::TRUST_CONFIDENCE_FACTOR_ANON;
+        $integrityFactor = self::INTEGRITY_FACTOR_DEFAULT;
+        $biasFactor = self::BIAS_FACTOR_DEFAULT;
+        $activityFactor = self::ACTIVITY_FACTOR_DEFAULT;
+        $roleFactor = self::ROLE_FACTOR_DEFAULT;
+
+        $ratingWeight = $baseDuelWeight
+            * $authFactor
+            * $trustRatingFactor
+            * $integrityFactor
+            * $biasFactor
+            * $activityFactor
+            * $roleFactor;
+
+        $confidenceWeight = $baseDuelWeight
+            * $authFactor
+            * $trustConfidenceFactor
+            * $integrityFactor
+            * $biasFactor
+            * $activityFactor
+            * $roleFactor;
 
         $anonId = trim((string) $request->header('X-Zcout-Anon'));
 
@@ -130,7 +168,17 @@ class VoteController extends Controller
                 &$afterB,
                 $currentUserId,
                 $ratingWeight,
-                $confidenceWeight
+                $confidenceWeight,
+                $weightVersion,
+                $ratingAlgorithmVersion,
+                $baseDuelWeight,
+                $authFactor,
+                $trustRatingFactor,
+                $trustConfidenceFactor,
+                $integrityFactor,
+                $biasFactor,
+                $activityFactor,
+                $roleFactor
             ) {
                 $vote = new Vote();
                 $vote->source = 'duel';
@@ -143,13 +191,29 @@ class VoteController extends Controller
                 $vote->voter_hash = $voterHash;
                 $vote->weight_applied = $ratingWeight;
                 $vote->confidence_weight_applied = $confidenceWeight;
-                $vote->weight_version = 1;
+                $vote->weight_version = $weightVersion;
                 $vote->reputation_at_vote = null;
                 $vote->risk_score_at_vote = null;
                 $vote->value = null;
                 $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
                 $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
                 $vote->save();
+
+                VoteWeightLog::create([
+                    'vote_id' => $vote->id,
+                    'weight_version' => $weightVersion,
+                    'rating_algorithm_version' => $ratingAlgorithmVersion,
+                    'base_duel_weight' => $baseDuelWeight,
+                    'auth_factor' => $authFactor,
+                    'trust_rating_factor' => $trustRatingFactor,
+                    'trust_confidence_factor' => $trustConfidenceFactor,
+                    'integrity_factor' => $integrityFactor,
+                    'bias_factor' => $biasFactor,
+                    'activity_factor' => $activityFactor,
+                    'role_factor' => $roleFactor,
+                    'rating_weight_applied' => $ratingWeight,
+                    'confidence_weight_applied' => $confidenceWeight,
+                ]);
 
                 $ratingService->applyVote($winnerId, $loserId, $attribute->id, $ratingWeight, $confidenceWeight);
 
@@ -199,7 +263,8 @@ class VoteController extends Controller
                 'rating_after' => $after,
                 'delta' => $after - $before,
                 'votes_count' => (int) ($afterRow?->votes_count ?? 0),
-                'weight_sum' => (float) ($afterRow?->weight_sum ?? 0),
+                'rating_weight_sum' => (float) ($afterRow?->rating_weight_sum ?? 0),
+                'confidence_weight_sum' => (float) ($afterRow?->confidence_weight_sum ?? 0),
                 'confidence' => (float) ($afterRow?->confidence ?? 0),
                 'last_vote_at' => $afterRow?->last_vote_at,
             ];

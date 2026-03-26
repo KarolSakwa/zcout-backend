@@ -53,14 +53,15 @@ class PlayerController extends Controller
             ->keyBy('attribute_id');
 
         $payloadAttrs = [];
-        $totalWeight = 0.0;
+        $totalConfidenceWeight = 0.0;
 
         foreach ($attributes as $attr) {
             $row = $rows->get($attr->id);
 
             $rating = $row ? (float) $row->rating : (float) Seed::for($posCode, $attr->key);
             $confidence = $row ? (float) ($row->confidence ?? 0) : 0.0;
-            $weightSum = $row ? (float) ($row->weight_sum ?? 0) : 0.0;
+            $ratingWeightSum = $row ? (float) ($row->rating_weight_sum ?? 0) : 0.0;
+            $confidenceWeightSum = $row ? (float) ($row->confidence_weight_sum ?? 0) : 0.0;
             $votesCount = $row ? (int) ($row->votes_count ?? 0) : 0;
             $lastVoteAt = $row ? ($row->last_vote_at ? (string) $row->last_vote_at : null) : null;
 
@@ -71,15 +72,16 @@ class PlayerController extends Controller
                 'group' => $attr->group,
                 'rating' => (float) $rating,
                 'confidence' => (float) min(100.0, round($confidence, 2)),
-                'weight_sum' => (float) $weightSum,
+                'rating_weight_sum' => (float) $ratingWeightSum,
+                'confidence_weight_sum' => (float) $confidenceWeightSum,
                 'votes_count' => (int) $votesCount,
                 'last_vote_at' => $lastVoteAt,
             ];
 
-            $totalWeight += $weightSum;
+            $totalConfidenceWeight += $confidenceWeightSum;
         }
 
-        $overallConfidence = (float) min(100.0, round($totalWeight, 2));
+        $overallConfidence = (float) min(100.0, round($totalConfidenceWeight, 2));
         $radarAxes = $this->buildRadarAxesPayload($posCode, $payloadAttrs);
         $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
 

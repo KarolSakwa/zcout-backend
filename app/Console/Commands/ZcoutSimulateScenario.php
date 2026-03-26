@@ -358,7 +358,8 @@ class ZcoutSimulateScenario extends Command
                     'attribute_id' => (int) $a->id,
                     'rating' => number_format($val, 3, '.', ''),
                     'votes_count' => 0,
-                    'weight_sum' => 0,
+                    'rating_weight_sum' => 0,
+                    'confidence_weight_sum' => 0,
                     'confidence' => 0,
                     'last_vote_at' => null,
                 ];
@@ -393,7 +394,8 @@ class ZcoutSimulateScenario extends Command
                     'attribute_id' => (int) $a->id,
                     'rating' => number_format($value, 3, '.', ''),
                     'votes_count' => 0,
-                    'weight_sum' => 0,
+                    'rating_weight_sum' => 0,
+                    'confidence_weight_sum' => 0,
                     'confidence' => 0,
                     'last_vote_at' => null,
                 ];
