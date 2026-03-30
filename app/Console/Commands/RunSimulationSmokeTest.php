@@ -2,14 +2,16 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SimulationRun as SimulationRunModel;
 use App\Simulation\Data\SimulatedUser;
 use App\Simulation\Outputs\CollectingSimulationOutput;
 use App\Simulation\Outputs\MaterializingSimulationOutput;
+use App\Simulation\Processors\DuelSimulationDecisionProcessor;
+use App\Simulation\Processors\RoutingSimulationDecisionProcessor;
 use App\Simulation\SimulationContext;
 use App\Simulation\SimulationRun;
 use App\Simulation\Sources\DuelInteractionSource;
 use Illuminate\Console\Command;
-use App\Simulation\Processors\NullSimulationDecisionProcessor;
 
 final class RunSimulationSmokeTest extends Command
 {
@@ -21,35 +23,66 @@ final class RunSimulationSmokeTest extends Command
     {
         $mode = (string) $this->option('mode');
 
-        $output = $mode === 'materialize'
-            ? new MaterializingSimulationOutput(new NullSimulationDecisionProcessor())
-            : new CollectingSimulationOutput();
+        $runRecord = SimulationRunModel::query()->create([
+            'mode' => $mode,
+            'status' => 'running',
+            'config' => [],
+            'started_at' => now(),
+        ]);
 
-        $run = new SimulationRun(
-            sources: [new DuelInteractionSource()],
-            output: $output,
-        );
+        try {
+            $output = $mode === 'materialize'
+                ? new MaterializingSimulationOutput(
+                    new RoutingSimulationDecisionProcessor([
+                        'duel' => new DuelSimulationDecisionProcessor(),
+                    ])
+                )
+                : new CollectingSimulationOutput();
 
-        $users = [
-            new SimulatedUser(id: 'u1', type: 'casual', isLogged: false),
-            new SimulatedUser(id: 'u2', type: 'expert', isLogged: true),
-        ];
+            $run = new SimulationRun(
+                sources: [new DuelInteractionSource()],
+                output: $output,
+            );
 
-        $context = new SimulationContext(
-            mode: $mode,
-            runId: 1,
-            now: new \DateTimeImmutable(),
-            config: [],
-        );
+            $users = [
+                new SimulatedUser(id: 'u1', type: 'casual', isLogged: false),
+                new SimulatedUser(id: 'u2', type: 'expert', isLogged: true),
+            ];
 
-        $run->run($users, $context);
+            $context = new SimulationContext(
+                mode: $mode,
+                runId: $runRecord->id,
+                now: new \DateTimeImmutable(),
+                config: [],
+            );
 
-        if ($output instanceof CollectingSimulationOutput) {
-            $this->line(json_encode($output->items(), JSON_PRETTY_PRINT));
-        } else {
-            $this->info('Materialize mode executed.');
+            $run->run($users, $context);
+
+            $runRecord->update([
+                'status' => 'finished',
+                'finished_at' => now(),
+                'result' => $output instanceof CollectingSimulationOutput
+                    ? ['items' => $output->items()]
+                    : null,
+            ]);
+
+            if ($output instanceof CollectingSimulationOutput) {
+                $this->line(json_encode($output->items(), JSON_PRETTY_PRINT));
+            } else {
+                $this->info("Materialize mode executed for run #{$runRecord->id}.");
+            }
+
+            return self::SUCCESS;
+        } catch (\Throwable $e) {
+            $runRecord->update([
+                'status' => 'failed',
+                'finished_at' => now(),
+                'result' => [
+                    'error' => $e->getMessage(),
+                ],
+            ]);
+
+            throw $e;
         }
-
-        return self::SUCCESS;
     }
 }
