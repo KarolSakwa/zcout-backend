@@ -11,6 +11,7 @@ final class SimulatedDuelVote
         public readonly int $playerBId,
         public readonly string $attributeKey,
         public readonly string $decisionType,
+        public readonly int $step,
     ) {
     }
 }

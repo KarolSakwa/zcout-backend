@@ -12,10 +12,11 @@ use App\Simulation\SimulationContext;
 use App\Simulation\SimulationRun;
 use App\Simulation\Sources\DuelInteractionSource;
 use Illuminate\Console\Command;
+use App\Simulation\Actions\SnapshotSimulationRunTruthRatings;
 
 final class RunSimulationSmokeTest extends Command
 {
-    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1}';
+    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345}';
 
     protected $description = 'Run a basic simulation smoke test';
 
@@ -24,15 +25,19 @@ final class RunSimulationSmokeTest extends Command
         $mode = (string) $this->option('mode');
         $userCount = max(1, (int) $this->option('users'));
         $stepsPerUser = max(1, (int) $this->option('steps-per-user'));
+        $seed = (int) $this->option('seed');
 
         $runRecord = SimulationRunModel::query()->create([
             'mode' => $mode,
             'status' => 'running',
             'config' => [
                 'users' => $userCount,
+                'seed' => $seed,
             ],
             'started_at' => now(),
         ]);
+
+        (new SnapshotSimulationRunTruthRatings())->handle($runRecord);
 
         try {
             $output = $mode === 'materialize'
@@ -65,6 +70,7 @@ final class RunSimulationSmokeTest extends Command
                 config: [
                     'users' => $userCount,
                     'steps_per_user' => $stepsPerUser,
+                    'seed' => $seed,
                 ],
             );
 
@@ -74,12 +80,15 @@ final class RunSimulationSmokeTest extends Command
                 'status' => 'finished',
                 'finished_at' => now(),
                 'result' => $output instanceof CollectingSimulationOutput
-                    ? ['items' => $output->items()]
+                    ? [
+                        'summary' => $output->summary(),
+                        'items' => $output->items(),
+                    ]
                     : null,
             ]);
 
             if ($output instanceof CollectingSimulationOutput) {
-                $this->line(json_encode($output->items(), JSON_PRETTY_PRINT));
+                $this->line(json_encode($output->summary(), JSON_PRETTY_PRINT));
             } else {
                 $this->info("Materialize mode executed for run #{$runRecord->id}.");
             }

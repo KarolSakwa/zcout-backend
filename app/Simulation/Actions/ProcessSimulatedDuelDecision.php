@@ -57,6 +57,7 @@ final class ProcessSimulatedDuelDecision
             playerBId: (int) $opportunity->payload['player_b_id'],
             attributeKey: (string) $opportunity->payload['attribute'],
             decisionType: $decision->type,
+            step: $context->currentStep,
         );
 
         $this->materializer->handle($vote, $context);

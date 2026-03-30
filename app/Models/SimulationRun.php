@@ -30,4 +30,9 @@ final class SimulationRun extends Model
             'finished_at' => 'datetime',
         ];
     }
+
+    public function truthRatings(): HasMany
+    {
+        return $this->hasMany(SimulationRunTruthRating::class);
+    }
 }

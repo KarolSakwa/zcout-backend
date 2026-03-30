@@ -25,6 +25,7 @@ final class MaterializeSimulatedDuelVote
                 'player_a_id' => $vote->playerAId,
                 'player_b_id' => $vote->playerBId,
                 'attribute_key' => $vote->attributeKey,
+                'step' => $vote->step,
             ],
         ]);
     }

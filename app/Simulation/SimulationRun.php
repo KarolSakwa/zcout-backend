@@ -23,27 +23,41 @@ final class SimulationRun
     public function run(array $users, SimulationContext $context): void
     {
         $stepsPerUser = max(1, (int) ($context->config['steps_per_user'] ?? 1));
+        $seed = (int) ($context->config['seed'] ?? 12345);
 
-        foreach ($users as $user) {
-            for ($step = 0; $step < $stepsPerUser; $step++) {
+        for ($step = 0; $step < $stepsPerUser; $step++) {
+            $stepUsers = $users;
+
+            mt_srand($seed + $step);
+            shuffle($stepUsers);
+
+            $stepContext = new SimulationContext(
+                mode: $context->mode,
+                runId: $context->runId,
+                now: $context->now,
+                config: $context->config,
+                currentStep: $step + 1,
+            );
+
+            foreach ($stepUsers as $user) {
                 foreach ($this->sources as $source) {
-                    if (! $source->canGenerateFor($user, $context)) {
+                    if (! $source->canGenerateFor($user, $stepContext)) {
                         continue;
                     }
 
-                    $opportunity = $source->generateOpportunity($user, $context);
+                    $opportunity = $source->generateOpportunity($user, $stepContext);
 
                     if ($opportunity === null) {
                         continue;
                     }
 
-                    $decision = $source->simulateDecision($opportunity, $user, $context);
+                    $decision = $source->simulateDecision($opportunity, $user, $stepContext);
 
                     if ($decision === null) {
                         continue;
                     }
 
-                    $this->output->handleDecision($user, $opportunity, $decision, $context);
+                    $this->output->handleDecision($user, $opportunity, $decision, $stepContext);
                 }
             }
         }

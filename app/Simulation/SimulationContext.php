@@ -9,6 +9,7 @@ final class SimulationContext
         public readonly int $runId,
         public readonly \DateTimeImmutable $now,
         public readonly array $config = [],
+        public readonly int $currentStep = 0,
     ) {
     }
 }
