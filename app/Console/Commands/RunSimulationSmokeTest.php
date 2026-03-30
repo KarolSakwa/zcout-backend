@@ -15,18 +15,22 @@ use Illuminate\Console\Command;
 
 final class RunSimulationSmokeTest extends Command
 {
-    protected $signature = 'zcout:simulation-smoke {--mode=report}';
+    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1}';
 
     protected $description = 'Run a basic simulation smoke test';
 
     public function handle(): int
     {
         $mode = (string) $this->option('mode');
+        $userCount = max(1, (int) $this->option('users'));
+        $stepsPerUser = max(1, (int) $this->option('steps-per-user'));
 
         $runRecord = SimulationRunModel::query()->create([
             'mode' => $mode,
             'status' => 'running',
-            'config' => [],
+            'config' => [
+                'users' => $userCount,
+            ],
             'started_at' => now(),
         ]);
 
@@ -44,16 +48,24 @@ final class RunSimulationSmokeTest extends Command
                 output: $output,
             );
 
-            $users = [
-                new SimulatedUser(id: 'u1', type: 'casual', isLogged: false),
-                new SimulatedUser(id: 'u2', type: 'expert', isLogged: true),
-            ];
+            $users = [];
+
+            for ($i = 1; $i <= $userCount; $i++) {
+                $users[] = new SimulatedUser(
+                    id: 'u' . $i,
+                    type: $i % 5 === 0 ? 'expert' : 'casual',
+                    isLogged: $i % 2 === 0,
+                );
+            }
 
             $context = new SimulationContext(
                 mode: $mode,
                 runId: $runRecord->id,
                 now: new \DateTimeImmutable(),
-                config: [],
+                config: [
+                    'users' => $userCount,
+                    'steps_per_user' => $stepsPerUser,
+                ],
             );
 
             $run->run($users, $context);

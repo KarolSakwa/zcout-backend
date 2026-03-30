@@ -22,25 +22,29 @@ final class SimulationRun
      */
     public function run(array $users, SimulationContext $context): void
     {
+        $stepsPerUser = max(1, (int) ($context->config['steps_per_user'] ?? 1));
+
         foreach ($users as $user) {
-            foreach ($this->sources as $source) {
-                if (! $source->canGenerateFor($user, $context)) {
-                    continue;
+            for ($step = 0; $step < $stepsPerUser; $step++) {
+                foreach ($this->sources as $source) {
+                    if (! $source->canGenerateFor($user, $context)) {
+                        continue;
+                    }
+
+                    $opportunity = $source->generateOpportunity($user, $context);
+
+                    if ($opportunity === null) {
+                        continue;
+                    }
+
+                    $decision = $source->simulateDecision($opportunity, $user, $context);
+
+                    if ($decision === null) {
+                        continue;
+                    }
+
+                    $this->output->handleDecision($user, $opportunity, $decision, $context);
                 }
-
-                $opportunity = $source->generateOpportunity($user, $context);
-
-                if ($opportunity === null) {
-                    continue;
-                }
-
-                $decision = $source->simulateDecision($opportunity, $user, $context);
-
-                if ($decision === null) {
-                    continue;
-                }
-
-                $this->output->handleDecision($user, $opportunity, $decision, $context);
             }
         }
     }

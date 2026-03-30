@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class SimulationRun extends Model
 {
@@ -14,6 +15,11 @@ final class SimulationRun extends Model
         'finished_at',
         'result',
     ];
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(SimulationRunEvent::class);
+    }
 
     protected function casts(): array
     {
