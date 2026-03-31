@@ -29,6 +29,8 @@ final class MaterializeSimulatedDuelVote
             'payload' => [
                 'player_a_id' => $vote->playerAId,
                 'player_b_id' => $vote->playerBId,
+                'player_a_name' => $vote->playerAName,
+                'player_b_name' => $vote->playerBName,
                 'attribute_key' => $vote->attributeKey,
                 'step' => $vote->step,
                 'winner_player_id' => $vote->winnerPlayerId,

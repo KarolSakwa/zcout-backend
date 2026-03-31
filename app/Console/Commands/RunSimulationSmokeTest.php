@@ -112,6 +112,64 @@ final class RunSimulationSmokeTest extends Command
                 ->map(fn ($count) => (int) $count)
                 ->all();
 
+            $materializedAttributeCounts = SimulationRunEvent::query()
+                ->where('simulation_run_id', $runRecord->id)
+                ->where('source', 'duel')
+                ->select('payload->attribute_key as attribute_key', DB::raw('COUNT(*) as count'))
+                ->groupBy('attribute_key')
+                ->pluck('count', 'attribute_key')
+                ->map(fn ($count) => (int) $count)
+                ->all();
+
+            $pairEvents = SimulationRunEvent::query()
+                ->where('simulation_run_id', $runRecord->id)
+                ->where('source', 'duel')
+                ->get();
+
+            $materializedPairCounts = [];
+            $materializedPairAttributeCounts = [];
+            $topPairsReadable = [];
+
+            foreach ($pairEvents as $event) {
+                $payload = is_array($event->payload) ? $event->payload : [];
+
+                $playerAId = (int) ($payload['player_a_id'] ?? 0);
+                $playerBId = (int) ($payload['player_b_id'] ?? 0);
+                $playerAName = (string) ($payload['player_a_name'] ?? (string) $playerAId);
+                $playerBName = (string) ($payload['player_b_name'] ?? (string) $playerBId);
+                $attributeKey = (string) ($payload['attribute_key'] ?? 'unknown');
+
+                if ($playerAId <= 0 || $playerBId <= 0) {
+                    continue;
+                }
+
+                if ($playerAId <= $playerBId) {
+                    $leftId = $playerAId;
+                    $rightId = $playerBId;
+                    $leftName = $playerAName;
+                    $rightName = $playerBName;
+                } else {
+                    $leftId = $playerBId;
+                    $rightId = $playerAId;
+                    $leftName = $playerBName;
+                    $rightName = $playerAName;
+                }
+
+                $pairKey = $leftId . 'vs' . $rightId;
+                $pairAttributeKey = $pairKey . '|' . $attributeKey;
+                $readableKey = $leftName . ' vs ' . $rightName . ' | ' . $attributeKey;
+
+                $materializedPairCounts[$pairKey] = ($materializedPairCounts[$pairKey] ?? 0) + 1;
+                $materializedPairAttributeCounts[$pairAttributeKey] = ($materializedPairAttributeCounts[$pairAttributeKey] ?? 0) + 1;
+                $topPairsReadable[$readableKey] = ($topPairsReadable[$readableKey] ?? 0) + 1;
+            }
+
+            arsort($materializedPairCounts);
+            arsort($materializedPairAttributeCounts);
+            arsort($topPairsReadable);
+
+            $topPairsReadable = array_slice($topPairsReadable, 0, 10, true);
+
             $result = [
                 'metrics' => [
                     'before' => $beforeMetrics,
@@ -124,6 +182,10 @@ final class RunSimulationSmokeTest extends Command
                     'planned_interactions' => $plannedInteractions,
                     'skips' => $skipCount,
                     'materialized_event_counts' => $materializedEventCounts,
+                    'materialized_attribute_counts' => $materializedAttributeCounts,
+                    'materialized_pair_counts' => $materializedPairCounts,
+                    'materialized_pair_attribute_counts' => $materializedPairAttributeCounts,
+                    'top_pairs_readable' => $topPairsReadable,
                 ],
             ];
             $isReportOutput = $output instanceof CollectingSimulationOutput;

@@ -63,6 +63,8 @@ final class GenerateSimulatedDuelOpportunity
             payload: [
                 'player_a_id' => $playerAId,
                 'player_b_id' => $playerBId,
+                'player_a_name' => (string) ($players[0]['name'] ?? ''),
+                'player_b_name' => (string) ($players[1]['name'] ?? ''),
                 'attribute' => $resolvedAttributeKey,
             ],
         );

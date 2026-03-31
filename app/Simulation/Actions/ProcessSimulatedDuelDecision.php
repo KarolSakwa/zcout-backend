@@ -59,6 +59,8 @@ final class ProcessSimulatedDuelDecision
             isLogged: $user->isLogged,
             playerAId: (int) $opportunity->payload['player_a_id'],
             playerBId: (int) $opportunity->payload['player_b_id'],
+            playerAName: (string) ($opportunity->payload['player_a_name'] ?? ''),
+            playerBName: (string) ($opportunity->payload['player_b_name'] ?? ''),
             attributeKey: (string) $opportunity->payload['attribute'],
             decisionType: $decision->type,
             step: $context->currentStep,

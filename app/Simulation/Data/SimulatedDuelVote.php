@@ -9,6 +9,8 @@ final class SimulatedDuelVote
         public readonly bool $isLogged,
         public readonly int $playerAId,
         public readonly int $playerBId,
+        public readonly string $playerAName,
+        public readonly string $playerBName,
         public readonly string $attributeKey,
         public readonly string $decisionType,
         public readonly int $step,
