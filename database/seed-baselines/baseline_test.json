@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "updated_at": "2026-03-31T09:46:55Z",
+    "updated_at": "2026-03-31T11:38:07Z",
     "players": {
         "216": {
             "name": "Erling Haaland",
@@ -8,10 +8,20 @@
             "club": "Manchester City FC",
             "attributes": {
                 "pace": 94,
-                "acceleration": 93
+                "acceleration": 93,
+                "ball_control": 81
+            },
+            "review_attributes": []
+        },
+        "20": {
+            "name": "Christian N\u00f8rgaard",
+            "position": "DM",
+            "club": "Arsenal FC",
+            "attributes": {
+                "pace": 76
             },
             "review_attributes": [
-                "acceleration"
+                "pace"
             ]
         }
     }

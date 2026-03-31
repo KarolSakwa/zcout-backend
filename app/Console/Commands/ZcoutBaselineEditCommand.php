@@ -10,7 +10,7 @@ use RuntimeException;
 
 class ZcoutBaselineEditCommand extends Command
 {
-    protected $signature = 'zcout:baseline-edit {--player=} {--file=database/seed-baselines/baseline_v1.json}';
+    protected $signature = 'zcout:baseline-edit {--player=} {--file=database/seed-baselines/baseline_v1.json} {--review}';
 
     protected $description = 'Edit baseline seed ratings stored in a JSON file.';
 
@@ -47,7 +47,13 @@ class ZcoutBaselineEditCommand extends Command
 
         for ($playerIndex = $startIndex; $playerIndex < $players->count(); $playerIndex++) {
             $player = $players[$playerIndex];
-            $definitions = $this->attributeDefinitionsForPosition($player['position']);
+            $definitions = $this->promptDefinitionsForPlayer($player, $baseline);
+
+            if ($definitions === []) {
+                $playerIndex++;
+                continue;
+            }
+
             $attributeIndex = $this->resolveStartingAttributeIndex($player, $baseline);
 
             while ($attributeIndex < count($definitions)) {
@@ -135,6 +141,7 @@ class ZcoutBaselineEditCommand extends Command
     protected function resolveStartIndex($players, array $baseline): array
     {
         $playerOption = $this->option('player');
+        $reviewMode = (bool) $this->option('review');
 
         if ($playerOption !== null) {
             $targetId = (int) $playerOption;
@@ -154,6 +161,17 @@ class ZcoutBaselineEditCommand extends Command
         }
 
         foreach ($players as $index => $player) {
+            if ($reviewMode) {
+                if ($this->hasPlayerReviewPending($player, $baseline)) {
+                    return [
+                        'status' => 'ok',
+                        'index' => $index,
+                    ];
+                }
+
+                continue;
+            }
+
             if (! $this->isPlayerComplete($player, $baseline)) {
                 return [
                     'status' => 'ok',
@@ -166,6 +184,13 @@ class ZcoutBaselineEditCommand extends Command
             'status' => 'ok',
             'index' => null,
         ];
+    }
+
+    protected function hasPlayerReviewPending(array $player, array $baseline): bool
+    {
+        $reviewAttributes = $baseline['players'][(string) $player['id']]['review_attributes'] ?? [];
+
+        return is_array($reviewAttributes) && count($reviewAttributes) > 0;
     }
 
     protected function isPlayerComplete(array $player, array $baseline): bool
@@ -403,7 +428,7 @@ class ZcoutBaselineEditCommand extends Command
 
     protected function resolveStartingAttributeIndex(array $player, array $baseline): int
     {
-        $definitions = $this->attributeDefinitionsForPosition($player['position']);
+        $definitions = $this->promptDefinitionsForPlayer($player, $baseline);
         $attributes = $baseline['players'][(string) $player['id']]['attributes'] ?? [];
 
         foreach ($definitions as $index => $definition) {
@@ -415,5 +440,25 @@ class ZcoutBaselineEditCommand extends Command
         }
 
         return 0;
+    }
+
+    protected function promptDefinitionsForPlayer(array $player, array $baseline): array
+    {
+        $definitions = $this->attributeDefinitionsForPosition($player['position']);
+
+        if (! $this->option('review')) {
+            return $definitions;
+        }
+
+        $reviewAttributes = $baseline['players'][(string) $player['id']]['review_attributes'] ?? [];
+
+        if (! is_array($reviewAttributes) || $reviewAttributes === []) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $definitions,
+            fn (array $definition) => in_array($definition['key'], $reviewAttributes, true),
+        ));
     }
 }

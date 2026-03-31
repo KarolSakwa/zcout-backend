@@ -14,10 +14,12 @@ use App\Simulation\Sources\DuelInteractionSource;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use App\Simulation\Truth\DatabaseSnapshotTruthProvider;
+use App\Simulation\Actions\ResetSimulationState;
+use App\Models\SimulationRunEvent;
 
 final class RunSimulationSmokeTest extends Command
 {
-    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345}';
+    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0}';
 
     protected $description = 'Run a basic simulation smoke test';
 
@@ -38,13 +40,11 @@ final class RunSimulationSmokeTest extends Command
             'started_at' => now(),
         ]);
 
-        $beforeMetrics = [
-            'votes' => (int) DB::table('votes')->count(),
-            'duels' => (int) DB::table('duels')->count(),
-            'ratings' => (int) DB::table('player_attribute_ratings')->count(),
-        ];
-
         (new DatabaseSnapshotTruthProvider())->snapshotForRun($runRecord);
+
+        if ((string) $this->option('reset') === '1') {
+            (new ResetSimulationState())->handle();
+        }
 
         try {
             $output = $mode === 'materialize'
@@ -81,6 +81,12 @@ final class RunSimulationSmokeTest extends Command
                 ],
             );
 
+            $beforeMetrics = [
+                'votes' => (int) DB::table('votes')->count(),
+                'duels' => (int) DB::table('duels')->count(),
+                'ratings' => (int) DB::table('player_attribute_ratings')->count(),
+            ];
+
             $run->run($users, $context);
 
             $afterMetrics = [
@@ -88,6 +94,23 @@ final class RunSimulationSmokeTest extends Command
                 'duels' => (int) DB::table('duels')->count(),
                 'ratings' => (int) DB::table('player_attribute_ratings')->count(),
             ];
+
+            $plannedInteractions = $userCount * $stepsPerUser;
+
+            $skipCount = $output instanceof CollectingSimulationOutput
+                ? (int) (($output->summary()['decision_counts']['skip'] ?? 0))
+                : (int) SimulationRunEvent::query()
+                    ->where('simulation_run_id', $runRecord->id)
+                    ->where('event_type', 'skip')
+                    ->count();
+
+            $materializedEventCounts = SimulationRunEvent::query()
+                ->where('simulation_run_id', $runRecord->id)
+                ->select('event_type', DB::raw('COUNT(*) as count'))
+                ->groupBy('event_type')
+                ->pluck('count', 'event_type')
+                ->map(fn ($count) => (int) $count)
+                ->all();
 
             $result = [
                 'metrics' => [
@@ -98,6 +121,9 @@ final class RunSimulationSmokeTest extends Command
                         'duels' => $afterMetrics['duels'] - $beforeMetrics['duels'],
                         'ratings' => $afterMetrics['ratings'] - $beforeMetrics['ratings'],
                     ],
+                    'planned_interactions' => $plannedInteractions,
+                    'skips' => $skipCount,
+                    'materialized_event_counts' => $materializedEventCounts,
                 ],
             ];
             $isReportOutput = $output instanceof CollectingSimulationOutput;
