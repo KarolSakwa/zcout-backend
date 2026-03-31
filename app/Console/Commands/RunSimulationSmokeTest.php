@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use App\Simulation\Truth\DatabaseSnapshotTruthProvider;
 use App\Simulation\Actions\ResetSimulationState;
 use App\Models\SimulationRunEvent;
+use App\Simulation\Actions\InitializeSimulationStateFromTruthSnapshot;
 
 final class RunSimulationSmokeTest extends Command
 {
@@ -44,8 +45,8 @@ final class RunSimulationSmokeTest extends Command
 
         if ((string) $this->option('reset') === '1') {
             (new ResetSimulationState())->handle();
-            (new \App\Simulation\Actions\InitializeSimulationStateFromTruthSnapshot())->handle($runRecord->id);
         }
+        (new InitializeSimulationStateFromTruthSnapshot())->handle($runRecord->id);
 
         try {
             $output = $mode === 'materialize'
