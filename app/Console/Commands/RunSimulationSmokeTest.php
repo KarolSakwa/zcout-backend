@@ -12,7 +12,8 @@ use App\Simulation\SimulationContext;
 use App\Simulation\SimulationRun;
 use App\Simulation\Sources\DuelInteractionSource;
 use Illuminate\Console\Command;
-use App\Simulation\Actions\SnapshotSimulationRunTruthRatings;
+use Illuminate\Support\Facades\DB;
+use App\Simulation\Truth\DatabaseSnapshotTruthProvider;
 
 final class RunSimulationSmokeTest extends Command
 {
@@ -37,7 +38,13 @@ final class RunSimulationSmokeTest extends Command
             'started_at' => now(),
         ]);
 
-        (new SnapshotSimulationRunTruthRatings())->handle($runRecord);
+        $beforeMetrics = [
+            'votes' => (int) DB::table('votes')->count(),
+            'duels' => (int) DB::table('duels')->count(),
+            'ratings' => (int) DB::table('player_attribute_ratings')->count(),
+        ];
+
+        (new DatabaseSnapshotTruthProvider())->snapshotForRun($runRecord);
 
         try {
             $output = $mode === 'materialize'
@@ -76,21 +83,47 @@ final class RunSimulationSmokeTest extends Command
 
             $run->run($users, $context);
 
+            $afterMetrics = [
+                'votes' => (int) DB::table('votes')->count(),
+                'duels' => (int) DB::table('duels')->count(),
+                'ratings' => (int) DB::table('player_attribute_ratings')->count(),
+            ];
+
+            $result = [
+                'metrics' => [
+                    'before' => $beforeMetrics,
+                    'after' => $afterMetrics,
+                    'delta' => [
+                        'votes' => $afterMetrics['votes'] - $beforeMetrics['votes'],
+                        'duels' => $afterMetrics['duels'] - $beforeMetrics['duels'],
+                        'ratings' => $afterMetrics['ratings'] - $beforeMetrics['ratings'],
+                    ],
+                ],
+            ];
+            $isReportOutput = $output instanceof CollectingSimulationOutput;
+
+            if ($isReportOutput) {
+                $result['report'] = [
+                    'summary' => $output->summary(),
+                    'items' => $output->items(),
+                ];
+            }
+
             $runRecord->update([
                 'status' => 'finished',
                 'finished_at' => now(),
-                'result' => $output instanceof CollectingSimulationOutput
-                    ? [
-                        'summary' => $output->summary(),
-                        'items' => $output->items(),
-                    ]
-                    : null,
+                'result' => $result,
             ]);
 
-            if ($output instanceof CollectingSimulationOutput) {
+            if ($isReportOutput) {
                 $this->line(json_encode($output->summary(), JSON_PRETTY_PRINT));
             } else {
-                $this->info("Materialize mode executed for run #{$runRecord->id}.");
+                $delta = $result['metrics']['delta'];
+
+                $this->info(
+                    "Materialize mode executed for run #{$runRecord->id}. "
+                    . "Δvotes={$delta['votes']} Δduels={$delta['duels']} Δratings={$delta['ratings']}"
+                );
             }
 
             return self::SUCCESS;

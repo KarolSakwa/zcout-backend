@@ -8,6 +8,11 @@ use App\Simulation\SimulationContext;
 
 final class MaterializeSimulatedDuelVote
 {
+    public function __construct(
+        private readonly SubmitSimulatedDuelVoteToApp $appVoteSubmitter = new SubmitSimulatedDuelVoteToApp(),
+    ) {
+    }
+
     public function handle(SimulatedDuelVote $vote, SimulationContext $context): void
     {
         $nextSequence = (int) SimulationRunEvent::query()
@@ -26,7 +31,10 @@ final class MaterializeSimulatedDuelVote
                 'player_b_id' => $vote->playerBId,
                 'attribute_key' => $vote->attributeKey,
                 'step' => $vote->step,
+                'winner_player_id' => $vote->winnerPlayerId,
             ],
         ]);
+
+        $this->appVoteSubmitter->handle($vote);
     }
 }

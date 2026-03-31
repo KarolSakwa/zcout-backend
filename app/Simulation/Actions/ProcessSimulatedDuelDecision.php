@@ -34,7 +34,7 @@ final class ProcessSimulatedDuelDecision
             throw new RuntimeException("Unsupported duel opportunity type [{$opportunity->type}].");
         }
 
-        if (! in_array($decision->type, ['vote_left', 'vote_right', 'skip'], true)) {
+        if (! in_array($decision->type, ['vote', 'skip'], true)) {
             throw new RuntimeException("Unsupported duel decision type [{$decision->type}].");
         }
 
@@ -50,6 +50,10 @@ final class ProcessSimulatedDuelDecision
             throw new RuntimeException('Missing [attribute] in duel opportunity payload.');
         }
 
+        if ($decision->type === 'vote' && ! array_key_exists('winner_player_id', $decision->payload)) {
+            throw new RuntimeException('Missing [winner_player_id] in duel decision payload.');
+        }
+
         $vote = new SimulatedDuelVote(
             simulatedUserId: $user->id,
             isLogged: $user->isLogged,
@@ -58,6 +62,9 @@ final class ProcessSimulatedDuelDecision
             attributeKey: (string) $opportunity->payload['attribute'],
             decisionType: $decision->type,
             step: $context->currentStep,
+            winnerPlayerId: $decision->type === 'vote'
+                ? (int) $decision->payload['winner_player_id']
+                : null,
         );
 
         $this->materializer->handle($vote, $context);

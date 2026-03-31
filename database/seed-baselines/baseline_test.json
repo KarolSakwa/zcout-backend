@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "updated_at": "2026-03-31T09:46:55Z",
+    "players": {
+        "216": {
+            "name": "Erling Haaland",
+            "position": "ST",
+            "club": "Manchester City FC",
+            "attributes": {
+                "pace": 94,
+                "acceleration": 93
+            },
+            "review_attributes": [
+                "acceleration"
+            ]
+        }
+    }
+}

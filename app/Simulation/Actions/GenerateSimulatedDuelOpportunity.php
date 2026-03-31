@@ -4,43 +4,66 @@ namespace App\Simulation\Actions;
 
 use App\Simulation\Data\InteractionOpportunity;
 use App\Simulation\Data\SimulatedUser;
+use App\Simulation\Services\SimulationTruthPoolReader;
 use App\Simulation\SimulationContext;
 
 final class GenerateSimulatedDuelOpportunity
 {
+    public function __construct(
+        private readonly FetchNextDuelPayload $duelPayloadFetcher = new FetchNextDuelPayload(),
+        private readonly SimulationTruthPoolReader $truthPoolReader = new SimulationTruthPoolReader(),
+    ) {
+    }
+
     public function handle(
         SimulatedUser $user,
         SimulationContext $context
     ): ?InteractionOpportunity {
-        $pairs = [
-            ['player_a_id' => 1, 'player_b_id' => 2],
-            ['player_a_id' => 3, 'player_b_id' => 4],
-            ['player_a_id' => 5, 'player_b_id' => 6],
-            ['player_a_id' => 7, 'player_b_id' => 8],
-        ];
+        $attributeKeys = $this->truthPoolReader->getAttributeKeysForRun($context->runId);
 
-        $attributes = [
-            'pace',
-            'dribbling',
-            'passing',
-            'finishing',
-        ];
+        if ($attributeKeys === []) {
+            return null;
+        }
 
-        $seedBase = $context->runId . '|' . $context->currentStep . '|' . $user->id;
+        $seed = (int) ($context->config['seed'] ?? 12345);
 
-        $pairIndex = abs(crc32($seedBase . '|pair')) % count($pairs);
-        $attributeIndex = abs(crc32($seedBase . '|attribute')) % count($attributes);
+        $base = implode('|', [
+            $seed,
+            $context->runId,
+            $context->currentStep,
+            $user->id,
+        ]);
 
-        $pair = $pairs[$pairIndex];
-        $attribute = $attributes[$attributeIndex];
+        $attributeKey = $attributeKeys[abs(crc32($base . '|attribute')) % count($attributeKeys)];
+
+        $payload = $this->duelPayloadFetcher->handle($attributeKey, 'sim:' . $user->id);
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $players = $payload['players'] ?? null;
+        $attribute = $payload['attribute'] ?? null;
+
+        if (! is_array($players) || count($players) < 2 || ! is_array($attribute)) {
+            return null;
+        }
+
+        $playerAId = (int) ($players[0]['id'] ?? 0);
+        $playerBId = (int) ($players[1]['id'] ?? 0);
+        $resolvedAttributeKey = (string) ($attribute['key'] ?? $attributeKey);
+
+        if ($playerAId <= 0 || $playerBId <= 0 || $playerAId === $playerBId || $resolvedAttributeKey === '') {
+            return null;
+        }
 
         return new InteractionOpportunity(
             source: 'duel',
             type: 'pair',
             payload: [
-                'player_a_id' => $pair['player_a_id'],
-                'player_b_id' => $pair['player_b_id'],
-                'attribute' => $attribute,
+                'player_a_id' => $playerAId,
+                'player_b_id' => $playerBId,
+                'attribute' => $resolvedAttributeKey,
             ],
         );
     }
