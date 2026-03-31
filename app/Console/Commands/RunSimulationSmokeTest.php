@@ -44,6 +44,7 @@ final class RunSimulationSmokeTest extends Command
 
         if ((string) $this->option('reset') === '1') {
             (new ResetSimulationState())->handle();
+            (new \App\Simulation\Actions\InitializeSimulationStateFromTruthSnapshot())->handle($runRecord->id);
         }
 
         try {
@@ -86,6 +87,25 @@ final class RunSimulationSmokeTest extends Command
                 'duels' => (int) DB::table('duels')->count(),
                 'ratings' => (int) DB::table('player_attribute_ratings')->count(),
             ];
+
+            $beforePlayerAttributeState = DB::table('player_attribute_ratings as par')
+                ->join('attributes as a', 'a.id', '=', 'par.attribute_id')
+                ->select([
+                    'par.player_id',
+                    'a.key as attribute_key',
+                    'par.rating',
+                    'par.confidence',
+                    'par.votes_count',
+                ])
+                ->get()
+                ->mapWithKeys(fn ($row) => [
+                    ((int) $row->player_id) . '|' . (string) $row->attribute_key => [
+                        'rating' => (float) $row->rating,
+                        'confidence' => (float) $row->confidence,
+                        'votes_count' => (int) $row->votes_count,
+                    ],
+                ])
+                ->all();
 
             $run->run($users, $context);
 
@@ -170,6 +190,121 @@ final class RunSimulationSmokeTest extends Command
 
             $topPairsReadable = array_slice($topPairsReadable, 0, 10, true);
 
+            $touchedPlayerAttributeCounts = [];
+
+            foreach ($pairEvents as $event) {
+                $payload = is_array($event->payload) ? $event->payload : [];
+
+                $playerAId = (int) ($payload['player_a_id'] ?? 0);
+                $playerBId = (int) ($payload['player_b_id'] ?? 0);
+                $playerAName = (string) ($payload['player_a_name'] ?? (string) $playerAId);
+                $playerBName = (string) ($payload['player_b_name'] ?? (string) $playerBId);
+                $attributeKey = (string) ($payload['attribute_key'] ?? 'unknown');
+                $eventType = (string) ($event->event_type ?? '');
+
+                if ($playerAId > 0) {
+                    $keyA = $playerAId . '|' . $attributeKey;
+                    $labelA = $playerAName . ' | ' . $attributeKey;
+
+                    if (! isset($touchedPlayerAttributeCounts[$keyA])) {
+                        $touchedPlayerAttributeCounts[$keyA] = [
+                            'player_id' => $playerAId,
+                            'player_name' => $playerAName,
+                            'attribute_key' => $attributeKey,
+                            'label' => $labelA,
+                            'count' => 0,
+                            'vote_touch_count' => 0,
+                            'skip_touch_count' => 0,
+                        ];
+                    }
+
+                    $touchedPlayerAttributeCounts[$keyA]['count']++;
+
+                    if ($eventType === 'vote') {
+                        $touchedPlayerAttributeCounts[$keyA]['vote_touch_count']++;
+                    }
+
+                    if ($eventType === 'skip') {
+                        $touchedPlayerAttributeCounts[$keyA]['skip_touch_count']++;
+                    }
+                }
+
+                if ($playerBId > 0) {
+                    $keyB = $playerBId . '|' . $attributeKey;
+                    $labelB = $playerBName . ' | ' . $attributeKey;
+
+                    if (! isset($touchedPlayerAttributeCounts[$keyB])) {
+                        $touchedPlayerAttributeCounts[$keyB] = [
+                            'player_id' => $playerBId,
+                            'player_name' => $playerBName,
+                            'attribute_key' => $attributeKey,
+                            'label' => $labelB,
+                            'count' => 0,
+                            'vote_touch_count' => 0,
+                            'skip_touch_count' => 0,
+                        ];
+                    }
+
+                    $touchedPlayerAttributeCounts[$keyB]['count']++;
+
+                    if ($eventType === 'vote') {
+                        $touchedPlayerAttributeCounts[$keyB]['vote_touch_count']++;
+                    }
+
+                    if ($eventType === 'skip') {
+                        $touchedPlayerAttributeCounts[$keyB]['skip_touch_count']++;
+                    }
+                }
+            }
+
+            usort($touchedPlayerAttributeCounts, fn ($a, $b) => $b['count'] <=> $a['count']);
+
+            $topTouchedPlayerAttributes = array_slice($touchedPlayerAttributeCounts, 0, 15);
+
+            $topTouchedPlayerAttributes = array_map(function (array $item) use ($beforePlayerAttributeState): array {
+                $row = DB::table('player_attribute_ratings as par')
+                    ->join('attributes as a', 'a.id', '=', 'par.attribute_id')
+                    ->where('par.player_id', $item['player_id'])
+                    ->where('a.key', $item['attribute_key'])
+                    ->select([
+                        'par.rating',
+                        'par.confidence',
+                        'par.votes_count',
+                    ])
+                    ->first();
+
+                $stateKey = $item['player_id'] . '|' . $item['attribute_key'];
+                $before = $beforePlayerAttributeState[$stateKey] ?? null;
+
+                $currentRating = $row ? (float) $row->rating : null;
+                $currentConfidence = $row ? (float) $row->confidence : null;
+                $currentVotesCount = $row ? (int) $row->votes_count : null;
+
+                $beforeRating = $before['rating'] ?? null;
+                $beforeConfidence = $before['confidence'] ?? null;
+                $beforeVotesCount = $before['votes_count'] ?? null;
+
+                $item['before_rating'] = $beforeRating;
+                $item['current_rating'] = $currentRating;
+                $item['rating_delta'] = $currentRating !== null
+                    ? $currentRating - (float) ($beforeRating ?? 0.0)
+                    : null;
+
+                $item['before_confidence'] = $beforeConfidence;
+                $item['current_confidence'] = $currentConfidence;
+                $item['confidence_delta'] = $currentConfidence !== null
+                    ? $currentConfidence - (float) ($beforeConfidence ?? 0.0)
+                    : null;
+
+                $item['before_votes_count'] = $beforeVotesCount;
+                $item['current_votes_count'] = $currentVotesCount;
+                $item['votes_count_delta'] = $currentVotesCount !== null
+                    ? $currentVotesCount - (int) ($beforeVotesCount ?? 0)
+                    : null;
+
+                return $item;
+            }, $topTouchedPlayerAttributes);
+
             $result = [
                 'metrics' => [
                     'before' => $beforeMetrics,
@@ -186,6 +321,7 @@ final class RunSimulationSmokeTest extends Command
                     'materialized_pair_counts' => $materializedPairCounts,
                     'materialized_pair_attribute_counts' => $materializedPairAttributeCounts,
                     'top_pairs_readable' => $topPairsReadable,
+                    'top_touched_player_attributes' => $topTouchedPlayerAttributes,
                 ],
             ];
             $isReportOutput = $output instanceof CollectingSimulationOutput;
@@ -206,12 +342,32 @@ final class RunSimulationSmokeTest extends Command
             if ($isReportOutput) {
                 $this->line(json_encode($output->summary(), JSON_PRETTY_PRINT));
             } else {
-                $delta = $result['metrics']['delta'];
+                $metrics = $result['metrics'];
+                $delta = $metrics['delta'];
+                $topPairs = $metrics['top_pairs_readable'] ?? [];
+
+                $planned = (int) ($metrics['planned_interactions'] ?? 0);
+                $votes = (int) ($metrics['materialized_event_counts']['vote'] ?? 0);
+                $skips = (int) ($metrics['materialized_event_counts']['skip'] ?? 0);
+                $deltaVotes = (int) ($delta['votes'] ?? 0);
+                $deltaDuels = (int) ($delta['duels'] ?? 0);
+                $deltaRatings = (int) ($delta['ratings'] ?? 0);
 
                 $this->info(
                     "Materialize mode executed for run #{$runRecord->id}. "
-                    . "Δvotes={$delta['votes']} Δduels={$delta['duels']} Δratings={$delta['ratings']}"
+                    . "planned={$planned} "
+                    . "votes={$votes} "
+                    . "skips={$skips} "
+                    . "Δvotes={$deltaVotes} Δduels={$deltaDuels} Δratings={$deltaRatings}"
                 );
+
+                if ($topPairs !== []) {
+                    $this->line('Top pairs:');
+
+                    foreach ($topPairs as $label => $count) {
+                        $this->line("- {$label}: {$count}");
+                    }
+                }
             }
 
             return self::SUCCESS;
