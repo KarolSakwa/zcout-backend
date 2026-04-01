@@ -20,10 +20,11 @@ final class SimulationRun
     /**
      * @param  array<SimulatedUser>  $users
      */
-    public function run(array $users, SimulationContext $context): void
+    public function run(array $users, SimulationContext $context, ?callable $onProgress = null): void
     {
         $stepsPerUser = max(1, (int) ($context->config['steps_per_user'] ?? 1));
         $seed = (int) ($context->config['seed'] ?? 12345);
+        $processedInteractions = 0;
 
         for ($step = 0; $step < $stepsPerUser; $step++) {
             $stepUsers = $users;
@@ -58,8 +59,18 @@ final class SimulationRun
                     }
 
                     $this->output->handleDecision($user, $opportunity, $decision, $stepContext);
+
+                    $processedInteractions++;
+
+                    if ($onProgress !== null && $processedInteractions % 5000 === 0) {
+                        $onProgress($processedInteractions);
+                    }
                 }
             }
+        }
+
+        if ($onProgress !== null) {
+            $onProgress($processedInteractions);
         }
     }
 }

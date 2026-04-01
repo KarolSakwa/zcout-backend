@@ -41,12 +41,21 @@ final class RunSimulationSmokeTest extends Command
             'started_at' => now(),
         ]);
 
+        $logPhase = function (string $message) use ($runRecord): void {
+            $this->line("[run #{$runRecord->id}] {$message}");
+        };
+
+        $logPhase('snapshotting truth');
         (new DatabaseSnapshotTruthProvider())->snapshotForRun($runRecord);
 
         if ((string) $this->option('reset') === '1') {
+            $logPhase('resetting live state');
             (new ResetSimulationState())->handle();
+
+            $logPhase('initializing live state from truth snapshot');
+            (new InitializeSimulationStateFromTruthSnapshot())->handle($runRecord->id);
         }
-        (new InitializeSimulationStateFromTruthSnapshot())->handle($runRecord->id);
+
 
         try {
             $output = $mode === 'materialize'
@@ -64,10 +73,21 @@ final class RunSimulationSmokeTest extends Command
 
             $users = [];
 
+            $users = [];
+
             for ($i = 1; $i <= $userCount; $i++) {
+                $bucket = $i % 10;
+
+                $type = match (true) {
+                    $bucket === 0 => 'expert',
+                    $bucket === 1 || $bucket === 2 => 'noisy',
+                    $bucket === 3 || $bucket === 4 => 'biased',
+                    default => 'casual',
+                };
+
                 $users[] = new SimulatedUser(
                     id: 'u' . $i,
-                    type: $i % 5 === 0 ? 'expert' : 'casual',
+                    type: $type,
                     isLogged: $i % 2 === 0,
                 );
             }
@@ -108,7 +128,17 @@ final class RunSimulationSmokeTest extends Command
                 ])
                 ->all();
 
-            $run->run($users, $context);
+            $logPhase("running simulation for {$userCount} users x {$stepsPerUser} steps");
+            $totalPlanned = $userCount * $stepsPerUser;
+
+            $run->run($users, $context, function (int $processed) use ($logPhase, $totalPlanned): void {
+                $percent = $totalPlanned > 0
+                    ? round(($processed / $totalPlanned) * 100, 1)
+                    : 0.0;
+
+                $logPhase("progress {$processed}/{$totalPlanned} ({$percent}%)");
+            });
+            $logPhase('simulation finished, collecting metrics');
 
             $afterMetrics = [
                 'votes' => (int) DB::table('votes')->count(),

@@ -8,10 +8,6 @@ final class ResetSimulationState
 {
     public function handle(): void
     {
-        DB::transaction(function (): void {
-            DB::table('votes')->delete();
-            DB::table('duels')->delete();
-            DB::table('player_attribute_ratings')->delete();
-        });
+        DB::statement('TRUNCATE TABLE votes, duels, player_attribute_ratings RESTART IDENTITY CASCADE');
     }
 }

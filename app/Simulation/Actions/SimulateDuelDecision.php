@@ -44,10 +44,13 @@ final class SimulateDuelDecision
 
         $skipRoll = abs(crc32($base . '|skip')) % 1000;
         $correctnessRoll = abs(crc32($base . '|correctness')) % 1000;
+        $biasRoll = abs(crc32($base . '|bias')) % 1000;
 
         $skipThreshold = match ($user->type) {
             'expert' => $absDiff < 3 ? 90 : ($absDiff < 8 ? 40 : 15),
             'casual' => $absDiff < 3 ? 240 : ($absDiff < 8 ? 120 : 50),
+            'noisy' => $absDiff < 3 ? 180 : ($absDiff < 8 ? 90 : 35),
+            'biased' => $absDiff < 3 ? 140 : ($absDiff < 8 ? 70 : 25),
             default => $absDiff < 3 ? 180 : ($absDiff < 8 ? 80 : 35),
         };
 
@@ -62,6 +65,8 @@ final class SimulateDuelDecision
         $correctnessThreshold = match ($user->type) {
             'expert' => $absDiff < 3 ? 650 : ($absDiff < 8 ? 850 : 950),
             'casual' => $absDiff < 3 ? 540 : ($absDiff < 8 ? 720 : 860),
+            'noisy' => $absDiff < 3 ? 420 : ($absDiff < 8 ? 560 : 680),
+            'biased' => $absDiff < 3 ? 500 : ($absDiff < 8 ? 660 : 800),
             default => $absDiff < 3 ? 500 : ($absDiff < 8 ? 650 : 780),
         };
 
@@ -71,6 +76,14 @@ final class SimulateDuelDecision
         $winnerPlayerId = $correctnessRoll < $correctnessThreshold
             ? $preferredWinnerId
             : $oppositeWinnerId;
+
+        if ($user->type === 'biased' && $absDiff < 8) {
+            $biasedPreferredWinnerId = $biasRoll < 500 ? $duel->playerAId : $duel->playerBId;
+
+            if ($biasRoll < 350) {
+                $winnerPlayerId = $biasedPreferredWinnerId;
+            }
+        }
 
         return new InteractionDecision(
             source: 'duel',
