@@ -13,8 +13,14 @@ final class MaterializeSimulatedDuelVote
     ) {
     }
 
-    public function handle(SimulatedDuelVote $vote, SimulationContext $context): void
+    public function handle(SimulatedDuelVote $vote, SimulationContext $context): int
     {
+        $statusCode = $this->appVoteSubmitter->handle($vote);
+
+        if ($statusCode === 409) {
+            return 409;
+        }
+
         $nextSequence = (int) SimulationRunEvent::query()
                 ->where('simulation_run_id', $context->runId)
                 ->max('sequence') + 1;
@@ -37,6 +43,6 @@ final class MaterializeSimulatedDuelVote
             ],
         ]);
 
-        $this->appVoteSubmitter->handle($vote);
+        return $statusCode;
     }
 }

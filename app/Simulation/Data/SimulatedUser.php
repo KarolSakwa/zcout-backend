@@ -8,7 +8,7 @@ final class SimulatedUser
         public readonly string $id,
         public readonly string $type,
         public readonly bool $isLogged,
-        public readonly array $traits = [],
+        public readonly ?int $appUserId = null,
     ) {
     }
 }

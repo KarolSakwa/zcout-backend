@@ -14,5 +14,5 @@ interface SimulationDecisionProcessor
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void;
+    ): int;
 }

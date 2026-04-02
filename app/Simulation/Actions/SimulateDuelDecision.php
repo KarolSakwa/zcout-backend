@@ -47,10 +47,10 @@ final class SimulateDuelDecision
         $biasRoll = abs(crc32($base . '|bias')) % 1000;
 
         $skipThreshold = match ($user->type) {
-            'expert' => $absDiff < 3 ? 90 : ($absDiff < 8 ? 40 : 15),
-            'casual' => $absDiff < 3 ? 240 : ($absDiff < 8 ? 120 : 50),
+            'expert' => $absDiff < 3 ? 420 : ($absDiff < 8 ? 110 : 15),
+            'casual' => $absDiff < 3 ? 260 : ($absDiff < 8 ? 110 : 35),
             'noisy' => $absDiff < 3 ? 180 : ($absDiff < 8 ? 90 : 35),
-            'biased' => $absDiff < 3 ? 140 : ($absDiff < 8 ? 70 : 25),
+            'biased' => $absDiff < 3 ? 120 : ($absDiff < 8 ? 55 : 20),
             default => $absDiff < 3 ? 180 : ($absDiff < 8 ? 80 : 35),
         };
 
@@ -63,10 +63,10 @@ final class SimulateDuelDecision
         }
 
         $correctnessThreshold = match ($user->type) {
-            'expert' => $absDiff < 3 ? 650 : ($absDiff < 8 ? 850 : 950),
-            'casual' => $absDiff < 3 ? 540 : ($absDiff < 8 ? 720 : 860),
+            'expert' => $absDiff < 3 ? 920 : ($absDiff < 8 ? 975 : 995),
+            'casual' => $absDiff < 3 ? 720 : ($absDiff < 8 ? 840 : 920),
             'noisy' => $absDiff < 3 ? 420 : ($absDiff < 8 ? 560 : 680),
-            'biased' => $absDiff < 3 ? 500 : ($absDiff < 8 ? 660 : 800),
+            'biased' => $absDiff < 3 ? 560 : ($absDiff < 8 ? 700 : 820),
             default => $absDiff < 3 ? 500 : ($absDiff < 8 ? 650 : 780),
         };
 

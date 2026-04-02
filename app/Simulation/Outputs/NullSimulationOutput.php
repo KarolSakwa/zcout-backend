@@ -15,6 +15,7 @@ final class NullSimulationOutput implements SimulationOutput
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
+    ): int {
+        return 204;
     }
 }

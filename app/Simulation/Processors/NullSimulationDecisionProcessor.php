@@ -15,6 +15,7 @@ final class NullSimulationDecisionProcessor implements SimulationDecisionProcess
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
+    ): int {
+        return 204;
     }
 }

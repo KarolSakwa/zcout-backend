@@ -24,13 +24,13 @@ final class RoutingSimulationDecisionProcessor implements SimulationDecisionProc
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
+    ): int {
         $processor = $this->processors[$opportunity->source] ?? null;
 
-        if ($processor === null) {
+        if (! $processor instanceof SimulationDecisionProcessor) {
             throw new RuntimeException("No processor registered for source [{$opportunity->source}].");
         }
 
-        $processor->process($user, $opportunity, $decision, $context);
+        return $processor->process($user, $opportunity, $decision, $context);
     }
 }

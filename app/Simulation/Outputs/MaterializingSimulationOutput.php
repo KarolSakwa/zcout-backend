@@ -21,7 +21,7 @@ final class MaterializingSimulationOutput implements SimulationOutput
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
-        $this->processor->process($user, $opportunity, $decision, $context);
+    ): int {
+        return $this->processor->process($user, $opportunity, $decision, $context);
     }
 }

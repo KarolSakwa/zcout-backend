@@ -4,6 +4,7 @@ namespace App\Simulation\Actions;
 
 use App\Http\Controllers\Api\DuelController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 final class FetchNextDuelPayload
 {
@@ -12,25 +13,29 @@ final class FetchNextDuelPayload
     ) {
     }
 
-    public function handle(string $attributeKey, ?string $anonId = null): ?array
+    public function handle(string $attributeKey, ?string $anonId = null, ?int $appUserId = null): ?array
     {
-        $req = Request::create('/api/duels/next', 'GET', [
+        $request = Request::create('/api/duels/next', 'GET', [
             'attribute' => $attributeKey,
         ]);
 
-        if ($anonId !== null && $anonId !== '') {
-            $req->headers->set('X-Zcout-Anon', $anonId);
+        if ($appUserId !== null) {
+            Auth::onceUsingId($appUserId);
+        } elseif ($anonId !== null && $anonId !== '') {
+            $request->headers->set('X-Zcout-Anon', $anonId);
         }
 
-        app()->instance('request', $req);
+        app()->instance('request', $request);
 
-        $resp = $this->duelController->next();
+        $response = $this->duelController->next();
 
-        if (! method_exists($resp, 'getData')) {
+        Auth::forgetGuards();
+
+        if (! method_exists($response, 'getData')) {
             return null;
         }
 
-        $data = $resp->getData(true);
+        $data = $response->getData(true);
 
         return is_array($data) ? $data : null;
     }

@@ -9,7 +9,7 @@ use App\Simulation\Data\SimulatedUser;
 final class SimulationRun
 {
     /**
-     * @param  array<InteractionSource>  $sources
+     * @param array<int, InteractionSource> $sources
      */
     public function __construct(
         private readonly array $sources,
@@ -17,9 +17,6 @@ final class SimulationRun
     ) {
     }
 
-    /**
-     * @param  array<SimulatedUser>  $users
-     */
     public function run(array $users, SimulationContext $context, ?callable $onProgress = null): void
     {
         $stepsPerUser = max(1, (int) ($context->config['steps_per_user'] ?? 1));
@@ -46,24 +43,34 @@ final class SimulationRun
                         continue;
                     }
 
-                    $opportunity = $source->generateOpportunity($user, $stepContext);
+                    $maxAttempts = 5;
 
-                    if ($opportunity === null) {
-                        continue;
-                    }
+                    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                        $opportunity = $source->generateOpportunity($user, $stepContext);
 
-                    $decision = $source->simulateDecision($opportunity, $user, $stepContext);
+                        if ($opportunity === null) {
+                            break;
+                        }
 
-                    if ($decision === null) {
-                        continue;
-                    }
+                        $decision = $source->simulateDecision($opportunity, $user, $stepContext);
 
-                    $this->output->handleDecision($user, $opportunity, $decision, $stepContext);
+                        if ($decision === null) {
+                            break;
+                        }
 
-                    $processedInteractions++;
+                        $statusCode = $this->output->handleDecision($user, $opportunity, $decision, $stepContext);
 
-                    if ($onProgress !== null && $processedInteractions % 5000 === 0) {
-                        $onProgress($processedInteractions);
+                        if ($statusCode === 409) {
+                            continue;
+                        }
+
+                        $processedInteractions++;
+
+                        if ($onProgress !== null && $processedInteractions % 5000 === 0) {
+                            $onProgress($processedInteractions);
+                        }
+
+                        break;
                     }
                 }
             }

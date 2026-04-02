@@ -17,17 +17,16 @@ final class CollectingSimulationOutput implements SimulationOutput
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
+    ): int {
         $this->items[] = [
             'user_id' => $user->id,
-            'user_type' => $user->type,
             'source' => $opportunity->source,
             'opportunity_type' => $opportunity->type,
             'decision_type' => $decision->type,
             'payload' => $decision->payload,
-            'opportunity_payload' => $opportunity->payload,
-            'step' => $context->currentStep,
         ];
+
+        return 200;
     }
 
     public function items(): array
@@ -41,11 +40,16 @@ final class CollectingSimulationOutput implements SimulationOutput
         $attributeCounts = [];
 
         foreach ($this->items as $item) {
-            $decisionType = $item['decision_type'];
-            $attributeKey = $item['opportunity_payload']['attribute'] ?? 'unknown';
-
+            $decisionType = (string) ($item['decision_type'] ?? 'unknown');
             $decisionCounts[$decisionType] = ($decisionCounts[$decisionType] ?? 0) + 1;
-            $attributeCounts[$attributeKey] = ($attributeCounts[$attributeKey] ?? 0) + 1;
+
+            $attributeKey = $item['payload']['attribute_key']
+                ?? $item['payload']['attribute']
+                ?? null;
+
+            if (is_string($attributeKey) && $attributeKey !== '') {
+                $attributeCounts[$attributeKey] = ($attributeCounts[$attributeKey] ?? 0) + 1;
+            }
         }
 
         ksort($decisionCounts);

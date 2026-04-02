@@ -21,7 +21,7 @@ final class ProcessSimulatedDuelDecision
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
+    ): int {
         if ($opportunity->source !== 'duel') {
             throw new RuntimeException('ProcessSimulatedDuelDecision supports only duel opportunities.');
         }
@@ -57,6 +57,7 @@ final class ProcessSimulatedDuelDecision
         $vote = new SimulatedDuelVote(
             simulatedUserId: $user->id,
             isLogged: $user->isLogged,
+            appUserId: $user->appUserId,
             playerAId: (int) $opportunity->payload['player_a_id'],
             playerBId: (int) $opportunity->payload['player_b_id'],
             playerAName: (string) ($opportunity->payload['player_a_name'] ?? ''),
@@ -69,6 +70,6 @@ final class ProcessSimulatedDuelDecision
                 : null,
         );
 
-        $this->materializer->handle($vote, $context);
+        return $this->materializer->handle($vote, $context);
     }
 }

@@ -36,7 +36,11 @@ final class GenerateSimulatedDuelOpportunity
 
         $attributeKey = $attributeKeys[abs(crc32($base . '|attribute')) % count($attributeKeys)];
 
-        $payload = $this->duelPayloadFetcher->handle($attributeKey, 'sim:' . $user->id);
+        $payload = $this->duelPayloadFetcher->handle(
+            $attributeKey,
+            $user->isLogged ? null : 'sim:' . $user->id,
+            $user->isLogged ? $user->appUserId : null,
+        );
 
         if (! is_array($payload)) {
             return null;

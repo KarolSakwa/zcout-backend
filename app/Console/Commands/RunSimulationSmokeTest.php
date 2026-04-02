@@ -17,10 +17,11 @@ use App\Simulation\Truth\DatabaseSnapshotTruthProvider;
 use App\Simulation\Actions\ResetSimulationState;
 use App\Models\SimulationRunEvent;
 use App\Simulation\Actions\InitializeSimulationStateFromTruthSnapshot;
+use App\Simulation\Actions\CopySimulationRunTruthFromExistingRun;
 
 final class RunSimulationSmokeTest extends Command
 {
-    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0}';
+    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0} {--truth-run-id=}';
 
     protected $description = 'Run a basic simulation smoke test';
 
@@ -30,6 +31,8 @@ final class RunSimulationSmokeTest extends Command
         $userCount = max(1, (int) $this->option('users'));
         $stepsPerUser = max(1, (int) $this->option('steps-per-user'));
         $seed = (int) $this->option('seed');
+        $truthRunId = $this->option('truth-run-id');
+        $truthRunId = $truthRunId !== null && $truthRunId !== '' ? (int) $truthRunId : null;
 
         $runRecord = SimulationRunModel::query()->create([
             'mode' => $mode,
@@ -45,8 +48,13 @@ final class RunSimulationSmokeTest extends Command
             $this->line("[run #{$runRecord->id}] {$message}");
         };
 
-        $logPhase('snapshotting truth');
-        (new DatabaseSnapshotTruthProvider())->snapshotForRun($runRecord);
+        if ($truthRunId !== null) {
+            $logPhase("copying truth from run #{$truthRunId}");
+            (new CopySimulationRunTruthFromExistingRun())->handle($truthRunId, $runRecord);
+        } else {
+            $logPhase('snapshotting truth');
+            (new DatabaseSnapshotTruthProvider())->snapshotForRun($runRecord);
+        }
 
         if ((string) $this->option('reset') === '1') {
             $logPhase('resetting live state');
@@ -72,8 +80,16 @@ final class RunSimulationSmokeTest extends Command
             );
 
             $users = [];
+            $appUserIds = DB::table('users')
+                ->where('email', 'like', 'sim%@zcout.local')
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
 
-            $users = [];
+            if ($appUserIds === []) {
+                throw new \RuntimeException('No simulation app users found (sim%@zcout.local).');
+            }
 
             for ($i = 1; $i <= $userCount; $i++) {
                 $bucket = $i % 10;
@@ -85,10 +101,15 @@ final class RunSimulationSmokeTest extends Command
                     default => 'casual',
                 };
 
+                $isLogged = $i % 2 === 0;
+
                 $users[] = new SimulatedUser(
                     id: 'u' . $i,
                     type: $type,
-                    isLogged: $i % 2 === 0,
+                    isLogged: $isLogged,
+                    appUserId: $isLogged
+                        ? $appUserIds[(int) (floor(($i - 1) / 2) % count($appUserIds))]
+                        : null,
                 );
             }
 

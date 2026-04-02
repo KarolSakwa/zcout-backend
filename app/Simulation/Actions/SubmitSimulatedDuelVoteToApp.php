@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\VoteController;
 use App\Services\RatingService;
 use App\Simulation\Data\SimulatedDuelVote;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 final class SubmitSimulatedDuelVoteToApp
 {
@@ -15,10 +16,10 @@ final class SubmitSimulatedDuelVoteToApp
     ) {
     }
 
-    public function handle(SimulatedDuelVote $vote): void
+    public function handle(SimulatedDuelVote $vote): int
     {
         if ($vote->decisionType !== 'vote' || $vote->winnerPlayerId === null) {
-            return;
+            return 204;
         }
 
         $body = json_encode([
@@ -30,10 +31,19 @@ final class SubmitSimulatedDuelVoteToApp
 
         $request = Request::create('/api/votes', 'POST', [], [], [], [], $body);
         $request->headers->set('Content-Type', 'application/json');
-        $request->headers->set('X-Zcout-Anon', 'sim:' . $vote->simulatedUserId);
+
+        if ($vote->isLogged && $vote->appUserId !== null) {
+            Auth::onceUsingId($vote->appUserId);
+        } else {
+            $request->headers->set('X-Zcout-Anon', 'sim:' . $vote->simulatedUserId);
+        }
 
         app()->instance('request', $request);
 
-        $this->voteController->store($request, $this->ratingService);
+        $response = $this->voteController->store($request, $this->ratingService);
+
+        Auth::forgetGuards();
+
+        return $response->getStatusCode();
     }
 }

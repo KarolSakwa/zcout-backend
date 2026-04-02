@@ -21,7 +21,7 @@ final class DuelSimulationDecisionProcessor implements SimulationDecisionProcess
         InteractionOpportunity $opportunity,
         InteractionDecision $decision,
         SimulationContext $context
-    ): void {
-        $this->action->handle($user, $opportunity, $decision, $context);
+    ): int {
+        return $this->action->handle($user, $opportunity, $decision, $context);
     }
 }

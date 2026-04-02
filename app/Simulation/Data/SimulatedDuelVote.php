@@ -7,6 +7,7 @@ final class SimulatedDuelVote
     public function __construct(
         public readonly string $simulatedUserId,
         public readonly bool $isLogged,
+        public readonly ?int $appUserId,
         public readonly int $playerAId,
         public readonly int $playerBId,
         public readonly string $playerAName,
