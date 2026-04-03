@@ -18,10 +18,11 @@ use App\Simulation\Actions\ResetSimulationState;
 use App\Models\SimulationRunEvent;
 use App\Simulation\Actions\InitializeSimulationStateFromTruthSnapshot;
 use App\Simulation\Actions\CopySimulationRunTruthFromExistingRun;
+use App\Simulation\Truth\BaselineJsonTruthProvider;
 
 final class RunSimulationSmokeTest extends Command
 {
-    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0} {--truth-run-id=}';
+    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0} {--truth-run-id=} {--baseline-json=}';
 
     protected $description = 'Run a basic simulation smoke test';
 
@@ -33,6 +34,10 @@ final class RunSimulationSmokeTest extends Command
         $seed = (int) $this->option('seed');
         $truthRunId = $this->option('truth-run-id');
         $truthRunId = $truthRunId !== null && $truthRunId !== '' ? (int) $truthRunId : null;
+        $baselineJsonPath = $this->option('baseline-json');
+        $baselineJsonPath = is_string($baselineJsonPath) && trim($baselineJsonPath) !== ''
+            ? trim($baselineJsonPath)
+            : null;
 
         $runRecord = SimulationRunModel::query()->create([
             'mode' => $mode,
@@ -51,6 +56,9 @@ final class RunSimulationSmokeTest extends Command
         if ($truthRunId !== null) {
             $logPhase("copying truth from run #{$truthRunId}");
             (new CopySimulationRunTruthFromExistingRun())->handle($truthRunId, $runRecord);
+        } elseif ($baselineJsonPath !== null) {
+            $logPhase("snapshotting truth from baseline json [{$baselineJsonPath}]");
+            (new BaselineJsonTruthProvider($baselineJsonPath))->snapshotForRun($runRecord);
         } else {
             $logPhase('snapshotting truth');
             (new DatabaseSnapshotTruthProvider())->snapshotForRun($runRecord);

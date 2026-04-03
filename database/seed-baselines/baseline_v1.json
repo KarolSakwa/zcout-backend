@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "updated_at": "2026-04-02T10:15:32Z",
+    "updated_at": "2026-04-03T07:00:40Z",
     "players": {
         "216": {
             "name": "Erling Haaland",
@@ -2172,6 +2172,38 @@
                 "interceptions": 76,
                 "penalties": 69,
                 "free_kicks": 65
+            },
+            "review_attributes": []
+        },
+        "263": {
+            "name": "Amad Diallo",
+            "position": "RW",
+            "club": "Manchester United FC",
+            "attributes": {
+                "pace": 85,
+                "acceleration": 88,
+                "ball_control": 80,
+                "dribbling": 83,
+                "finishing": 78,
+                "long_shots": 76,
+                "attacking_movement": 80,
+                "heading": 65,
+                "passing": 72,
+                "crossing": 76,
+                "creativity": 76,
+                "leadership": 60,
+                "concentration": 74,
+                "aggression": 70,
+                "composure": 78,
+                "work_rate": 81,
+                "strength": 70,
+                "agility": 85,
+                "stamina": 76,
+                "marking": 54,
+                "tackling": 64,
+                "interceptions": 63,
+                "penalties": 74,
+                "free_kicks": 71
             },
             "review_attributes": []
         }
