@@ -22,7 +22,7 @@ use App\Simulation\Truth\BaselineJsonTruthProvider;
 
 final class RunSimulationSmokeTest extends Command
 {
-    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0} {--truth-run-id=} {--baseline-json=}';
+    protected $signature = 'zcout:simulation-smoke {--mode=report} {--users=10} {--steps-per-user=1} {--seed=12345} {--reset=0} {--truth-run-id=} {--baseline-json=} {--label=}';
 
     protected $description = 'Run a basic simulation smoke test';
 
@@ -39,6 +39,11 @@ final class RunSimulationSmokeTest extends Command
             ? trim($baselineJsonPath)
             : null;
 
+        $label = $this->option('label');
+        $label = is_string($label) && trim($label) !== ''
+            ? trim($label)
+            : null;
+
         $runRecord = SimulationRunModel::query()->create([
             'mode' => $mode,
             'status' => 'running',
@@ -47,6 +52,7 @@ final class RunSimulationSmokeTest extends Command
                 'seed' => $seed,
             ],
             'started_at' => now(),
+            'label' => $label,
         ]);
 
         $logPhase = function (string $message) use ($runRecord): void {
@@ -365,6 +371,41 @@ final class RunSimulationSmokeTest extends Command
                 return $item;
             }, $topTouchedPlayerAttributes);
 
+            $topAttributeDeltasAfterRun = DB::table('simulation_run_truth_ratings as truth')
+                ->join('attributes as a', 'a.key', '=', 'truth.attribute_key')
+                ->join('player_attribute_ratings as par', function ($join) {
+                    $join->on('par.player_id', '=', 'truth.player_id')
+                        ->on('par.attribute_id', '=', 'a.id');
+                })
+                ->join('players as p', 'p.id', '=', 'truth.player_id')
+                ->where('truth.simulation_run_id', $runRecord->id)
+                ->select([
+                    'truth.player_id',
+                    'p.name as player_name',
+                    'truth.attribute_key',
+                    'truth.truth_rating as before_rating',
+                    'par.rating as current_rating',
+                    DB::raw('(par.rating - truth.truth_rating) as signed_delta'),
+                    DB::raw('ABS(par.rating - truth.truth_rating) as abs_delta'),
+                    'par.confidence',
+                    'par.votes_count',
+                ])
+                ->orderByDesc('abs_delta')
+                ->limit(50)
+                ->get()
+                ->map(fn ($row) => [
+                    'player_id' => (int) $row->player_id,
+                    'player_name' => (string) $row->player_name,
+                    'attribute_key' => (string) $row->attribute_key,
+                    'before_rating' => (float) $row->before_rating,
+                    'current_rating' => (float) $row->current_rating,
+                    'signed_delta' => (float) $row->signed_delta,
+                    'abs_delta' => (float) $row->abs_delta,
+                    'confidence' => (float) $row->confidence,
+                    'votes_count' => (int) $row->votes_count,
+                ])
+                ->all();
+
             $result = [
                 'metrics' => [
                     'before' => $beforeMetrics,
@@ -382,6 +423,7 @@ final class RunSimulationSmokeTest extends Command
                     'materialized_pair_attribute_counts' => $materializedPairAttributeCounts,
                     'top_pairs_readable' => $topPairsReadable,
                     'top_touched_player_attributes' => $topTouchedPlayerAttributes,
+                    'top_attribute_deltas_after_run' => $topAttributeDeltasAfterRun,
                 ],
             ];
             $isReportOutput = $output instanceof CollectingSimulationOutput;

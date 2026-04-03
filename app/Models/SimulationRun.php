@@ -10,6 +10,7 @@ final class SimulationRun extends Model
     protected $fillable = [
         'mode',
         'status',
+        'label',
         'config',
         'started_at',
         'finished_at',

@@ -152,11 +152,8 @@ class RatingService
         $Dnew = $Dold + (2.0 * $delta);
         $mean = 0.5 * ($ratingA + $ratingB);
 
-        [$L_A, $U_A] = $this->posRange($posA);
-        [$L_B, $U_B] = $this->posRange($posB);
-
-        $newA = $this->clamp($mean + 0.5 * $Dnew, $L_A, $U_A);
-        $newB = $this->clamp($mean - 0.5 * $Dnew, $L_B, $U_B);
+        $newA = $this->clamp($mean + 0.5 * $Dnew, 0.0, 99.0);
+        $newB = $this->clamp($mean - 0.5 * $Dnew, 0.0, 99.0);
 
         $gapTarget = null;
         if ($pCrowdA !== null) {
@@ -305,11 +302,8 @@ class RatingService
         $Dnew = $Dold + $deltaChange;
         $mean = 0.5 * ($ratingA + $ratingB);
 
-        [$L_A, $U_A] = $this->posRange($posA);
-        [$L_B, $U_B] = $this->posRange($posB);
-
-        $newA = $this->clamp($mean + 0.5 * $Dnew, $L_A, $U_A);
-        $newB = $this->clamp($mean - 0.5 * $Dnew, $L_B, $U_B);
+        $newA = $this->clamp($mean + 0.5 * $Dnew, 0.0, 99.0);
+        $newB = $this->clamp($mean - 0.5 * $Dnew, 0.0, 99.0);
 
         return [$newA, $newB, $deltaChange];
     }
