@@ -152,6 +152,8 @@ class DuelController extends Controller
             $useLongTail = $mm['use_long_tail'];
 
             $category = $mm['category'];
+            $intent = $mm['intent'];
+            $selectedTier = $mm['tier'];
             $positionScope = $mm['position_scope'];
             $positionalMode = $mm['positional_mode'];
 
@@ -180,6 +182,10 @@ class DuelController extends Controller
                 })
                 ->where('prs.is_long_tail', '=', $useLongTail)
                 ->whereNotNull('p.position_id');
+
+            if ($intent === 'production' && $selectedTier !== null) {
+                $rowsQ->where('prs.tier', '=', $selectedTier);
+            }
 
             if ($forceGK) {
                 $rowsQ->where('pos.short_label', '=', 'GK');
