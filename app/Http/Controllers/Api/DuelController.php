@@ -7,9 +7,17 @@ use App\Models\Attribute;
 use App\Models\Duel;
 use App\Models\Player;
 use Illuminate\Support\Facades\DB;
+use App\Matchmaking\DuelMatchmakingInputResolver;
 
 class DuelController extends Controller
 {
+    private DuelMatchmakingInputResolver $matchmakingInputResolver;
+
+    public function __construct(DuelMatchmakingInputResolver $matchmakingInputResolver)
+    {
+        $this->matchmakingInputResolver = $matchmakingInputResolver;
+    }
+
     public function next()
     {
         $anon = request()->header('X-Zcout-Anon');
@@ -146,13 +154,14 @@ class DuelController extends Controller
             $forceGK = ($attribute->scope ?? 'both') === 'gk';
 
             $cfg = config('zcout_matchmaking', []);
-            $mm = $this->resolveMatchmakingInputs($cfg);
+            $mm = $this->matchmakingInputResolver->handle($cfg);
 
             $debug = $mm['debug'];
 
             $category = $mm['category'];
             $intent = $mm['intent'];
             $selectedTier = $mm['tier'];
+            $positionProfile = $mm['position_profile'] ?? 'adjacent';
             $positionScope = $mm['position_scope'];
             $positionalMode = $mm['positional_mode'];
 
@@ -292,7 +301,7 @@ class DuelController extends Controller
                 $metaB = $this->expectedRatingMeta($pickedB['rating'], $pickedB['pos'], $attribute->key, $pickedB['cost'] ?? null, $maxCost, $pickedB['sel'] ?? null, $maxSel);
                 $gap = abs(((float) $metaA['value']) - ((float) $metaB['value']));
             } else {
-                $scopesToTry = $this->scopesToTryForCategory($positionScope, $category);
+                $modesToTry = $this->positionalModesToTry($positionProfile);
                 $maxTries = 8;
 
                 for ($t = 0; $t < $maxTries; $t++) {
@@ -304,8 +313,8 @@ class DuelController extends Controller
                     $aMeta = $this->expectedRatingMeta($aTry['rating'], $aTry['pos'], $attribute->key, $aTry['cost'] ?? null, $maxCost, $aTry['sel'] ?? null, $maxSel);
                     $ratingA = (float) $aMeta['value'];
 
-                    foreach ($scopesToTry as $scopeTry) {
-                        $pool = $this->filterByScope($baseCandidates, $aTry, $scopeTry);
+                    foreach ($modesToTry as $modeTry) {
+                        $pool = $this->filterByPositionalMode($baseCandidates, $aTry, $modeTry, $positionalAdjacent, $positionalSides);
                         if (count($pool) < 1) continue;
 
                         $bMatches = [];
@@ -355,7 +364,7 @@ class DuelController extends Controller
                                 $metaB = $pickedBtry['meta'];
                                 $gap = (float) $pickedBtry['gap'];
 
-                                $selectedScope = $scopeTry;
+                                $selectedPositionalMode = $modeTry;
                                 break 2;
                             }
                         }
@@ -516,10 +525,12 @@ class DuelController extends Controller
                 'matchmaking' => [
                     'category' => $selectedCategory,
                     'pool' => null,
-                    'position_scope' => $selectedCategory === 'positional' ? null : $selectedScope,
-                    'positional_mode' => $selectedCategory === 'positional' ? $selectedPositionalMode : null,
+                    'position_scope' => null,
+                    'positional_mode' => $intent === 'production' ? $selectedPositionalMode : ($selectedCategory === 'positional' ? $selectedPositionalMode : null),
                     'intent' => $mm['intent'],
                     'tier' => $mm['tier'],
+                    'position_profile' => $mm['position_profile'],
+                    'gap_profile' => in_array($selectedCategory, ['close', 'medium', 'obvious'], true) ? $selectedCategory : null,
                 ],
             ];
 
@@ -886,125 +897,4 @@ class DuelController extends Controller
 
         return $out;
     }
-
-    private function resolveMatchmakingInputs(array $cfg): array
-    {
-        $debug = (string) request('debug') === '1';
-
-        $intentMix = $cfg['intent_mix'] ?? [
-                'calibration' => 0.10,
-                'production' => 0.90,
-            ];
-
-        $productionTierMix = $cfg['production_tier_mix'] ?? [
-                'A' => 0.75,
-                'B' => 0.20,
-                'C' => 0.05,
-            ];
-
-        $productionCategoryMix = $cfg['production_category_mix'] ?? [
-                'close' => 0.75,
-                'medium' => 0.25,
-            ];
-
-        $posMix = $cfg['position_mix'] ?? [
-                'same_pos' => 0.70,
-                'same_line' => 0.25,
-                'any' => 0.05,
-            ];
-
-        $positionalMix = $cfg['positional_mix'] ?? [
-                'exact' => 0.30,
-                'adjacent' => 0.50,
-                'same_side' => 0.15,
-                'any' => 0.05,
-            ];
-
-        $positionalAdjacent = $cfg['positional_adjacent'] ?? [];
-
-        $positionalSides = $cfg['positional_sides'] ?? [
-                'def' => ['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'WB', 'DM'],
-                'off' => ['CM', 'AM', 'LM', 'RM', 'LW', 'RW', 'ST', 'CF'],
-            ];
-
-        $gaps = $cfg['rating_gap'] ?? [
-                'close_max' => 6,
-                'medium_min' => 7,
-                'medium_max' => 16,
-                'obvious_min' => 25,
-            ];
-
-        $needPow = (float) ($cfg['weights']['need_pow'] ?? 1.2);
-
-        $requestedIntent = request('intent');
-        $intent = in_array($requestedIntent, ['calibration', 'production'], true)
-            ? $requestedIntent
-            : $this->rollFromMix($intentMix, 'production', ['calibration', 'production']);
-
-        $requestedTier = request('tier');
-        $tier = null;
-
-        if ($intent === 'production') {
-            $tier = in_array($requestedTier, ['A', 'B', 'C'], true)
-                ? $requestedTier
-                : $this->rollFromMix($productionTierMix, 'A', ['A', 'B', 'C']);
-        }
-
-        $requestedCategory = request('category');
-
-        if ($intent === 'calibration') {
-            $category = 'obvious';
-        } else {
-            $category = in_array($requestedCategory, ['close', 'medium'], true)
-                ? $requestedCategory
-                : $this->rollFromMix($productionCategoryMix, 'close', ['close', 'medium']);
-        }
-
-        $requestedScope = request('position_scope');
-        if ($category === 'obvious') {
-            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true) ? $requestedScope : 'any';
-        } else {
-            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true)
-                ? $requestedScope
-                : $this->rollFromMix($posMix, 'same_pos', ['same_pos', 'same_line', 'any']);
-        }
-
-        $requestedPositionalMode = request('positional_mode');
-        $positionalMode = in_array($requestedPositionalMode, ['exact', 'adjacent', 'same_side', 'any'], true)
-            ? $requestedPositionalMode
-            : $this->rollFromMix($positionalMix, 'adjacent', ['exact', 'adjacent', 'same_side', 'any']);
-
-        return [
-            'debug' => $debug,
-
-            'intent' => $intent,
-            'tier' => $tier,
-            'category' => $category,
-            'position_scope' => $positionScope,
-            'positional_mode' => $positionalMode,
-
-            'positional_adjacent' => $positionalAdjacent,
-            'positional_sides' => $positionalSides,
-            'rating_gap' => $gaps,
-
-            'need_pow' => $needPow,
-
-            'requested' => [
-                'attribute' => request('attribute'),
-                'intent' => $requestedIntent,
-                'tier' => $requestedTier,
-                'category' => $requestedCategory,
-                'position_scope' => $requestedScope,
-                'positional_mode' => $requestedPositionalMode,
-            ],
-            'picked' => [
-                'intent' => $intent,
-                'tier' => $tier,
-                'category' => $category,
-                'position_scope' => $category === 'positional' ? null : $positionScope,
-                'positional_mode' => $category === 'positional' ? $positionalMode : null,
-            ],
-        ];
-    }
-
 }

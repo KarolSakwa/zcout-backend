@@ -19,6 +19,13 @@ return [
         'medium' => 0.25,
     ],
 
+    'production_position_profile_mix' => [
+        'exact' => 0.35,
+        'adjacent' => 0.45,
+        'same_side' => 0.15,
+        'any' => 0.05,
+    ],
+
     'duel_mix' => [
         'close' => 0.60,
         'medium' => 0.30,
