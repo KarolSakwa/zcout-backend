@@ -14,6 +14,11 @@ return [
         'C' => 0.05,
     ],
 
+    'production_category_mix' => [
+        'close' => 0.75,
+        'medium' => 0.25,
+    ],
+
     'duel_mix' => [
         'close' => 0.60,
         'medium' => 0.30,
