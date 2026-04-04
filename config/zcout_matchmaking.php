@@ -3,6 +3,17 @@
 return [
     'long_tail_share' => 0.01,
 
+    'intent_mix' => [
+        'calibration' => 0.10,
+        'production' => 0.90,
+    ],
+
+    'production_tier_mix' => [
+        'A' => 0.75,
+        'B' => 0.20,
+        'C' => 0.05,
+    ],
+
     'duel_mix' => [
         'close' => 0.60,
         'medium' => 0.30,

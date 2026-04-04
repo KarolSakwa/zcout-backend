@@ -98,6 +98,7 @@ class DuelController extends Controller
                                     'pool' => null,
                                     'position_scope' => null,
                                     'positional_mode' => null,
+                                    'intent' => null,
                                 ],
                             ]);
                         }
@@ -514,6 +515,8 @@ class DuelController extends Controller
                     'pool' => $useLongTail ? 'long_tail' : 'normal',
                     'position_scope' => $selectedCategory === 'positional' ? null : $selectedScope,
                     'positional_mode' => $selectedCategory === 'positional' ? $selectedPositionalMode : null,
+                    'intent' => $mm['intent'],
+                    'tier' => $mm['tier'],
                 ],
             ];
 
@@ -887,6 +890,17 @@ class DuelController extends Controller
 
         $longTailShare = (float) ($cfg['long_tail_share'] ?? 0.0);
 
+        $intentMix = $cfg['intent_mix'] ?? [
+                'calibration' => 0.10,
+                'production' => 0.90,
+            ];
+
+        $productionTierMix = $cfg['production_tier_mix'] ?? [
+                'A' => 0.75,
+                'B' => 0.20,
+                'C' => 0.05,
+            ];
+
         $mix = $cfg['duel_mix'] ?? [
                 'positional' => 0.55,
                 'close' => 0.30,
@@ -910,8 +924,8 @@ class DuelController extends Controller
         $positionalAdjacent = $cfg['positional_adjacent'] ?? [];
 
         $positionalSides = $cfg['positional_sides'] ?? [
-                'def' => ['GK','CB','LB','RB','LWB','RWB','WB','DM'],
-                'off' => ['CM','AM','LM','RM','LW','RW','ST','CF'],
+                'def' => ['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'WB', 'DM'],
+                'off' => ['CM', 'AM', 'LM', 'RM', 'LW', 'RW', 'ST', 'CF'],
             ];
 
         $gaps = $cfg['rating_gap'] ?? [
@@ -923,6 +937,20 @@ class DuelController extends Controller
 
         $repPow = (float) ($cfg['weights']['rep_pow'] ?? 1.0);
         $needPow = (float) ($cfg['weights']['need_pow'] ?? 1.2);
+
+        $requestedIntent = request('intent');
+        $intent = in_array($requestedIntent, ['calibration', 'production'], true)
+            ? $requestedIntent
+            : $this->rollFromMix($intentMix, 'production', ['calibration', 'production']);
+
+        $requestedTier = request('tier');
+        $tier = null;
+
+        if ($intent === 'production') {
+            $tier = in_array($requestedTier, ['A', 'B', 'C'], true)
+                ? $requestedTier
+                : $this->rollFromMix($productionTierMix, 'A', ['A', 'B', 'C']);
+        }
 
         $requestedCategory = request('category');
         $category = in_array($requestedCategory, ['positional', 'close', 'medium', 'obvious'], true)
@@ -950,6 +978,8 @@ class DuelController extends Controller
             'debug' => $debug,
             'use_long_tail' => $useLongTail,
 
+            'intent' => $intent,
+            'tier' => $tier,
             'category' => $category,
             'position_scope' => $positionScope,
             'positional_mode' => $positionalMode,
@@ -963,12 +993,16 @@ class DuelController extends Controller
 
             'requested' => [
                 'attribute' => request('attribute'),
+                'intent' => $requestedIntent,
+                'tier' => $requestedTier,
                 'category' => $requestedCategory,
                 'pool' => $requestedPool,
                 'position_scope' => $requestedScope,
                 'positional_mode' => $requestedPositionalMode,
             ],
             'picked' => [
+                'intent' => $intent,
+                'tier' => $tier,
                 'category' => $category,
                 'pool' => $useLongTail ? 'long_tail' : 'normal',
                 'position_scope' => $category === 'positional' ? null : $positionScope,
