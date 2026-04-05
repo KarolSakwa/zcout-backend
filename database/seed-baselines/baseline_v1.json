@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "updated_at": "2026-04-04T17:03:44Z",
+    "updated_at": "2026-04-05T06:44:25Z",
     "players": {
         "216": {
             "name": "Erling Haaland",
@@ -4271,6 +4271,94 @@
                 "interceptions": 68,
                 "penalties": 74,
                 "free_kicks": 60
+            },
+            "review_attributes": []
+        },
+        "429": {
+            "name": "Jaidon Anthony",
+            "position": "LW",
+            "club": "Burnley FC",
+            "attributes": {
+                "pace": 81,
+                "acceleration": 80,
+                "ball_control": 79,
+                "dribbling": 83,
+                "finishing": 64,
+                "long_shots": 48,
+                "attacking_movement": 71,
+                "heading": 52,
+                "passing": 69,
+                "crossing": 74,
+                "creativity": 71,
+                "leadership": 42,
+                "concentration": 62,
+                "aggression": 59,
+                "composure": 63,
+                "work_rate": 69,
+                "strength": 62,
+                "agility": 80,
+                "stamina": 74,
+                "marking": 40,
+                "tackling": 45,
+                "interceptions": 46,
+                "penalties": 71,
+                "free_kicks": 49
+            },
+            "review_attributes": []
+        },
+        "249": {
+            "name": "Diogo Dalot",
+            "position": "RB",
+            "club": "Manchester United FC",
+            "attributes": {
+                "pace": 80,
+                "acceleration": 77,
+                "ball_control": 69,
+                "dribbling": 66,
+                "finishing": 49,
+                "long_shots": 54,
+                "attacking_movement": 68,
+                "heading": 59,
+                "passing": 68,
+                "crossing": 72,
+                "creativity": 60,
+                "leadership": 64,
+                "concentration": 58,
+                "aggression": 75,
+                "composure": 62,
+                "work_rate": 84,
+                "strength": 78,
+                "agility": 79,
+                "stamina": 85,
+                "marking": 64,
+                "tackling": 70,
+                "interceptions": 72,
+                "penalties": 62,
+                "free_kicks": 50
+            },
+            "review_attributes": []
+        },
+        "189": {
+            "name": "Alexander Isak",
+            "position": "ST",
+            "club": "Liverpool FC",
+            "attributes": {
+                "pace": 86,
+                "acceleration": 89,
+                "ball_control": 90,
+                "dribbling": 84,
+                "finishing": 85,
+                "long_shots": 64,
+                "attacking_movement": 88,
+                "heading": 69,
+                "passing": 72,
+                "crossing": 59,
+                "creativity": 79,
+                "leadership": 48,
+                "concentration": 69,
+                "aggression": 65,
+                "composure": 86,
+                "work_rate": 72
             },
             "review_attributes": []
         }

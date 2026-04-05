@@ -86,8 +86,6 @@ final class DuelMatchmakingInputResolver
                 : $this->rollFromMix($productionGapProfileMix, 'close', ['close', 'medium']);
         }
 
-        $category = $intent === 'calibration' ? 'obvious' : null;
-
         return [
             'debug' => $debug,
 
@@ -96,7 +94,7 @@ final class DuelMatchmakingInputResolver
             'position_profile' => $positionProfile,
             'gap_profile' => $gapProfile,
 
-            'category' => $category,
+            'category' => $intent === 'calibration' ? 'obvious' : null,
 
             'positional_adjacent' => $positionalAdjacent,
             'positional_sides' => $positionalSides,

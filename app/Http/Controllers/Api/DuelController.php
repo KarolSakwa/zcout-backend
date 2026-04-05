@@ -102,7 +102,7 @@ class DuelController extends Controller
                                 'players' => [$toApi($pA), $toApi($pB)],
                                 'duel_id' => $lockedDuel->id,
                                 'matchmaking' => [
-                                    'category' => 'locked',
+                                    'category' => null,
                                     'positional_mode' => null,
                                     'intent' => null,
                                 ],
@@ -160,7 +160,6 @@ class DuelController extends Controller
             $selectedTier = $mm['tier'];
             $positionProfile = $mm['position_profile'] ?? 'adjacent';
             $gapProfile = $mm['gap_profile'] ?? 'close';
-            $category = $intent === 'production' ? $gapProfile : $mm['category'];
 
             $positionalAdjacent = $mm['positional_adjacent'];
             $positionalSides = $mm['positional_sides'];
@@ -260,7 +259,7 @@ class DuelController extends Controller
 
             $baseCandidates = $candidates;
 
-            if (!$forceGK && $category === 'obvious') {
+            if (!$forceGK && $intent === 'calibration') {
                 $tmp = [];
                 foreach ($candidates as $c) {
                     if (($c['pos'] ?? null) !== 'GK') $tmp[] = $c;
@@ -293,9 +292,9 @@ class DuelController extends Controller
 
                         $ok = false;
 
-                        if ($category === 'close') {
+                        if ($gapProfile === 'close') {
                             $ok = $g <= (float)($gaps['close_max'] ?? 6);
-                        } elseif ($category === 'medium') {
+                        } elseif ($gapProfile === 'medium') {
                             $min = (float)($gaps['medium_min'] ?? 7);
                             $max = (float)($gaps['medium_max'] ?? 16);
                             $ok = $g >= $min && $g <= $max;
@@ -341,7 +340,7 @@ class DuelController extends Controller
             if (!$pickedA || !$pickedB) {
                 $fallbacks[] = 'category_or_scope_no_match';
 
-                if (in_array($category, ['close', 'medium'], true)) {
+                if (in_array($gapProfile, ['close', 'medium'], true)) {
                     $fallbacks[] = 'fallback_to_positional';
 
                     $pair = $this->pickPositionalPair(
@@ -483,7 +482,7 @@ class DuelController extends Controller
                 'players' => [$toApi($pA), $toApi($pB)],
                 'duel_id' => $duel->id,
                 'matchmaking' => [
-                    'category' => $intent === 'calibration' ? $category : null,
+                    'category' => $intent === 'calibration' ? $mm['category'] : null,
                     'positional_mode' => $intent === 'production' ? $selectedPositionalMode : null,
                     'intent' => $mm['intent'],
                     'tier' => $mm['tier'],
