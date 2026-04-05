@@ -7,35 +7,15 @@ use App\Models\Attribute;
 use App\Models\Duel;
 use App\Models\Player;
 use Illuminate\Support\Facades\DB;
-use App\Matchmaking\DuelMatchmakingInputResolver;
-use App\Matchmaking\ProductionDuelPlanner;
-use App\Matchmaking\CalibrationOpportunitySelector;
-use App\Matchmaking\MatchmakingCandidatePoolBuilder;
-use App\Matchmaking\MatchmakingCandidateRowFetcher;
 use App\Actions\GetNextDuelAction;
 
 class DuelController extends Controller
 {
-    private DuelMatchmakingInputResolver $matchmakingInputResolver;
-    private ProductionDuelPlanner $productionDuelPlanner;
-    private CalibrationOpportunitySelector $calibrationOpportunitySelector;
-    private MatchmakingCandidatePoolBuilder $candidatePoolBuilder;
-    private MatchmakingCandidateRowFetcher $candidateRowFetcher;
     private GetNextDuelAction $getNextDuelAction;
 
     public function __construct(
-        DuelMatchmakingInputResolver $matchmakingInputResolver,
-        ProductionDuelPlanner $productionDuelPlanner,
-        CalibrationOpportunitySelector $calibrationOpportunitySelector,
-        MatchmakingCandidatePoolBuilder $candidatePoolBuilder,
-        MatchmakingCandidateRowFetcher $candidateRowFetcher,
         GetNextDuelAction $getNextDuelAction
     ) {
-        $this->matchmakingInputResolver = $matchmakingInputResolver;
-        $this->productionDuelPlanner = $productionDuelPlanner;
-        $this->calibrationOpportunitySelector = $calibrationOpportunitySelector;
-        $this->candidatePoolBuilder = $candidatePoolBuilder;
-        $this->candidateRowFetcher = $candidateRowFetcher;
         $this->getNextDuelAction = $getNextDuelAction;
     }
 

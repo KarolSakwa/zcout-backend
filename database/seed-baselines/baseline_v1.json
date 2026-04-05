@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "updated_at": "2026-04-05T12:13:56Z",
+    "updated_at": "2026-04-05T12:20:41Z",
     "players": {
         "216": {
             "name": "Erling Haaland",
@@ -4889,7 +4889,27 @@
                 "gk_one_on_ones": 84,
                 "gk_handling": 79,
                 "gk_command_of_area": 74,
-                "passing": 69
+                "passing": 69,
+                "gk_throwing": 70,
+                "gk_rushing_out": 66,
+                "gk_eccentricity": 56
+            },
+            "review_attributes": []
+        },
+        "312": {
+            "name": "Daniel Ballard",
+            "position": "CB",
+            "club": "Sunderland AFC",
+            "attributes": {
+                "pace": 66,
+                "acceleration": 59,
+                "ball_control": 56,
+                "dribbling": 46,
+                "finishing": 56,
+                "long_shots": 52,
+                "attacking_movement": 56,
+                "heading": 89,
+                "passing": 58
             },
             "review_attributes": []
         }
