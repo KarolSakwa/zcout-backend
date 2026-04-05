@@ -8,15 +8,19 @@ use App\Models\Duel;
 use App\Models\Player;
 use Illuminate\Support\Facades\DB;
 use App\Actions\GetNextDuelAction;
+use App\Actions\MaterializeNextDuelAction;
 
 class DuelController extends Controller
 {
     private GetNextDuelAction $getNextDuelAction;
+    private MaterializeNextDuelAction $materializeNextDuelAction;
 
     public function __construct(
-        GetNextDuelAction $getNextDuelAction
+        GetNextDuelAction $getNextDuelAction,
+        MaterializeNextDuelAction $materializeNextDuelAction
     ) {
         $this->getNextDuelAction = $getNextDuelAction;
+        $this->materializeNextDuelAction = $materializeNextDuelAction;
     }
 
     public function next()
@@ -179,34 +183,24 @@ class DuelController extends Controller
                 return response()->json(['error' => 'Failed to pick duel pair'], 422);
             }
 
-            $playerIds = [(int)$pickedA['id'], (int)$pickedB['id']];
+            $materialized = $this->materializeNextDuelAction->handle([
+                'attribute' => $attribute,
+                'picked_a' => $pickedA,
+                'picked_b' => $pickedB,
+            ]);
 
-            $players = Player::query()
-                ->select(['id', 'name', 'slug', 'number', 'club_id', 'country_id', 'position_id'])
-                ->with([
-                    'clubRel:id,name,color_primary,color_secondary,color_tertiary',
-                    'countryRef:id,name,iso2',
-                    'positionRef:id,short_label,label,key',
-                ])
-                ->whereIn('id', $playerIds)
-                ->get()
-                ->keyBy('id');
-
-            if ($players->count() < 2) {
-                return response()->json(['error' => 'Players not found'], 422);
+            if (($materialized['status'] ?? 'failed') !== 'ok') {
+                return response()->json([
+                    'error' => 'Failed to materialize duel',
+                    'reason' => $materialized['failure_reason'] ?? 'unknown',
+                ], 422);
             }
 
-            $pA = $players[(int)$pickedA['id']];
-            $pB = $players[(int)$pickedB['id']];
+            $duel = $materialized['duel'];
+            $players = $materialized['players'];
 
-            $playerAId = min($pA->id, $pB->id);
-            $playerBId = max($pA->id, $pB->id);
-
-            $duel = Duel::firstOrCreate([
-                'attribute_id' => $attribute->id,
-                'player_a_id' => $playerAId,
-                'player_b_id' => $playerBId,
-            ]);
+            $pA = $players[(int) $pickedA['id']];
+            $pB = $players[(int) $pickedB['id']];
 
             if (isset($skipped[(int)$duel->id])) {
                 $fallbacks[] = 'skipped_reroll';

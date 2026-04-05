@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "updated_at": "2026-04-05T12:20:41Z",
+    "updated_at": "2026-04-05T12:41:31Z",
     "players": {
         "216": {
             "name": "Erling Haaland",
@@ -4909,7 +4909,76 @@
                 "long_shots": 52,
                 "attacking_movement": 56,
                 "heading": 89,
-                "passing": 58
+                "passing": 58,
+                "crossing": 38,
+                "creativity": 49,
+                "leadership": 83,
+                "concentration": 72,
+                "aggression": 84,
+                "composure": 70,
+                "work_rate": 85,
+                "strength": 89,
+                "agility": 48,
+                "stamina": 68,
+                "marking": 74,
+                "tackling": 78,
+                "interceptions": 79,
+                "penalties": 46,
+                "free_kicks": 39
+            },
+            "review_attributes": []
+        },
+        "387": {
+            "name": "Ladislav Krej\u010d\u00ed",
+            "position": "CB",
+            "club": "Wolverhampton Wanderers FC",
+            "attributes": {
+                "pace": 62,
+                "acceleration": 59,
+                "ball_control": 64,
+                "dribbling": 56,
+                "finishing": 58,
+                "long_shots": 68,
+                "attacking_movement": 56,
+                "heading": 77,
+                "passing": 68,
+                "crossing": 48,
+                "creativity": 58,
+                "leadership": 75,
+                "concentration": 72,
+                "aggression": 79,
+                "composure": 77,
+                "work_rate": 79,
+                "strength": 80,
+                "agility": 62,
+                "stamina": 69,
+                "marking": 73,
+                "tackling": 70,
+                "interceptions": 73,
+                "penalties": 70,
+                "free_kicks": 52
+            },
+            "review_attributes": []
+        },
+        "34": {
+            "name": "Riccardo Calafiori",
+            "position": "LB",
+            "club": "Arsenal FC",
+            "attributes": {
+                "pace": 72,
+                "acceleration": 71,
+                "ball_control": 73,
+                "dribbling": 63,
+                "finishing": 64,
+                "long_shots": 61,
+                "attacking_movement": 71,
+                "heading": 70,
+                "passing": 70,
+                "crossing": 68,
+                "creativity": 66,
+                "leadership": 66,
+                "concentration": 66,
+                "aggression": 76
             },
             "review_attributes": []
         }
