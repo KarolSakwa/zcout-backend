@@ -14,11 +14,6 @@ return [
         'C' => 0.05,
     ],
 
-    'production_category_mix' => [
-        'close' => 0.75,
-        'medium' => 0.25,
-    ],
-
     'production_position_profile_mix' => [
         'exact' => 0.35,
         'adjacent' => 0.45,
@@ -31,12 +26,6 @@ return [
         'medium' => 0.25,
     ],
 
-    'duel_mix' => [
-        'close' => 0.60,
-        'medium' => 0.30,
-        'obvious' => 0.10,
-    ],
-
     'rating_gap' => [
         'close_max' => 6,
         'medium_min' => 7,
@@ -47,13 +36,6 @@ return [
     'weights' => [
         'rep_pow' => 1.0,
         'need_pow' => 1.2,
-    ],
-
-    'positional_mix' => [
-        'exact' => 0.30,
-        'adjacent' => 0.50,
-        'same_side' => 0.15,
-        'any' => 0.05,
     ],
 
     'positional_adjacent' => [

@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "updated_at": "2026-04-05T06:44:25Z",
+    "updated_at": "2026-04-05T07:01:13Z",
     "players": {
         "216": {
             "name": "Erling Haaland",
@@ -4358,7 +4358,45 @@
                 "concentration": 69,
                 "aggression": 65,
                 "composure": 86,
-                "work_rate": 72
+                "work_rate": 72,
+                "strength": 74,
+                "agility": 87,
+                "stamina": 75,
+                "marking": 42,
+                "tackling": 44,
+                "interceptions": 48,
+                "penalties": 86,
+                "free_kicks": 63
+            },
+            "review_attributes": []
+        },
+        "230": {
+            "name": "Nico Gonzalez",
+            "position": "CM",
+            "club": "Manchester City FC",
+            "attributes": {
+                "pace": 68,
+                "acceleration": 66,
+                "ball_control": 78,
+                "dribbling": 69,
+                "finishing": 58,
+                "long_shots": 62,
+                "attacking_movement": 68,
+                "heading": 62,
+                "passing": 79,
+                "crossing": 51,
+                "creativity": 72,
+                "leadership": 66,
+                "concentration": 76,
+                "aggression": 79,
+                "composure": 80,
+                "work_rate": 79,
+                "strength": 79,
+                "agility": 62,
+                "stamina": 84,
+                "marking": 62,
+                "tackling": 70,
+                "interceptions": 76
             },
             "review_attributes": []
         }

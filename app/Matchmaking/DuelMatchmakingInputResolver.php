@@ -31,13 +31,6 @@ final class DuelMatchmakingInputResolver
                 'medium' => 0.25,
             ];
 
-        $positionalMix = $cfg['positional_mix'] ?? [
-                'exact' => 0.30,
-                'adjacent' => 0.50,
-                'same_side' => 0.15,
-                'any' => 0.05,
-            ];
-
         $positionalAdjacent = $cfg['positional_adjacent'] ?? [];
 
         $positionalSides = $cfg['positional_sides'] ?? [
