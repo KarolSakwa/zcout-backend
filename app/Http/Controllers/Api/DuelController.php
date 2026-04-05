@@ -27,7 +27,7 @@ class DuelController extends Controller
             return response()->json(['error' => 'Missing voter id'], 400);
         }
 
-        $voteVoterHash = hash_hmac('sha256', $voterHash, (string) config('app.key'));
+        $voteVoterHash = hash_hmac('sha256', $voterHash, (string)config('app.key'));
 
         $lockedDuelId = DB::table('voter_duel_locks')->where('voter_hash', $voterHash)->value('duel_id');
 
@@ -50,7 +50,7 @@ class DuelController extends Controller
                     $lockedAttr = Attribute::query()->find($lockedDuel->attribute_id);
 
                     if ($lockedAttr) {
-                        $playerIds = [(int) $lockedDuel->player_a_id, (int) $lockedDuel->player_b_id];
+                        $playerIds = [(int)$lockedDuel->player_a_id, (int)$lockedDuel->player_b_id];
 
                         $players = Player::query()
                             ->select(['id', 'name', 'slug', 'number', 'club_id', 'country_id', 'position_id'])
@@ -63,8 +63,8 @@ class DuelController extends Controller
                             ->get()
                             ->keyBy('id');
 
-                        $pA = $players->get((int) $lockedDuel->player_a_id);
-                        $pB = $players->get((int) $lockedDuel->player_b_id);
+                        $pA = $players->get((int)$lockedDuel->player_a_id);
+                        $pB = $players->get((int)$lockedDuel->player_b_id);
 
                         if ($pA && $pB) {
                             $toApi = function (Player $p) {
@@ -103,8 +103,6 @@ class DuelController extends Controller
                                 'duel_id' => $lockedDuel->id,
                                 'matchmaking' => [
                                     'category' => 'locked',
-                                    'pool' => null,
-                                    'position_scope' => null,
                                     'positional_mode' => null,
                                     'intent' => null,
                                 ],
@@ -124,7 +122,7 @@ class DuelController extends Controller
 
         $skipped = [];
         foreach ($skippedIds as $id) {
-            $skipped[(int) $id] = true;
+            $skipped[(int)$id] = true;
         }
 
         $votedIds = DB::table('votes')
@@ -135,7 +133,7 @@ class DuelController extends Controller
 
         $voted = [];
         foreach ($votedIds as $id) {
-            $voted[(int) $id] = true;
+            $voted[(int)$id] = true;
         }
 
         $maxAttempts = 12;
@@ -158,12 +156,11 @@ class DuelController extends Controller
 
             $debug = $mm['debug'];
 
-            $category = $mm['category'];
             $intent = $mm['intent'];
             $selectedTier = $mm['tier'];
             $positionProfile = $mm['position_profile'] ?? 'adjacent';
-            $positionScope = $mm['position_scope'];
-            $positionalMode = $mm['positional_mode'];
+            $gapProfile = $mm['gap_profile'] ?? 'close';
+            $category = $intent === 'production' ? $gapProfile : $mm['category'];
 
             $positionalAdjacent = $mm['positional_adjacent'];
             $positionalSides = $mm['positional_sides'];
@@ -175,10 +172,6 @@ class DuelController extends Controller
             $picked = $mm['picked'];
 
             $fallbacks = [];
-            if ($forceGK && $category === 'positional') {
-                $category = 'close';
-                $fallbacks[] = 'gk_attr_forced_close';
-            }
 
             $rowsQ = DB::table('players as p')
                 ->join('player_reputation_stats as prs', 'prs.player_id', '=', 'p.id')
@@ -197,6 +190,10 @@ class DuelController extends Controller
                 $rowsQ->where('pos.short_label', '=', 'GK');
             }
 
+            if (!$forceGK && $intent === 'production') {
+                $rowsQ->where('pos.short_label', '!=', 'GK');
+            }
+
             $rows = $rowsQ
                 ->selectRaw('p.id, pos.short_label as pos_short, prs.player_rep, (COALESCE(par.confidence, 0) / 100.0) as attr_confidence, par.rating as attr_rating, COALESCE(prs.fpl_now_cost, 0) as fpl_cost, COALESCE(prs.fpl_selected_by_percent, 0) as fpl_sel')
                 ->get();
@@ -207,11 +204,11 @@ class DuelController extends Controller
 
             $candidates = [];
             foreach ($rows as $r) {
-                $posShort = $r->pos_short ? (string) $r->pos_short : null;
+                $posShort = $r->pos_short ? (string)$r->pos_short : null;
                 if (!$posShort) continue;
 
-                $rep = (float) $r->player_rep;
-                $conf = (float) $r->attr_confidence;
+                $rep = (float)$r->player_rep;
+                $conf = (float)$r->attr_confidence;
 
                 $need = 1.0 - $conf;
                 if ($need < 0) $need = 0.0;
@@ -221,15 +218,15 @@ class DuelController extends Controller
 
                 if ($w > 0) {
                     $candidates[] = [
-                        'id' => (int) $r->id,
+                        'id' => (int)$r->id,
                         'pos' => $posShort,
                         'line' => $this->posLine($posShort),
                         'rep' => $rep,
                         'conf' => $conf,
-                        'rating' => $r->attr_rating !== null ? (float) $r->attr_rating : null,
-                        'cost' => (int) ($r->fpl_cost ?? 0),
-                        'sel' => (float) ($r->fpl_sel ?? 0),
-                        'w' => (float) $w,
+                        'rating' => $r->attr_rating !== null ? (float)$r->attr_rating : null,
+                        'cost' => (int)($r->fpl_cost ?? 0),
+                        'sel' => (float)($r->fpl_sel ?? 0),
+                        'w' => (float)$w,
                     ];
                 }
             }
@@ -242,10 +239,10 @@ class DuelController extends Controller
             $maxSel = 0.0;
 
             foreach ($candidates as $c) {
-                $cc = (int) ($c['cost'] ?? 0);
+                $cc = (int)($c['cost'] ?? 0);
                 if ($cc > $maxCost) $maxCost = $cc;
 
-                $ss = (float) ($c['sel'] ?? 0);
+                $ss = (float)($c['sel'] ?? 0);
                 if ($ss > $maxSel) $maxSel = $ss;
             }
 
@@ -254,9 +251,8 @@ class DuelController extends Controller
             $pickedA = null;
             $pickedB = null;
 
-            $selectedCategory = $category;
-            $selectedScope = $positionScope;
-            $selectedPositionalMode = $positionalMode;
+            $selectedPositionalMode = null;
+            $selectedGapProfile = $intent === 'production' ? $gapProfile : null;
 
             $metaA = null;
             $metaB = null;
@@ -272,171 +268,135 @@ class DuelController extends Controller
                 if (count($tmp) >= 2) $baseCandidates = $tmp;
             }
 
-            if ($category === 'positional') {
-                $pair = $this->pickPositionalPair(
-                    $candidates,
-                    $attribute->key,
-                    $positionalMode,
-                    $positionalAdjacent,
-                    $positionalSides,
-                    10,
-                    $maxCost,
-                    $maxSel
-                );
+            $modesToTry = $this->positionalModesToTry($positionProfile);
+            $maxTries = 8;
 
-                if (!$pair) {
-                    return response()->json(['error' => 'Failed to pick positional pair'], 422);
-                }
+            for ($t = 0; $t < $maxTries; $t++) {
+                $triesUsed = $t + 1;
 
-                $pickedA = $pair['a'];
-                $pickedB = $pair['b'];
-                $selectedPositionalMode = $pair['mode'];
-                $triesUsed = $pair['tries_used'];
+                $aTry = $this->pickWeighted($baseCandidates);
+                if (!$aTry) break;
 
-                if (!empty($pair['fallbacks'])) {
-                    foreach ($pair['fallbacks'] as $f) $fallbacks[] = $f;
-                }
+                $aMeta = $this->expectedRatingMeta($aTry['rating'], $aTry['pos'], $attribute->key, $aTry['cost'] ?? null, $maxCost, $aTry['sel'] ?? null, $maxSel);
+                $ratingA = (float)$aMeta['value'];
 
-                $metaA = $this->expectedRatingMeta($pickedA['rating'], $pickedA['pos'], $attribute->key, $pickedA['cost'] ?? null, $maxCost, $pickedA['sel'] ?? null, $maxSel);
-                $metaB = $this->expectedRatingMeta($pickedB['rating'], $pickedB['pos'], $attribute->key, $pickedB['cost'] ?? null, $maxCost, $pickedB['sel'] ?? null, $maxSel);
-                $gap = abs(((float) $metaA['value']) - ((float) $metaB['value']));
-            } else {
-                $modesToTry = $this->positionalModesToTry($positionProfile);
-                $maxTries = 8;
+                foreach ($modesToTry as $modeTry) {
+                    $pool = $this->filterByPositionalMode($baseCandidates, $aTry, $modeTry, $positionalAdjacent, $positionalSides);
+                    if (count($pool) < 1) continue;
 
-                for ($t = 0; $t < $maxTries; $t++) {
-                    $triesUsed = $t + 1;
+                    $bMatches = [];
+                    foreach ($pool as $c) {
+                        $bMeta = $this->expectedRatingMeta($c['rating'], $c['pos'], $attribute->key, $c['cost'] ?? null, $maxCost, $c['sel'] ?? null, $maxSel);
+                        $ratingB = (float)$bMeta['value'];
 
-                    $aTry = $this->pickWeighted($baseCandidates);
-                    if (!$aTry) break;
+                        $g = abs($ratingA - $ratingB);
 
-                    $aMeta = $this->expectedRatingMeta($aTry['rating'], $aTry['pos'], $attribute->key, $aTry['cost'] ?? null, $maxCost, $aTry['sel'] ?? null, $maxSel);
-                    $ratingA = (float) $aMeta['value'];
+                        $ok = false;
 
-                    foreach ($modesToTry as $modeTry) {
-                        $pool = $this->filterByPositionalMode($baseCandidates, $aTry, $modeTry, $positionalAdjacent, $positionalSides);
-                        if (count($pool) < 1) continue;
-
-                        $bMatches = [];
-                        foreach ($pool as $c) {
-                            $bMeta = $this->expectedRatingMeta($c['rating'], $c['pos'], $attribute->key, $c['cost'] ?? null, $maxCost, $c['sel'] ?? null, $maxSel);
-                            $ratingB = (float) $bMeta['value'];
-
-                            $g = abs($ratingA - $ratingB);
-
-                            $ok = false;
-
-                            if ($category === 'close') {
-                                $ok = $g <= (float) ($gaps['close_max'] ?? 6);
-                            } elseif ($category === 'medium') {
-                                $min = (float) ($gaps['medium_min'] ?? 7);
-                                $max = (float) ($gaps['medium_max'] ?? 16);
-                                $ok = $g >= $min && $g <= $max;
-                            } else {
-                                $min = (float) ($gaps['obvious_min'] ?? 25);
-                                $ok = $g >= $min;
-                            }
-
-                            if ($ok) {
-                                $bMatches[] = [
-                                    'id' => $c['id'],
-                                    'pos' => $c['pos'],
-                                    'line' => $c['line'],
-                                    'rep' => $c['rep'],
-                                    'conf' => $c['conf'],
-                                    'rating' => $c['rating'],
-                                    'cost' => $c['cost'] ?? 0,
-                                    'sel' => $c['sel'] ?? 0.0,
-                                    'w' => $c['w'],
-                                    'gap' => $g,
-                                    'meta' => $bMeta,
-                                ];
-                            }
+                        if ($category === 'close') {
+                            $ok = $g <= (float)($gaps['close_max'] ?? 6);
+                        } elseif ($category === 'medium') {
+                            $min = (float)($gaps['medium_min'] ?? 7);
+                            $max = (float)($gaps['medium_max'] ?? 16);
+                            $ok = $g >= $min && $g <= $max;
+                        } else {
+                            $min = (float)($gaps['obvious_min'] ?? 25);
+                            $ok = $g >= $min;
                         }
 
-                        if (count($bMatches) > 0) {
-                            $pickedBtry = $this->pickWeighted($bMatches);
-                            if ($pickedBtry) {
-                                $pickedA = $aTry;
-                                $pickedB = $pickedBtry;
-
-                                $metaA = $aMeta;
-                                $metaB = $pickedBtry['meta'];
-                                $gap = (float) $pickedBtry['gap'];
-
-                                $selectedPositionalMode = $modeTry;
-                                break 2;
-                            }
+                        if ($ok) {
+                            $bMatches[] = [
+                                'id' => $c['id'],
+                                'pos' => $c['pos'],
+                                'line' => $c['line'],
+                                'rep' => $c['rep'],
+                                'conf' => $c['conf'],
+                                'rating' => $c['rating'],
+                                'cost' => $c['cost'] ?? 0,
+                                'sel' => $c['sel'] ?? 0.0,
+                                'w' => $c['w'],
+                                'gap' => $g,
+                                'meta' => $bMeta,
+                            ];
                         }
                     }
-                }
 
-                if (!$pickedA || !$pickedB) {
-                    $fallbacks[] = 'category_or_scope_no_match';
+                    if (count($bMatches) > 0) {
+                        $pickedBtry = $this->pickWeighted($bMatches);
+                        if ($pickedBtry) {
+                            $pickedA = $aTry;
+                            $pickedB = $pickedBtry;
 
-                    if (in_array($category, ['close', 'medium'], true)) {
-                        $fallbacks[] = 'fallback_to_positional';
-                        $selectedCategory = 'positional';
+                            $metaA = $aMeta;
+                            $metaB = $pickedBtry['meta'];
+                            $gap = (float)$pickedBtry['gap'];
 
-                        $pair = $this->pickPositionalPair(
-                            $candidates,
-                            $attribute->key,
-                            $positionalMode,
-                            $positionalAdjacent,
-                            $positionalSides,
-                            10,
-                            $maxCost,
-                            $maxSel
-                        );
-
-                        if (!$pair) {
-                            return response()->json(['error' => 'Failed to pick positional fallback'], 422);
-                        }
-
-                        $pickedA = $pair['a'];
-                        $pickedB = $pair['b'];
-                        $selectedPositionalMode = $pair['mode'];
-                        $triesUsed = max($triesUsed, $pair['tries_used']);
-
-                        if (!empty($pair['fallbacks'])) {
-                            foreach ($pair['fallbacks'] as $f) $fallbacks[] = $f;
-                        }
-
-                        $metaA = $this->expectedRatingMeta($pickedA['rating'], $pickedA['pos'], $attribute->key, $pickedA['cost'] ?? null, $maxCost, $pickedA['sel'] ?? null, $maxSel);
-                        $metaB = $this->expectedRatingMeta($pickedB['rating'], $pickedB['pos'], $attribute->key, $pickedB['cost'] ?? null, $maxCost, $pickedB['sel'] ?? null, $maxSel);
-                        $gap = abs(((float) $metaA['value']) - ((float) $metaB['value']));
-                    } else {
-                        $fallbacks[] = 'obvious_fallback_max_gap';
-
-                        $pickedA = $this->pickWeighted($baseCandidates);
-                        if (!$pickedA) {
-                            return response()->json(['error' => 'Failed to pick player A'], 422);
-                        }
-
-                        $best = $this->pickBestGapOpponent($baseCandidates, $pickedA, $attribute->key, $maxCost, $maxSel);
-                        if (!$best) {
-                            return response()->json(['error' => 'Failed to pick player B'], 422);
-                        }
-
-                        $pickedB = $best['b'];
-                        $metaA = $best['metaA'];
-                        $metaB = $best['metaB'];
-                        $gap = (float) $best['gap'];
-                        $selectedScope = 'any';
-
-                        $min = (float) ($gaps['obvious_min'] ?? 25);
-                        if ($gap < $min) {
-                            $fallbacks[] = 'obvious_gap_relaxed';
+                            $selectedPositionalMode = $modeTry;
+                            break 2;
                         }
                     }
-                }
-
-                if ($selectedCategory !== 'positional' && $selectedScope !== $positionScope) {
-                    $fallbacks[] = 'scope_relaxed';
                 }
             }
 
-            $playerIds = [(int) $pickedA['id'], (int) $pickedB['id']];
+            if (!$pickedA || !$pickedB) {
+                $fallbacks[] = 'category_or_scope_no_match';
+
+                if (in_array($category, ['close', 'medium'], true)) {
+                    $fallbacks[] = 'fallback_to_positional';
+
+                    $pair = $this->pickPositionalPair(
+                        $candidates,
+                        $attribute->key,
+                        $positionProfile,
+                        $positionalAdjacent,
+                        $positionalSides,
+                        10,
+                        $maxCost,
+                        $maxSel
+                    );
+
+                    if (!$pair) {
+                        return response()->json(['error' => 'Failed to pick positional fallback'], 422);
+                    }
+
+                    $pickedA = $pair['a'];
+                    $pickedB = $pair['b'];
+                    $selectedPositionalMode = $pair['mode'];
+                    $triesUsed = max($triesUsed, $pair['tries_used']);
+
+                    if (!empty($pair['fallbacks'])) {
+                        foreach ($pair['fallbacks'] as $f) $fallbacks[] = $f;
+                    }
+
+                    $metaA = $this->expectedRatingMeta($pickedA['rating'], $pickedA['pos'], $attribute->key, $pickedA['cost'] ?? null, $maxCost, $pickedA['sel'] ?? null, $maxSel);
+                    $metaB = $this->expectedRatingMeta($pickedB['rating'], $pickedB['pos'], $attribute->key, $pickedB['cost'] ?? null, $maxCost, $pickedB['sel'] ?? null, $maxSel);
+                    $gap = abs(((float)$metaA['value']) - ((float)$metaB['value']));
+                } else {
+                    $fallbacks[] = 'obvious_fallback_max_gap';
+
+                    $pickedA = $this->pickWeighted($baseCandidates);
+                    if (!$pickedA) {
+                        return response()->json(['error' => 'Failed to pick player A'], 422);
+                    }
+
+                    $best = $this->pickBestGapOpponent($baseCandidates, $pickedA, $attribute->key, $maxCost, $maxSel);
+                    if (!$best) {
+                        return response()->json(['error' => 'Failed to pick player B'], 422);
+                    }
+
+                    $pickedB = $best['b'];
+                    $metaA = $best['metaA'];
+                    $metaB = $best['metaB'];
+                    $gap = (float)$best['gap'];
+
+                    $min = (float)($gaps['obvious_min'] ?? 25);
+                    if ($gap < $min) {
+                        $fallbacks[] = 'obvious_gap_relaxed';
+                    }
+                }
+            }
+
+            $playerIds = [(int)$pickedA['id'], (int)$pickedB['id']];
 
             $players = Player::query()
                 ->select(['id', 'name', 'slug', 'number', 'club_id', 'country_id', 'position_id'])
@@ -453,24 +413,24 @@ class DuelController extends Controller
                 return response()->json(['error' => 'Players not found'], 422);
             }
 
-            $pA = $players[(int) $pickedA['id']];
-            $pB = $players[(int) $pickedB['id']];
+            $pA = $players[(int)$pickedA['id']];
+            $pB = $players[(int)$pickedB['id']];
 
             $playerAId = min($pA->id, $pB->id);
             $playerBId = max($pA->id, $pB->id);
 
             $duel = Duel::firstOrCreate([
                 'attribute_id' => $attribute->id,
-                'player_a_id'  => $playerAId,
-                'player_b_id'  => $playerBId,
+                'player_a_id' => $playerAId,
+                'player_b_id' => $playerBId,
             ]);
 
-            if (isset($skipped[(int) $duel->id])) {
+            if (isset($skipped[(int)$duel->id])) {
                 $fallbacks[] = 'skipped_reroll';
                 continue;
             }
 
-            if (isset($voted[(int) $duel->id])) {
+            if (isset($voted[(int)$duel->id])) {
                 $fallbacks[] = 'already_voted_reroll';
                 continue;
             }
@@ -523,14 +483,11 @@ class DuelController extends Controller
                 'players' => [$toApi($pA), $toApi($pB)],
                 'duel_id' => $duel->id,
                 'matchmaking' => [
-                    'category' => $selectedCategory,
-                    'pool' => null,
-                    'position_scope' => null,
-                    'positional_mode' => $intent === 'production' ? $selectedPositionalMode : ($selectedCategory === 'positional' ? $selectedPositionalMode : null),
+                    'category' => $intent === 'calibration' ? $category : null,
+                    'positional_mode' => $intent === 'production' ? $selectedPositionalMode : null,
                     'intent' => $mm['intent'],
                     'tier' => $mm['tier'],
-                    'position_profile' => $mm['position_profile'],
-                    'gap_profile' => in_array($selectedCategory, ['close', 'medium', 'obvious'], true) ? $selectedCategory : null,
+                    'gap_profile' => $intent === 'production' ? $selectedGapProfile : null,
                 ],
             ];
 
@@ -552,22 +509,23 @@ class DuelController extends Controller
     }
 
     private function pickPositionalPair(
-        array $candidates,
+        array  $candidates,
         string $attrKey,
         string $modeWanted,
-        array $adjacentMap,
-        array $sidesMap,
-        int $maxTries,
-        int $maxCost,
-        float $maxSel
-    ): ?array {
+        array  $adjacentMap,
+        array  $sidesMap,
+        int    $maxTries,
+        int    $maxCost,
+        float  $maxSel
+    ): ?array
+    {
         $modeChain = $this->positionalModesToTry($modeWanted);
 
         for ($t = 0; $t < $maxTries; $t++) {
             $a = $this->pickWeighted($candidates);
             if (!$a) return null;
 
-            $aPos = (string) ($a['pos'] ?? '');
+            $aPos = (string)($a['pos'] ?? '');
             if ($aPos === '') continue;
 
             foreach ($modeChain as $mode) {
@@ -592,20 +550,20 @@ class DuelController extends Controller
 
     private function pickBestGapOpponent(array $candidates, array $a, string $attrKey, int $maxCost, float $maxSel): ?array
     {
-        $aId = (int) ($a['id'] ?? 0);
+        $aId = (int)($a['id'] ?? 0);
         $metaA = $this->expectedRatingMeta($a['rating'] ?? null, $a['pos'] ?? null, $attrKey, $a['cost'] ?? null, $maxCost, $a['sel'] ?? null, $maxSel);
-        $ratingA = (float) ($metaA['value'] ?? 0);
+        $ratingA = (float)($metaA['value'] ?? 0);
 
         $best = null;
         $bestGap = -1.0;
         $bestMetaB = null;
 
         foreach ($candidates as $c) {
-            $cid = (int) ($c['id'] ?? 0);
+            $cid = (int)($c['id'] ?? 0);
             if ($cid === $aId) continue;
 
             $metaB = $this->expectedRatingMeta($c['rating'] ?? null, $c['pos'] ?? null, $attrKey, $c['cost'] ?? null, $maxCost, $c['sel'] ?? null, $maxSel);
-            $ratingB = (float) ($metaB['value'] ?? 0);
+            $ratingB = (float)($metaB['value'] ?? 0);
 
             $g = abs($ratingA - $ratingB);
             if ($g > $bestGap) {
@@ -637,8 +595,8 @@ class DuelController extends Controller
     {
         $out = [];
 
-        $aId = (int) ($a['id'] ?? 0);
-        $aPos = (string) ($a['pos'] ?? '');
+        $aId = (int)($a['id'] ?? 0);
+        $aPos = (string)($a['pos'] ?? '');
 
         $side = null;
         if ($aPos !== '') {
@@ -650,12 +608,12 @@ class DuelController extends Controller
 
         $adj = [];
         if ($aPos !== '' && isset($adjacentMap[$aPos]) && is_array($adjacentMap[$aPos])) {
-            $adj = array_values(array_unique(array_map(fn ($x) => strtoupper(trim((string) $x)), $adjacentMap[$aPos])));
+            $adj = array_values(array_unique(array_map(fn($x) => strtoupper(trim((string)$x)), $adjacentMap[$aPos])));
         }
 
         if ($mode === 'any') {
             foreach ($candidates as $c) {
-                $cid = (int) ($c['id'] ?? 0);
+                $cid = (int)($c['id'] ?? 0);
                 if ($cid === $aId) continue;
                 $out[] = $c;
             }
@@ -663,10 +621,10 @@ class DuelController extends Controller
         }
 
         foreach ($candidates as $c) {
-            $cid = (int) ($c['id'] ?? 0);
+            $cid = (int)($c['id'] ?? 0);
             if ($cid === $aId) continue;
 
-            $pos = (string) ($c['pos'] ?? '');
+            $pos = (string)($c['pos'] ?? '');
             if ($pos === '') continue;
 
             if ($mode === 'exact') {
@@ -695,7 +653,7 @@ class DuelController extends Controller
         $sum = 0.0;
 
         foreach ($keys as $k) {
-            $sum += (float) ($mix[$k] ?? 0.0);
+            $sum += (float)($mix[$k] ?? 0.0);
             if ($r <= $sum) return $k;
         }
 
@@ -713,7 +671,7 @@ class DuelController extends Controller
     {
         $total = 0.0;
         foreach ($items as $it) {
-            $w = (float) ($it['w'] ?? 0.0);
+            $w = (float)($it['w'] ?? 0.0);
             if ($w > 0) $total += $w;
         }
 
@@ -723,7 +681,7 @@ class DuelController extends Controller
         $acc = 0.0;
 
         foreach ($items as $it) {
-            $w = (float) ($it['w'] ?? 0.0);
+            $w = (float)($it['w'] ?? 0.0);
             if ($w <= 0) continue;
 
             $acc += $w;
@@ -736,7 +694,7 @@ class DuelController extends Controller
     private function expectedRatingMeta(?float $rating, ?string $posShort, string $attrKey, ?int $fplCost = null, ?int $maxCost = null, ?float $fplSel = null, ?float $maxSel = null): array
     {
         if ($rating !== null) {
-            return ['value' => (float) $rating, 'source' => 'rating'];
+            return ['value' => (float)$rating, 'source' => 'rating'];
         }
 
         $seedClass = 'App\\Support\\Seed';
@@ -744,7 +702,7 @@ class DuelController extends Controller
 
         if ($posShort && class_exists($seedClass) && method_exists($seedClass, 'for')) {
             $v = $seedClass::for($posShort, $attrKey);
-            if (is_numeric($v)) $seed = (float) $v;
+            if (is_numeric($v)) $seed = (float)$v;
         }
 
         if ($seed === null) $seed = 50.0;
@@ -756,11 +714,11 @@ class DuelController extends Controller
             'seed' => $seed,
         ];
 
-        $mc = $maxCost !== null ? (int) $maxCost : 0;
-        $fc = $fplCost !== null ? (int) $fplCost : 0;
+        $mc = $maxCost !== null ? (int)$maxCost : 0;
+        $fc = $fplCost !== null ? (int)$fplCost : 0;
 
         if ($mc > 0 && $fc > 0) {
-            $delta = (float) (config('zcout_matchmaking.rating_proxy_cost_delta') ?? 30);
+            $delta = (float)(config('zcout_matchmaking.rating_proxy_cost_delta') ?? 30);
             $ratio = $fc / $mc;
             if ($ratio < 0) $ratio = 0;
             if ($ratio > 1) $ratio = 1;
@@ -778,11 +736,11 @@ class DuelController extends Controller
             $components['cost_adj'] = $adj;
         }
 
-        $ms = $maxSel !== null ? (float) $maxSel : 0.0;
-        $fs = $fplSel !== null ? (float) $fplSel : 0.0;
+        $ms = $maxSel !== null ? (float)$maxSel : 0.0;
+        $fs = $fplSel !== null ? (float)$fplSel : 0.0;
 
         if ($ms > 0 && $fs > 0) {
-            $delta = (float) (config('zcout_matchmaking.rating_proxy_sel_delta') ?? 12);
+            $delta = (float)(config('zcout_matchmaking.rating_proxy_sel_delta') ?? 12);
             $ratio = $fs / $ms;
             if ($ratio < 0) $ratio = 0;
             if ($ratio > 1) $ratio = 1;
@@ -806,7 +764,7 @@ class DuelController extends Controller
         $components['value'] = $val;
 
         return [
-            'value' => (float) $val,
+            'value' => (float)$val,
             'source' => $src,
             'components' => $components,
         ];
@@ -821,7 +779,7 @@ class DuelController extends Controller
             return response()->json(['error' => 'Missing voter id'], 400);
         }
 
-        $duelId = (int) request('duel_id');
+        $duelId = (int)request('duel_id');
         if ($duelId <= 0) {
             return response()->json(['error' => 'Missing duel_id'], 422);
         }
@@ -849,10 +807,10 @@ class DuelController extends Controller
 
         if ($p === 'GK') return 'GK';
 
-        $def = ['CB','LB','RB','LWB','RWB','WB'];
+        $def = ['CB', 'LB', 'RB', 'LWB', 'RWB', 'WB'];
         if (in_array($p, $def, true)) return 'DEF';
 
-        $fwd = ['ST','CF','LW','RW','LF','RF','ATT'];
+        $fwd = ['ST', 'CF', 'LW', 'RW', 'LF', 'RF', 'ATT'];
         if (in_array($p, $fwd, true)) return 'FWD';
 
         return 'MID';
@@ -865,26 +823,12 @@ class DuelController extends Controller
         return ['any'];
     }
 
-    private function scopesToTryForCategory(string $scope, string $category): array
-    {
-        if ($category === 'obvious') {
-            return ['any'];
-        }
-
-        if (in_array($category, ['close', 'medium'], true)) {
-            if ($scope === 'same_pos') return ['same_pos', 'same_line'];
-            return ['same_line'];
-        }
-
-        return $this->scopesToTry($scope);
-    }
-
     private function filterByScope(array $candidates, array $a, string $scope): array
     {
         $out = [];
 
         foreach ($candidates as $c) {
-            if ((int) $c['id'] === (int) $a['id']) continue;
+            if ((int)$c['id'] === (int)$a['id']) continue;
 
             if ($scope === 'same_pos') {
                 if (($c['pos'] ?? null) !== ($a['pos'] ?? null)) continue;

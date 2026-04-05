@@ -26,6 +26,11 @@ return [
         'any' => 0.05,
     ],
 
+    'production_gap_profile_mix' => [
+        'close' => 0.75,
+        'medium' => 0.25,
+    ],
+
     'duel_mix' => [
         'close' => 0.60,
         'medium' => 0.30,
@@ -78,7 +83,7 @@ return [
     ],
 
     'positional_sides' => [
-        'def' => ['GK','CB','LB','RB','LWB','RWB','WB','DM','DEF'],
+        'def' => ['CB','LB','RB','LWB','RWB','WB','DM','DEF'],
         'off' => ['CM','AM','LM','RM','LW','RW','ST','CF','ATT','MID'],
     ],
 ];

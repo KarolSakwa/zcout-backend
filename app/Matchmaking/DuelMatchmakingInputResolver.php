@@ -19,11 +19,6 @@ final class DuelMatchmakingInputResolver
                 'C' => 0.05,
             ];
 
-        $productionCategoryMix = $cfg['production_category_mix'] ?? [
-                'close' => 0.75,
-                'medium' => 0.25,
-            ];
-
         $productionPositionProfileMix = $cfg['production_position_profile_mix'] ?? [
                 'exact' => 0.35,
                 'adjacent' => 0.45,
@@ -31,10 +26,9 @@ final class DuelMatchmakingInputResolver
                 'any' => 0.05,
             ];
 
-        $posMix = $cfg['position_mix'] ?? [
-                'same_pos' => 0.70,
-                'same_line' => 0.25,
-                'any' => 0.05,
+        $productionGapProfileMix = $cfg['production_gap_profile_mix'] ?? [
+                'close' => 0.75,
+                'medium' => 0.25,
             ];
 
         $positionalMix = $cfg['positional_mix'] ?? [
@@ -47,8 +41,8 @@ final class DuelMatchmakingInputResolver
         $positionalAdjacent = $cfg['positional_adjacent'] ?? [];
 
         $positionalSides = $cfg['positional_sides'] ?? [
-                'def' => ['GK','CB','LB','RB','LWB','RWB','WB','DM'],
-                'off' => ['CM','AM','LM','RM','LW','RW','ST','CF'],
+                'def' => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'WB', 'DM'],
+                'off' => ['CM', 'AM', 'LM', 'RM', 'LW', 'RW', 'ST', 'CF'],
             ];
 
         $gaps = $cfg['rating_gap'] ?? [
@@ -83,29 +77,16 @@ final class DuelMatchmakingInputResolver
                 : $this->rollFromMix($productionPositionProfileMix, 'adjacent', ['exact', 'adjacent', 'same_side', 'any']);
         }
 
-        $requestedCategory = request('category');
+        $requestedGapProfile = request('gap_profile');
+        $gapProfile = null;
 
-        if ($intent === 'calibration') {
-            $category = 'obvious';
-        } else {
-            $category = in_array($requestedCategory, ['close', 'medium'], true)
-                ? $requestedCategory
-                : $this->rollFromMix($productionCategoryMix, 'close', ['close', 'medium']);
+        if ($intent === 'production') {
+            $gapProfile = in_array($requestedGapProfile, ['close', 'medium'], true)
+                ? $requestedGapProfile
+                : $this->rollFromMix($productionGapProfileMix, 'close', ['close', 'medium']);
         }
 
-        $requestedScope = request('position_scope');
-        if ($category === 'obvious') {
-            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true) ? $requestedScope : 'any';
-        } else {
-            $positionScope = in_array($requestedScope, ['same_pos', 'same_line', 'any'], true)
-                ? $requestedScope
-                : $this->rollFromMix($posMix, 'same_pos', ['same_pos', 'same_line', 'any']);
-        }
-
-        $requestedPositionalMode = request('positional_mode');
-        $positionalMode = in_array($requestedPositionalMode, ['exact', 'adjacent', 'same_side', 'any'], true)
-            ? $requestedPositionalMode
-            : $this->rollFromMix($positionalMix, 'adjacent', ['exact', 'adjacent', 'same_side', 'any']);
+        $category = $intent === 'calibration' ? 'obvious' : null;
 
         return [
             'debug' => $debug,
@@ -113,10 +94,9 @@ final class DuelMatchmakingInputResolver
             'intent' => $intent,
             'tier' => $tier,
             'position_profile' => $positionProfile,
+            'gap_profile' => $gapProfile,
 
             'category' => $category,
-            'position_scope' => $positionScope,
-            'positional_mode' => $positionalMode,
 
             'positional_adjacent' => $positionalAdjacent,
             'positional_sides' => $positionalSides,
@@ -129,19 +109,15 @@ final class DuelMatchmakingInputResolver
                 'intent' => $requestedIntent,
                 'tier' => $requestedTier,
                 'position_profile' => $requestedPositionProfile,
-                'category' => $requestedCategory,
-                'position_scope' => $requestedScope,
-                'positional_mode' => $requestedPositionalMode,
+                'gap_profile' => $requestedGapProfile,
             ],
             'picked' => [
                 'intent' => $intent,
                 'tier' => $tier,
                 'position_profile' => $positionProfile,
-                'position_scope' => $category === 'positional' ? null : $positionScope,
-                'positional_mode' => $category === 'positional' ? $positionalMode : null,
+                'gap_profile' => $gapProfile,
             ],
         ];
-
     }
 
     private function rollFromMix(array $mix, string $default, array $keys): string
@@ -151,7 +127,9 @@ final class DuelMatchmakingInputResolver
 
         foreach ($keys as $k) {
             $sum += (float) ($mix[$k] ?? 0.0);
-            if ($r <= $sum) return $k;
+            if ($r <= $sum) {
+                return $k;
+            }
         }
 
         return $default;
