@@ -3,316 +3,163 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attribute;
-use App\Models\Duel;
-use App\Models\Player;
 use Illuminate\Support\Facades\DB;
-use App\Actions\GetNextDuelAction;
-use App\Actions\MaterializeNextDuelAction;
+use App\Actions\PlanNextDuelForVoterAction;
+use App\Actions\BuildNextDuelPayloadAction;
+use App\Actions\ResolveVoterContextAction;
+use App\Actions\ResumeLockedDuelAction;
+use App\Actions\LoadVoterDuelStateAction;
+use App\Actions\SkipDuelForVoterAction;
 
 class DuelController extends Controller
 {
-    private GetNextDuelAction $getNextDuelAction;
-    private MaterializeNextDuelAction $materializeNextDuelAction;
+    private PlanNextDuelForVoterAction $planNextDuelForVoterAction;
+    private BuildNextDuelPayloadAction $buildNextDuelPayloadAction;
+    private ResolveVoterContextAction $resolveVoterContextAction;
+    private ResumeLockedDuelAction $resumeLockedDuelAction;
+    private LoadVoterDuelStateAction $loadVoterDuelStateAction;
+    private SkipDuelForVoterAction $skipDuelForVoterAction;
 
     public function __construct(
-        GetNextDuelAction $getNextDuelAction,
-        MaterializeNextDuelAction $materializeNextDuelAction
+        PlanNextDuelForVoterAction $planNextDuelForVoterAction,
+        BuildNextDuelPayloadAction $buildNextDuelPayloadAction,
+        ResolveVoterContextAction $resolveVoterContextAction,
+        ResumeLockedDuelAction $resumeLockedDuelAction,
+        LoadVoterDuelStateAction $loadVoterDuelStateAction,
+        SkipDuelForVoterAction $skipDuelForVoterAction
     ) {
-        $this->getNextDuelAction = $getNextDuelAction;
-        $this->materializeNextDuelAction = $materializeNextDuelAction;
+        $this->planNextDuelForVoterAction = $planNextDuelForVoterAction;
+        $this->buildNextDuelPayloadAction = $buildNextDuelPayloadAction;
+        $this->resolveVoterContextAction = $resolveVoterContextAction;
+        $this->resumeLockedDuelAction = $resumeLockedDuelAction;
+        $this->loadVoterDuelStateAction = $loadVoterDuelStateAction;
+        $this->skipDuelForVoterAction = $skipDuelForVoterAction;
     }
 
     public function next()
     {
-        $anon = request()->header('X-Zcout-Anon');
-        $voterHash = $anon ?: (auth()->check() ? ('user:' . auth()->id()) : null);
+        $voter = $this->resolveVoterContextAction->handle();
 
-        if (!$voterHash) {
+        if (($voter['status'] ?? 'failed') !== 'ok') {
             return response()->json(['error' => 'Missing voter id'], 400);
         }
 
-        $voteVoterHash = hash_hmac('sha256', $voterHash, (string)config('app.key'));
+        $voterHash = $voter['voter_hash'];
+        $voteVoterHash = $voter['vote_voter_hash'];
 
-        $lockedDuelId = DB::table('voter_duel_locks')->where('voter_hash', $voterHash)->value('duel_id');
+        $resumedLocked = $this->resumeLockedDuelAction->handle([
+            'voter_hash' => $voterHash,
+            'vote_voter_hash' => $voteVoterHash,
+        ]);
 
-        if ($lockedDuelId) {
-            $isLockedSkipped = DB::table('duel_skips')
-                ->where('duel_id', $lockedDuelId)
-                ->where('voter_hash', $voterHash)
-                ->exists();
-
-            $isLockedVoted = DB::table('votes')
-                ->where('source', 'duel')
-                ->where('duel_id', $lockedDuelId)
-                ->where('voter_hash', $voteVoterHash)
-                ->exists();
-
-            if (!$isLockedSkipped && !$isLockedVoted) {
-                $lockedDuel = Duel::query()->find($lockedDuelId);
-
-                if ($lockedDuel) {
-                    $lockedAttr = Attribute::query()->find($lockedDuel->attribute_id);
-
-                    if ($lockedAttr) {
-                        $playerIds = [(int)$lockedDuel->player_a_id, (int)$lockedDuel->player_b_id];
-
-                        $players = Player::query()
-                            ->select(['id', 'name', 'slug', 'number', 'club_id', 'country_id', 'position_id'])
-                            ->with([
-                                'clubRel:id,name,color_primary,color_secondary,color_tertiary',
-                                'countryRef:id,name,iso2',
-                                'positionRef:id,short_label,label,key',
-                            ])
-                            ->whereIn('id', $playerIds)
-                            ->get()
-                            ->keyBy('id');
-
-                        $pA = $players->get((int)$lockedDuel->player_a_id);
-                        $pB = $players->get((int)$lockedDuel->player_b_id);
-
-                        if ($pA && $pB) {
-                            $toApi = function (Player $p) {
-                                return [
-                                    'id' => $p->id,
-                                    'name' => $p->name,
-                                    'slug' => $p->slug,
-                                    'number' => $p->number,
-                                    'position' => $p->positionRef?->short_label
-                                        ?? $p->positionRef?->key
-                                        ?? $p->positionRef?->label
-                                        ?? null,
-                                    'country' => $p->countryRef ? [
-                                        'id' => $p->countryRef->id,
-                                        'name' => $p->countryRef->name,
-                                        'iso2' => $p->countryRef->iso2,
-                                    ] : null,
-                                    'club' => $p->clubRel ? [
-                                        'name' => $p->clubRel->name,
-                                        'color_primary' => $p->clubRel->color_primary,
-                                        'color_secondary' => $p->clubRel->color_secondary,
-                                        'color_tertiary' => $p->clubRel->color_tertiary,
-                                    ] : null,
-                                ];
-                            };
-
-                            return response()->json([
-                                'attribute' => [
-                                    'id' => $lockedAttr->id,
-                                    'key' => $lockedAttr->key,
-                                    'label' => $lockedAttr->label,
-                                    'group' => $lockedAttr->group,
-                                    'scope' => $lockedAttr->scope ?? 'both',
-                                ],
-                                'players' => [$toApi($pA), $toApi($pB)],
-                                'duel_id' => $lockedDuel->id,
-                                'matchmaking' => [
-                                    'category' => null,
-                                    'positional_mode' => null,
-                                    'intent' => null,
-                                ],
-                            ]);
-                        }
-                    }
-                }
-            }
-
-            DB::table('voter_duel_locks')->where('voter_hash', $voterHash)->delete();
+        if (($resumedLocked['status'] ?? 'failed') === 'ok') {
+            return response()->json($resumedLocked['payload']);
         }
 
-        $skippedIds = DB::table('duel_skips')
-            ->where('voter_hash', $voterHash)
-            ->pluck('duel_id')
-            ->all();
-
-        $skipped = [];
-        foreach ($skippedIds as $id) {
-            $skipped[(int)$id] = true;
+        if (($resumedLocked['status'] ?? 'failed') === 'failed') {
+            return response()->json([
+                'error' => 'Failed to resume locked duel',
+            ], 422);
         }
 
-        $votedIds = DB::table('votes')
-            ->where('source', 'duel')
-            ->where('voter_hash', $voteVoterHash)
-            ->pluck('duel_id')
-            ->all();
+        $voterState = $this->loadVoterDuelStateAction->handle([
+            'voter_hash' => $voterHash,
+            'vote_voter_hash' => $voteVoterHash,
+        ]);
 
-        $voted = [];
-        foreach ($votedIds as $id) {
-            $voted[(int)$id] = true;
+        if (($voterState['status'] ?? 'failed') !== 'ok') {
+            return response()->json([
+                'error' => 'Failed to load voter duel state',
+            ], 422);
         }
 
-        $maxAttempts = 12;
+        $skipped = $voterState['skipped'] ?? [];
+        $voted = $voterState['voted'] ?? [];
 
-        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-            $requestedAttr = request('attribute');
+        $planned = $this->planNextDuelForVoterAction->handle([
+            'cfg' => config('zcout_matchmaking', []),
+            'skipped' => $skipped,
+            'voted' => $voted,
+            'voter_hash' => $voterHash,
+            'requested_attribute' => request('attribute'),
+            'debug' => (string)request('debug') === '1',
+            'max_attempts' => 12,
+        ]);
 
-            $attribute = $requestedAttr
-                ? Attribute::where('key', $requestedAttr)->first()
-                : Attribute::query()->where('scope', 'both')->inRandomOrder()->first();
-
-            if (!$attribute) {
-                return response()->json(['error' => 'Unknown attribute'], 422);
-            }
-
-            $cfg = config('zcout_matchmaking', []);
-            $planned = $this->getNextDuelAction->handle([
-                'attribute' => $attribute,
-                'cfg' => $cfg,
-            ]);
-
-            $attribute = $planned['attribute'] ?? $attribute;
-            $intent = $planned['intent'] ?? null;
-            $selectedTier = $planned['tier'] ?? null;
-            $gapProfile = $planned['gap_profile'] ?? null;
-            $selectedPositionalMode = $planned['positional_mode'] ?? null;
-            $gap = $planned['gap'] ?? null;
-            $metaA = $planned['meta_a'] ?? null;
-            $metaB = $planned['meta_b'] ?? null;
-            $triesUsed = (int) ($planned['tries_used'] ?? 0);
-            $fallbacks = $planned['fallbacks'] ?? [];
-            $forceGK = (bool) ($planned['force_gk'] ?? false);
-            $requested = $planned['requested'] ?? [];
-            $picked = $planned['picked'] ?? [];
-            $category = $planned['category'] ?? null;
-            $debug = (string) request('debug') === '1';
-
-            $pickedA = $planned['picked_a'] ?? null;
-            $pickedB = $planned['picked_b'] ?? null;
-
-            if (!$pickedA || !$pickedB) {
-                return response()->json(['error' => 'Failed to pick duel pair'], 422);
-            }
-
-            $materialized = $this->materializeNextDuelAction->handle([
-                'attribute' => $attribute,
-                'picked_a' => $pickedA,
-                'picked_b' => $pickedB,
-            ]);
-
-            if (($materialized['status'] ?? 'failed') !== 'ok') {
-                return response()->json([
-                    'error' => 'Failed to materialize duel',
-                    'reason' => $materialized['failure_reason'] ?? 'unknown',
-                ], 422);
-            }
-
-            $duel = $materialized['duel'];
-            $players = $materialized['players'];
-
-            $pA = $players[(int) $pickedA['id']];
-            $pB = $players[(int) $pickedB['id']];
-
-            if (isset($skipped[(int)$duel->id])) {
-                $fallbacks[] = 'skipped_reroll';
-                continue;
-            }
-
-            if (isset($voted[(int)$duel->id])) {
-                $fallbacks[] = 'already_voted_reroll';
-                continue;
-            }
-
-            $now = now();
-
-            DB::table('voter_duel_locks')->upsert(
-                [[
-                    'voter_hash' => $voterHash,
-                    'duel_id' => $duel->id,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]],
-                ['voter_hash'],
-                ['duel_id', 'updated_at']
-            );
-
-            $toApi = function (Player $p) {
-                return [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'slug' => $p->slug,
-                    'number' => $p->number,
-                    'position' => $p->positionRef?->short_label
-                        ?? $p->positionRef?->key
-                        ?? $p->positionRef?->label
-                        ?? null,
-                    'country' => $p->countryRef ? [
-                        'id' => $p->countryRef->id,
-                        'name' => $p->countryRef->name,
-                        'iso2' => $p->countryRef->iso2,
-                    ] : null,
-                    'club' => $p->clubRel ? [
-                        'name' => $p->clubRel->name,
-                        'color_primary' => $p->clubRel->color_primary,
-                        'color_secondary' => $p->clubRel->color_secondary,
-                        'color_tertiary' => $p->clubRel->color_tertiary,
-                    ] : null,
-                ];
-            };
-
-            $payload = [
-                'attribute' => [
-                    'id' => $attribute->id,
-                    'key' => $attribute->key,
-                    'label' => $attribute->label,
-                    'group' => $attribute->group,
-                    'scope' => $attribute->scope ?? 'both',
-                ],
-                'players' => [$toApi($pA), $toApi($pB)],
-                'duel_id' => $duel->id,
-                'matchmaking' => [
-                    'category' => $category,
-                    'positional_mode' => $intent === 'production' ? $selectedPositionalMode : null,
-                    'intent' => $intent,
-                    'tier' => $selectedTier,
-                    'gap_profile' => $intent === 'production' ? $gapProfile : null,
-                ],
-            ];
-
-            if ($debug) {
-                $payload['debug'] = [
-                    'requested' => $requested,
-                    'picked' => $picked,
-                    'fallbacks' => $fallbacks,
-                    'tries_used' => $triesUsed,
-                    'attempt' => $attempt + 1,
-                    'force_gk' => $forceGK,
-                ];
-            }
-
-            return response()->json($payload);
+        if (($planned['status'] ?? 'failed') !== 'ok') {
+            return $this->nextFailureResponse($planned);
         }
 
-        return response()->json(['error' => 'No unskipped duel available'], 422);
+        $payload = $this->buildNextDuelPayloadAction->handle([
+            'attribute' => $planned['attribute'] ?? null,
+            'duel' => $planned['duel'] ?? null,
+            'players' => $planned['players'] ?? null,
+            'matchmaking' => $planned['matchmaking'] ?? [],
+            'debug' => $planned['debug'] ?? null,
+        ]);
+
+        return response()->json($payload);
     }
 
     public function skip()
     {
-        $anon = request()->header('X-Zcout-Anon');
-        $voterHash = $anon ?: (auth()->check() ? ('user:' . auth()->id()) : null);
+        $voter = $this->resolveVoterContextAction->handle();
 
-        if (!$voterHash) {
+        if (($voter['status'] ?? 'failed') !== 'ok') {
             return response()->json(['error' => 'Missing voter id'], 400);
         }
+
+        $voterHash = $voter['voter_hash'];
 
         $duelId = (int)request('duel_id');
         if ($duelId <= 0) {
             return response()->json(['error' => 'Missing duel_id'], 422);
         }
 
-        DB::table('duel_skips')->updateOrInsert(
-            [
-                'duel_id' => $duelId,
-                'voter_hash' => $voterHash,
-            ],
-            [
-                'user_id' => auth()->id(),
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
+        $skipped = $this->skipDuelForVoterAction->handle([
+            'voter_hash' => $voterHash,
+            'duel_id' => $duelId,
+            'user_id' => auth()->id(),
+        ]);
 
-        DB::table('voter_duel_locks')->where('voter_hash', $voterHash)->delete();
+        if (($skipped['status'] ?? 'failed') !== 'ok') {
+            return response()->json([
+                'error' => 'Failed to skip duel',
+                'reason' => $skipped['reason'] ?? 'failed_to_skip_duel',
+            ], 422);
+        }
 
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'ok' => true,
+        ]);
+    }
+
+    private function nextFailureResponse(array $planned)
+    {
+        $reason = $planned['failure_reason'] ?? 'failed_to_plan_next_duel';
+
+        if ($reason === 'unknown_attribute') {
+            return response()->json(['error' => 'Unknown attribute'], 422);
+        }
+
+        if ($reason === 'no_unskipped_duel_available') {
+            return response()->json(['error' => 'No unskipped duel available'], 422);
+        }
+
+        if ($reason === 'failed_to_pick_duel_pair') {
+            return response()->json(['error' => 'Failed to pick duel pair'], 422);
+        }
+
+        if (in_array($reason, ['players_not_found', 'missing_attribute', 'missing_picked_players', 'invalid_picked_players'], true)) {
+            return response()->json([
+                'error' => 'Failed to materialize duel',
+                'reason' => $reason,
+            ], 422);
+        }
+
+        return response()->json([
+            'error' => 'Failed to reserve duel',
+            'reason' => $reason,
+        ], 422);
     }
 }
