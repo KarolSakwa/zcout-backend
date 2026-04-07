@@ -203,4 +203,55 @@ class LiveFeedTopMoversTest extends TestCase
             ->assertJsonPath('items.1.playerId', $playerCId)
             ->assertJsonPath('items.1.delta', '-0.500');
     }
+
+    public function test_it_ignores_votes_older_than_7_days(): void
+    {
+        $playerAId = DB::table('players')->insertGetId([
+            'name' => 'Bukayo Saka',
+            'slug' => 'bukayo-saka',
+        ]);
+
+        $playerBId = DB::table('players')->insertGetId([
+            'name' => 'Cole Palmer',
+            'slug' => 'cole-palmer',
+        ]);
+
+        $attributeId = DB::table('attributes')->insertGetId([
+            'key' => 'dribbling',
+            'label' => 'Dribbling',
+            'group' => 'TECHNIQUE',
+        ]);
+
+        $oldDuelId = DB::table('duels')->insertGetId([
+            'attribute_id' => $attributeId,
+            'player_a_id' => $playerAId,
+            'player_b_id' => $playerBId,
+            'status' => 'completed',
+            'winner_id' => $playerAId,
+            'created_at' => now()->subDays(8),
+            'completed_at' => now()->subDays(8),
+        ]);
+
+        DB::table('votes')->insert([
+            'source' => 'duel',
+            'duel_id' => $oldDuelId,
+            'player_a_id' => $playerAId,
+            'player_b_id' => $playerBId,
+            'winner_id' => $playerAId,
+            'attribute_id' => $attributeId,
+            'pre_rating_a' => 80,
+            'post_rating_a' => 83,
+            'pre_rating_b' => 79,
+            'post_rating_b' => 76,
+            'created_at' => now()->subDays(8),
+        ]);
+
+        $response = $this->getJson('/api/live/top-movers?direction=risers&period=7d&limit=5');
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'items' => [],
+            ]);
+    }
 }
