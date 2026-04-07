@@ -2,41 +2,42 @@
 
 namespace App\Simulation\Actions;
 
-use App\Http\Controllers\Api\DuelController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Actions\HandleNextDuelRequestAction;
 
 final class FetchNextDuelPayload
 {
     public function __construct(
-        private readonly DuelController $duelController = new DuelController(),
+        private readonly HandleNextDuelRequestAction $handleNextDuelRequestAction,
     ) {
     }
 
-    public function handle(string $attributeKey, ?string $anonId = null, ?int $appUserId = null): ?array
+    public function handle(?string $attributeKey = null, ?string $anonId = null, ?int $appUserId = null): ?array
     {
-        $request = Request::create('/api/duels/next', 'GET', [
-            'attribute' => $attributeKey,
-        ]);
+        $voterHash = $anonId ?: ($appUserId !== null ? ('user:' . $appUserId) : null);
 
-        if ($appUserId !== null) {
-            Auth::onceUsingId($appUserId);
-        } elseif ($anonId !== null && $anonId !== '') {
-            $request->headers->set('X-Zcout-Anon', $anonId);
-        }
-
-        app()->instance('request', $request);
-
-        $response = $this->duelController->next();
-
-        Auth::forgetGuards();
-
-        if (! method_exists($response, 'getData')) {
+        if ($voterHash === null || $voterHash === '') {
             return null;
         }
 
-        $data = $response->getData(true);
+        $result = $this->handleNextDuelRequestAction->handle([
+            'cfg' => config('zcout_matchmaking', []),
+            'requested_attribute' => $attributeKey,
+            'requested_intent' => null,
+            'requested_tier' => null,
+            'requested_position_profile' => null,
+            'requested_gap_profile' => null,
+            'debug' => false,
+            'max_attempts' => 12,
+            'voter_hash' => $voterHash,
+            'vote_voter_hash' => hash_hmac('sha256', $voterHash, (string) config('app.key')),
+        ]);
 
-        return is_array($data) ? $data : null;
+        if (($result['status'] ?? 'error') !== 'ok') {
+            return null;
+        }
+
+        $payload = $result['payload'] ?? null;
+
+        return is_array($payload) ? $payload : null;
     }
 }

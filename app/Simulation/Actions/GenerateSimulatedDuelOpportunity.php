@@ -10,8 +10,8 @@ use App\Simulation\SimulationContext;
 final class GenerateSimulatedDuelOpportunity
 {
     public function __construct(
-        private readonly FetchNextDuelPayload $duelPayloadFetcher = new FetchNextDuelPayload(),
-        private readonly SimulationTruthPoolReader $truthPoolReader = new SimulationTruthPoolReader(),
+        private readonly FetchNextDuelPayload $duelPayloadFetcher,
+        private readonly SimulationTruthPoolReader $truthPoolReader,
     ) {
     }
 
@@ -37,7 +37,7 @@ final class GenerateSimulatedDuelOpportunity
         $attributeKey = $attributeKeys[abs(crc32($base . '|attribute')) % count($attributeKeys)];
 
         $payload = $this->duelPayloadFetcher->handle(
-            $attributeKey,
+            null,
             $user->isLogged ? null : 'sim:' . $user->id,
             $user->isLogged ? $user->appUserId : null,
         );

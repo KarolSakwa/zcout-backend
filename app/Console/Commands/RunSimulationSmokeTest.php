@@ -89,7 +89,7 @@ final class RunSimulationSmokeTest extends Command
                 : new CollectingSimulationOutput();
 
             $run = new SimulationRun(
-                sources: [new DuelInteractionSource()],
+                sources: [app(DuelInteractionSource::class)],
                 output: $output,
             );
 

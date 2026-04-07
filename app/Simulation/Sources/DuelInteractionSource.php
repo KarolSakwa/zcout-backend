@@ -13,8 +13,8 @@ use App\Simulation\SimulationContext;
 final class DuelInteractionSource implements InteractionSource
 {
     public function __construct(
-        private readonly GenerateSimulatedDuelOpportunity $opportunityGenerator = new GenerateSimulatedDuelOpportunity(),
-        private readonly SimulateDuelDecision $decisionSimulator = new SimulateDuelDecision(),
+        private readonly GenerateSimulatedDuelOpportunity $opportunityGenerator,
+        private readonly SimulateDuelDecision $decisionSimulator,
     ) {
     }
 
