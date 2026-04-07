@@ -4,23 +4,23 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Actions\ResolveVoterContextAction;
-use App\Actions\SkipDuelForVoterAction;
 use App\Actions\HandleNextDuelRequestAction;
+use App\Actions\HandleSkipDuelRequestAction;
 
 class DuelController extends Controller
 {
     private ResolveVoterContextAction $resolveVoterContextAction;
-    private SkipDuelForVoterAction $skipDuelForVoterAction;
     private HandleNextDuelRequestAction $handleNextDuelRequestAction;
+    private HandleSkipDuelRequestAction $handleSkipDuelRequestAction;
 
     public function __construct(
         ResolveVoterContextAction $resolveVoterContextAction,
-        SkipDuelForVoterAction $skipDuelForVoterAction,
-        HandleNextDuelRequestAction $handleNextDuelRequestAction
+        HandleNextDuelRequestAction $handleNextDuelRequestAction,
+        HandleSkipDuelRequestAction $handleSkipDuelRequestAction
     ) {
         $this->resolveVoterContextAction = $resolveVoterContextAction;
-        $this->skipDuelForVoterAction = $skipDuelForVoterAction;
         $this->handleNextDuelRequestAction = $handleNextDuelRequestAction;
+        $this->handleSkipDuelRequestAction = $handleSkipDuelRequestAction;
     }
 
     public function next()
@@ -34,6 +34,10 @@ class DuelController extends Controller
         $result = $this->handleNextDuelRequestAction->handle([
             'cfg' => config('zcout_matchmaking', []),
             'requested_attribute' => request('attribute'),
+            'requested_intent' => request('intent'),
+            'requested_tier' => request('tier'),
+            'requested_position_profile' => request('position_profile'),
+            'requested_gap_profile' => request('gap_profile'),
             'debug' => (string) request('debug') === '1',
             'max_attempts' => 12,
             'voter_hash' => $voter['voter_hash'],
@@ -58,28 +62,19 @@ class DuelController extends Controller
             return response()->json(['error' => 'Missing voter id'], 400);
         }
 
-        $voterHash = $voter['voter_hash'];
-
-        $duelId = (int)request('duel_id');
-        if ($duelId <= 0) {
-            return response()->json(['error' => 'Missing duel_id'], 422);
-        }
-
-        $skipped = $this->skipDuelForVoterAction->handle([
-            'voter_hash' => $voterHash,
-            'duel_id' => $duelId,
+        $result = $this->handleSkipDuelRequestAction->handle([
+            'voter_hash' => $voter['voter_hash'],
+            'duel_id' => (int) request('duel_id'),
             'user_id' => auth()->id(),
         ]);
 
-        if (($skipped['status'] ?? 'failed') !== 'ok') {
-            return response()->json([
-                'error' => 'Failed to skip duel',
-                'reason' => $skipped['reason'] ?? 'failed_to_skip_duel',
-            ], 422);
+        if (($result['status'] ?? 'error') !== 'ok') {
+            return response()->json(
+                $result['body'] ?? ['error' => 'Failed to handle skip duel request'],
+                (int) ($result['http_status'] ?? 422),
+            );
         }
 
-        return response()->json([
-            'ok' => true,
-        ]);
+        return response()->json($result['payload'] ?? ['ok' => true]);
     }
 }
