@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\LiveFeedController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -58,3 +59,4 @@ Route::middleware('auth:sanctum')->post('/auth/claim-anon', function (\Illuminat
 Route::post('/votes/direct', [VoteController::class, 'storeDirect'])->middleware('auth:sanctum');
 Route::post('/duels/skip', [\App\Http\Controllers\Api\DuelController::class, 'skip']);
 Route::get('/search', [SearchController::class, 'index']);
+Route::get('/live/recent-votes', [LiveFeedController::class, 'recentVotes']);
