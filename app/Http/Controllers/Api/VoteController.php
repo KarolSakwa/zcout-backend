@@ -14,6 +14,8 @@ use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use App\Events\RecentVoteCreated;
+use App\Support\Live\RecentVoteItem;
 
 class VoteController extends Controller
 {
@@ -230,6 +232,29 @@ class VoteController extends Controller
                 $vote->post_rating_b = number_format($afterB, 3, '.', '');
                 $vote->save();
             });
+
+            $recentVoteRow = DB::table('votes as v')
+                ->join('players as winner_player', 'winner_player.id', '=', 'v.winner_id')
+                ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
+                ->join('players as player_a', 'player_a.id', '=', 'v.player_a_id')
+                ->join('players as player_b', 'player_b.id', '=', 'v.player_b_id')
+                ->where('v.id', $vote->id)
+                ->select([
+                    'v.id',
+                    'v.winner_id',
+                    'v.player_a_id',
+                    'v.player_b_id',
+                    'winner_player.name as winner_name',
+                    'player_a.name as player_a_name',
+                    'player_b.name as player_b_name',
+                    'a.key as attribute_key',
+                    'a.label as attribute_label',
+                ])
+                ->first();
+
+            if ($recentVoteRow) {
+                event(new RecentVoteCreated(RecentVoteItem::fromRow($recentVoteRow)));
+            }
         } catch (\Illuminate\Database\QueryException $e) {
             $msg = (string) $e->getMessage();
             $code = (string) $e->getCode();
