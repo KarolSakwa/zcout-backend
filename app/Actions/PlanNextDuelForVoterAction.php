@@ -9,7 +9,8 @@ final class PlanNextDuelForVoterAction
     public function __construct(
         private GetNextDuelAction $getNextDuelAction,
         private MaterializeNextDuelAction $materializeNextDuelAction,
-        private ReserveNextDuelAction $reserveNextDuelAction
+        private ReserveNextDuelAction $reserveNextDuelAction,
+        private SelectNextDuelAttributeAction $selectNextDuelAttributeAction
     ) {
     }
 
@@ -32,29 +33,10 @@ final class PlanNextDuelForVoterAction
         }
 
         for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-            if ($requestedAttr) {
-                $attribute = Attribute::query()
-                    ->where('key', $requestedAttr)
-                    ->first();
-            } else {
-                $scopeMix = $cfg['attribute_scope_mix'] ?? [
-                        'both' => 0.90,
-                        'gk' => 0.10,
-                    ];
-
-                $scope = (mt_rand() / mt_getrandmax()) < (float) ($scopeMix['gk'] ?? 0.10) ? 'gk' : 'both';
-
-                $attribute = Attribute::query()
-                    ->where('scope', $scope)
-                    ->inRandomOrder()
-                    ->first();
-
-                if (!$attribute) {
-                    $attribute = Attribute::query()
-                        ->inRandomOrder()
-                        ->first();
-                }
-            }
+            $attribute = $this->selectNextDuelAttributeAction->handle([
+                'cfg' => $cfg,
+                'requested_attribute' => $requestedAttr,
+            ]);
 
             if (!$attribute) {
                 return [
@@ -84,6 +66,10 @@ final class PlanNextDuelForVoterAction
             $fallbacks = $planned['fallbacks'] ?? [];
 
             if (!$pickedA || !$pickedB) {
+                if (!$requestedAttr) {
+                    continue;
+                }
+
                 return [
                     'status' => 'failed',
                     'failure_reason' => 'failed_to_pick_duel_pair',
