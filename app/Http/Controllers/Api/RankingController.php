@@ -100,14 +100,10 @@ class RankingController extends Controller
             });
         }
 
-        if ($search !== '') {
-            $playersQuery->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search) . '%']);
-        }
-
         $players = $playersQuery->get();
 
         if ($attributeKey === 'overall') {
-            return $this->overall($players, $position, $limit, $page, $sort, $dir);
+            return $this->overall($players, $position, $limit, $page, $sort, $dir, $search);
         }
 
         $attribute = Attribute::query()
@@ -179,7 +175,7 @@ class RankingController extends Controller
             ];
         }
 
-        $ranked = $this->rankAndSortItems($items, $sort, $dir, $limit, $page);
+        $ranked = $this->rankAndSortItems($items, $sort, $dir, $limit, $page, $search);
 
         return response()->json([
             'attribute' => [
@@ -193,13 +189,13 @@ class RankingController extends Controller
                 'sort' => $sort,
                 'dir' => $dir,
             ],
-            'total' => count($players),
+            'total' => $ranked['total'],
             'total_pages' => $ranked['total_pages'],
             'items' => $ranked['items'],
         ]);
     }
 
-    private function overall(Collection $players, string $position, int $limit, int $page, string $sort, string $dir)
+    private function overall(Collection $players, string $position, int $limit, int $page, string $sort, string $dir, string $search = '')
     {
         $attributes = Attribute::query()
             ->select('id', 'key', 'label', 'group')
@@ -293,7 +289,7 @@ class RankingController extends Controller
             ];
         }
 
-        $ranked = $this->rankAndSortItems($items, $sort, $dir, $limit, $page);
+        $ranked = $this->rankAndSortItems($items, $sort, $dir, $limit, $page, $search);
 
         return response()->json([
             'attribute' => [
@@ -307,13 +303,13 @@ class RankingController extends Controller
                 'sort' => $sort,
                 'dir' => $dir,
             ],
-            'total' => count($players),
+            'total' => $ranked['total'],
             'total_pages' => $ranked['total_pages'],
             'items' => $ranked['items'],
         ]);
     }
 
-    private function rankAndSortItems(array $items, string $sort, string $dir, int $limit, int $page): array
+    private function rankAndSortItems(array $items, string $sort, string $dir, int $limit, int $page, string $search = ''): array
     {
         usort($items, function ($a, $b) {
             $c = $b['rating'] <=> $a['rating'];
@@ -331,6 +327,16 @@ class RankingController extends Controller
 
         foreach ($items as $i => $it) {
             $items[$i]['rank'] = $i + 1;
+        }
+
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+
+            $items = array_values(array_filter($items, function (array $item) use ($needle) {
+                $name = mb_strtolower((string) ($item['player']['name'] ?? ''));
+
+                return str_contains($name, $needle);
+            }));
         }
 
         if ($sort !== 'rank') {
@@ -366,6 +372,7 @@ class RankingController extends Controller
 
         return [
             'items' => $pagedItems,
+            'total' => $totalItems,
             'total_pages' => $totalPages,
             'page' => $safePage,
         ];
