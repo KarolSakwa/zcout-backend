@@ -14,7 +14,6 @@ final class ProductionDuelPlanner
         $positionalSides = $context['positional_sides'] ?? [];
         $gaps = $context['gaps'] ?? [];
         $maxCost = (int) ($context['max_cost'] ?? 0);
-        $maxSel = (float) ($context['max_sel'] ?? 0.0);
 
         $result = [
             'picked_a' => null,
@@ -48,8 +47,6 @@ final class ProductionDuelPlanner
                 $attributeKey,
                 $aTry['cost'] ?? null,
                 $maxCost,
-                $aTry['sel'] ?? null,
-                $maxSel
             );
 
             $ratingA = (float) $aMeta['value'];
@@ -69,8 +66,6 @@ final class ProductionDuelPlanner
                         $attributeKey,
                         $c['cost'] ?? null,
                         $maxCost,
-                        $c['sel'] ?? null,
-                        $maxSel
                     );
 
                     $ratingB = (float) $bMeta['value'];
@@ -95,7 +90,6 @@ final class ProductionDuelPlanner
                             'conf' => $c['conf'] ?? null,
                             'rating' => $c['rating'] ?? null,
                             'cost' => $c['cost'] ?? 0,
-                            'sel' => $c['sel'] ?? 0.0,
                             'w' => $c['w'] ?? 0.0,
                             'gap' => $g,
                             'meta' => $bMeta,
@@ -134,8 +128,6 @@ final class ProductionDuelPlanner
         array  $adjacentMap,
         array  $sidesMap,
         int    $maxTries,
-        int    $maxCost,
-        float  $maxSel
     ): ?array
     {
         $modeChain = $this->positionalModesToTry($modeWanted);
@@ -167,10 +159,10 @@ final class ProductionDuelPlanner
         return null;
     }
 
-    private function pickBestGapOpponent(array $candidates, array $a, string $attrKey, int $maxCost, float $maxSel): ?array
+    private function pickBestGapOpponent(array $candidates, array $a, string $attrKey, int $maxCost): ?array
     {
         $aId = (int)($a['id'] ?? 0);
-        $metaA = $this->expectedRatingMeta($a['rating'] ?? null, $a['pos'] ?? null, $attrKey, $a['cost'] ?? null, $maxCost, $a['sel'] ?? null, $maxSel);
+        $metaA = $this->expectedRatingMeta($a['rating'] ?? null, $a['pos'] ?? null, $attrKey, $a['cost'] ?? null, $maxCost);
         $ratingA = (float)($metaA['value'] ?? 0);
 
         $best = null;
@@ -181,7 +173,7 @@ final class ProductionDuelPlanner
             $cid = (int)($c['id'] ?? 0);
             if ($cid === $aId) continue;
 
-            $metaB = $this->expectedRatingMeta($c['rating'] ?? null, $c['pos'] ?? null, $attrKey, $c['cost'] ?? null, $maxCost, $c['sel'] ?? null, $maxSel);
+            $metaB = $this->expectedRatingMeta($c['rating'] ?? null, $c['pos'] ?? null, $attrKey, $c['cost'] ?? null, $maxCost);
             $ratingB = (float)($metaB['value'] ?? 0);
 
             $g = abs($ratingA - $ratingB);
@@ -298,7 +290,7 @@ final class ProductionDuelPlanner
         return $items[count($items) - 1] ?? null;
     }
 
-    private function expectedRatingMeta(?float $rating, ?string $posShort, string $attrKey, ?int $fplCost = null, ?int $maxCost = null, ?float $fplSel = null, ?float $maxSel = null): array
+    private function expectedRatingMeta(?float $rating, ?string $posShort, string $attrKey, ?int $fplCost = null, ?int $maxCost = null): array
     {
         if ($rating !== null) {
             return ['value' => (float)$rating, 'source' => 'rating'];
@@ -341,28 +333,6 @@ final class ProductionDuelPlanner
             $components['cost_ratio'] = $ratio;
             $components['cost_norm'] = $norm;
             $components['cost_adj'] = $adj;
-        }
-
-        $ms = $maxSel !== null ? (float)$maxSel : 0.0;
-        $fs = $fplSel !== null ? (float)$fplSel : 0.0;
-
-        if ($ms > 0 && $fs > 0) {
-            $delta = (float)(config('zcout_matchmaking.rating_proxy_sel_delta') ?? 12);
-            $ratio = $fs / $ms;
-            if ($ratio < 0) $ratio = 0;
-            if ($ratio > 1) $ratio = 1;
-
-            $norm = sqrt($ratio);
-            $adj = ($norm - 0.5) * $delta;
-
-            $val += $adj;
-            $src = $src === 'seed' ? 'seed+fpl_sel' : ($src . '+fpl_sel');
-
-            $components['sel'] = $fs;
-            $components['max_sel'] = $ms;
-            $components['sel_ratio'] = $ratio;
-            $components['sel_norm'] = $norm;
-            $components['sel_adj'] = $adj;
         }
 
         if ($val < 1) $val = 1;

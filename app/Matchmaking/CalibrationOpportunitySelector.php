@@ -12,7 +12,6 @@ final class CalibrationOpportunitySelector
         $attributeKey = $context['attribute_key'] ?? null;
         $gaps = $context['gaps'] ?? [];
         $maxCost = (int) ($context['max_cost'] ?? 0);
-        $maxSel = (float) ($context['max_sel'] ?? 0.0);
 
         if (!is_array($candidates) || count($candidates) < 2 || !is_string($attributeKey) || $attributeKey === '') {
             return [
@@ -52,8 +51,6 @@ final class CalibrationOpportunitySelector
                 $attributeKey,
                 $aTry['cost'] ?? null,
                 $maxCost,
-                $aTry['sel'] ?? null,
-                $maxSel
             );
 
             $ratingA = (float) ($aMeta['value'] ?? 0.0);
@@ -71,8 +68,6 @@ final class CalibrationOpportunitySelector
                     $attributeKey,
                     $c['cost'] ?? null,
                     $maxCost,
-                    $c['sel'] ?? null,
-                    $maxSel
                 );
 
                 $ratingB = (float) ($bMeta['value'] ?? 0.0);
@@ -87,7 +82,6 @@ final class CalibrationOpportunitySelector
                         'conf' => $c['conf'],
                         'rating' => $c['rating'],
                         'cost' => $c['cost'] ?? 0,
-                        'sel' => $c['sel'] ?? 0.0,
                         'w' => $c['w'],
                         'gap' => $currentGap,
                         'meta' => $bMeta,
@@ -116,7 +110,7 @@ final class CalibrationOpportunitySelector
             $pickedA = $this->pickRandom($candidates);
 
             if ($pickedA) {
-                $best = $this->pickBestGapOpponent($candidates, $pickedA, $attributeKey, $maxCost, $maxSel);
+                $best = $this->pickBestGapOpponent($candidates, $pickedA, $attributeKey, $maxCost);
 
                 if ($best) {
                     $pickedB = $best['b'];
@@ -186,10 +180,10 @@ final class CalibrationOpportunitySelector
         return $items[count($items) - 1] ?? null;
     }
 
-    private function pickBestGapOpponent(array $candidates, array $a, string $attrKey, int $maxCost, float $maxSel): ?array
+    private function pickBestGapOpponent(array $candidates, array $a, string $attrKey, int $maxCost): ?array
     {
         $aId = (int) ($a['id'] ?? 0);
-        $metaA = $this->expectedRatingMeta($a['rating'] ?? null, $a['pos'] ?? null, $attrKey, $a['cost'] ?? null, $maxCost, $a['sel'] ?? null, $maxSel);
+        $metaA = $this->expectedRatingMeta($a['rating'] ?? null, $a['pos'] ?? null, $attrKey, $a['cost'] ?? null, $maxCost);
         $ratingA = (float) ($metaA['value'] ?? 0);
 
         $best = null;
@@ -202,7 +196,7 @@ final class CalibrationOpportunitySelector
                 continue;
             }
 
-            $metaB = $this->expectedRatingMeta($c['rating'] ?? null, $c['pos'] ?? null, $attrKey, $c['cost'] ?? null, $maxCost, $c['sel'] ?? null, $maxSel);
+            $metaB = $this->expectedRatingMeta($c['rating'] ?? null, $c['pos'] ?? null, $attrKey, $c['cost'] ?? null, $maxCost);
             $ratingB = (float) ($metaB['value'] ?? 0);
 
             $g = abs($ratingA - $ratingB);
@@ -225,7 +219,7 @@ final class CalibrationOpportunitySelector
         ];
     }
 
-    private function expectedRatingMeta(?float $rating, ?string $posShort, string $attrKey, ?int $fplCost = null, ?int $maxCost = null, ?float $fplSel = null, ?float $maxSel = null): array
+    private function expectedRatingMeta(?float $rating, ?string $posShort, string $attrKey, ?int $fplCost = null, ?int $maxCost = null): array
     {
         if ($rating !== null) {
             return ['value' => (float) $rating, 'source' => 'rating'];
@@ -276,32 +270,6 @@ final class CalibrationOpportunitySelector
             $components['cost_ratio'] = $ratio;
             $components['cost_norm'] = $norm;
             $components['cost_adj'] = $adj;
-        }
-
-        $ms = $maxSel !== null ? (float) $maxSel : 0.0;
-        $fs = $fplSel !== null ? (float) $fplSel : 0.0;
-
-        if ($ms > 0 && $fs > 0) {
-            $delta = 12.0;
-            $ratio = $fs / $ms;
-            if ($ratio < 0) {
-                $ratio = 0;
-            }
-            if ($ratio > 1) {
-                $ratio = 1;
-            }
-
-            $norm = sqrt($ratio);
-            $adj = ($norm - 0.5) * $delta;
-
-            $val += $adj;
-            $src = $src === 'seed' ? 'seed+fpl_sel' : ($src . '+fpl_sel');
-
-            $components['sel'] = $fs;
-            $components['max_sel'] = $ms;
-            $components['sel_ratio'] = $ratio;
-            $components['sel_norm'] = $norm;
-            $components['sel_adj'] = $adj;
         }
 
         if ($val < 1) {

@@ -11,7 +11,6 @@ final class MatchmakingCandidatePoolBuilder
 
         $candidates = [];
         $maxCost = 0;
-        $maxSel = 0.0;
 
         foreach ($rows as $r) {
             $posShort = $r->pos_short ? (string) $r->pos_short : null;
@@ -37,14 +36,9 @@ final class MatchmakingCandidatePoolBuilder
             }
 
             $cost = (int) ($r->fpl_cost ?? 0);
-            $sel = (float) ($r->fpl_sel ?? 0);
 
             if ($cost > $maxCost) {
                 $maxCost = $cost;
-            }
-
-            if ($sel > $maxSel) {
-                $maxSel = $sel;
             }
 
             $candidates[] = [
@@ -55,7 +49,6 @@ final class MatchmakingCandidatePoolBuilder
                 'conf' => $conf,
                 'rating' => $r->attr_rating !== null ? (float) $r->attr_rating : null,
                 'cost' => $cost,
-                'sel' => $sel,
                 'w' => (float) $w,
             ];
         }
@@ -63,7 +56,6 @@ final class MatchmakingCandidatePoolBuilder
         return [
             'candidates' => $candidates,
             'max_cost' => $maxCost,
-            'max_sel' => $maxSel,
         ];
     }
 

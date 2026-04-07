@@ -75,7 +75,6 @@ final class GetNextDuelAction
 
         $candidates = $pool['candidates'] ?? [];
         $maxCost = (int) ($pool['max_cost'] ?? 0);
-        $maxSel = (float) ($pool['max_sel'] ?? 0.0);
 
         if (count($candidates) < 2) {
             return $result;
@@ -93,7 +92,6 @@ final class GetNextDuelAction
                 'positional_sides' => $positionalSides,
                 'gaps' => $gaps,
                 'max_cost' => $maxCost,
-                'max_sel' => $maxSel,
             ]);
         }
 
@@ -103,7 +101,6 @@ final class GetNextDuelAction
                 'attribute_key' => $attribute->key,
                 'gaps' => $gaps,
                 'max_cost' => $maxCost,
-                'max_sel' => $maxSel,
             ]);
         }
 
