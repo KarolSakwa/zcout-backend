@@ -1,8 +1,6 @@
 <?php
 
 return [
-    'long_tail_share' => 0.01,
-
     'intent_mix' => [
         'calibration' => 0.10,
         'production' => 0.90,
@@ -12,6 +10,11 @@ return [
         'A' => 0.75,
         'B' => 0.20,
         'C' => 0.05,
+    ],
+
+    'attribute_scope_mix' => [
+        'both' => 0.90,
+        'gk' => 0.10,
     ],
 
     'production_position_profile_mix' => [
@@ -29,12 +32,11 @@ return [
     'rating_gap' => [
         'close_max' => 6,
         'medium_min' => 7,
-        'medium_max' => 16,
+        'medium_max' => 24,
         'obvious_min' => 25,
     ],
 
     'weights' => [
-        'rep_pow' => 1.0,
         'need_pow' => 1.2,
     ],
 

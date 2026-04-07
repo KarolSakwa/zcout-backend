@@ -41,7 +41,7 @@ final class CalibrationOpportunitySelector
         for ($t = 0; $t < $maxTries; $t++) {
             $triesUsed = $t + 1;
 
-            $aTry = $this->pickWeighted($candidates);
+            $aTry = $this->pickRandom($candidates);
             if (!$aTry) {
                 break;
             }
@@ -96,7 +96,7 @@ final class CalibrationOpportunitySelector
             }
 
             if (count($bMatches) > 0) {
-                $pickedBTry = $this->pickWeighted($bMatches);
+                $pickedBTry = $this->pickRandom($bMatches);
 
                 if ($pickedBTry) {
                     $pickedA = $aTry;
@@ -113,7 +113,7 @@ final class CalibrationOpportunitySelector
             $fallbacks[] = 'category_or_scope_no_match';
             $fallbacks[] = 'obvious_fallback_max_gap';
 
-            $pickedA = $this->pickWeighted($candidates);
+            $pickedA = $this->pickRandom($candidates);
 
             if ($pickedA) {
                 $best = $this->pickBestGapOpponent($candidates, $pickedA, $attributeKey, $maxCost, $maxSel);
@@ -141,6 +141,17 @@ final class CalibrationOpportunitySelector
             'tries_used' => $triesUsed,
             'fallbacks' => $fallbacks,
         ];
+    }
+
+    private function pickRandom(array $items): ?array
+    {
+        if (count($items) < 1) {
+            return null;
+        }
+
+        $index = array_rand($items);
+
+        return $items[$index] ?? null;
     }
 
     private function pickWeighted(array $items): ?array

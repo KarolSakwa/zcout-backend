@@ -28,9 +28,7 @@ final class MatchmakingCandidateRowFetcher
 
         if ($forceGK) {
             $rowsQ->where('pos.short_label', '=', 'GK');
-        }
-
-        if (!$forceGK && $intent === 'production') {
+        } else {
             $rowsQ->where('pos.short_label', '!=', 'GK');
         }
 

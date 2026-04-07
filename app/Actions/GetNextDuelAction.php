@@ -24,12 +24,27 @@ final class GetNextDuelAction
         $attribute = $context['attribute'] ?? null;
         $cfg = $context['cfg'] ?? [];
 
+        $debug = (bool) ($context['debug'] ?? false);
+        $requestedAttribute = $context['requested_attribute'] ?? null;
+        $requestedIntent = $context['requested_intent'] ?? null;
+        $requestedTier = $context['requested_tier'] ?? null;
+        $requestedPositionProfile = $context['requested_position_profile'] ?? null;
+        $requestedGapProfile = $context['requested_gap_profile'] ?? null;
+
         if (!$attribute) {
             return $this->defaultResult(null, [], false);
         }
 
         $forceGK = (($attribute->scope ?? 'both') === 'gk');
-        $mm = $this->matchmakingInputResolver->handle($cfg);
+        $mm = $this->matchmakingInputResolver->handle([
+            'cfg' => $cfg,
+            'debug' => $debug,
+            'requested_attribute' => $requestedAttribute,
+            'requested_intent' => $requestedIntent,
+            'requested_tier' => $requestedTier,
+            'requested_position_profile' => $requestedPositionProfile,
+            'requested_gap_profile' => $requestedGapProfile,
+        ]);
 
         $intent = $mm['intent'] ?? null;
         $selectedTier = $mm['tier'] ?? null;
@@ -66,26 +81,11 @@ final class GetNextDuelAction
             return $result;
         }
 
-        $baseCandidates = $candidates;
-
-        if (!$forceGK && $intent === 'calibration') {
-            $tmp = [];
-            foreach ($candidates as $c) {
-                if (($c['pos'] ?? null) !== 'GK') {
-                    $tmp[] = $c;
-                }
-            }
-
-            if (count($tmp) >= 2) {
-                $baseCandidates = $tmp;
-            }
-        }
-
         $planned = null;
 
         if ($intent === 'production') {
             $planned = $this->productionDuelPlanner->handle([
-                'candidates' => $baseCandidates,
+                'candidates' => $candidates,
                 'attribute_key' => $attribute->key,
                 'gap_profile' => $gapProfile,
                 'position_profile' => $positionProfile,
@@ -99,7 +99,7 @@ final class GetNextDuelAction
 
         if ($intent === 'calibration') {
             $planned = $this->calibrationOpportunitySelector->handle([
-                'candidates' => $baseCandidates,
+                'candidates' => $candidates,
                 'attribute_key' => $attribute->key,
                 'gaps' => $gaps,
                 'max_cost' => $maxCost,

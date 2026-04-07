@@ -114,58 +114,13 @@ final class ProductionDuelPlanner
                         $result['meta_a'] = $aMeta;
                         $result['meta_b'] = $pickedBtry['meta'];
 
+                        if ($modeTry !== $positionProfile) {
+                            $result['fallbacks'][] = 'positional_mode_stepdown';
+                        }
+
                         return $result;
                     }
                 }
-            }
-        }
-
-        if ((!$pickedA || !$pickedB) && in_array($gapProfile, ['close', 'medium'], true)) {
-            $fallbacks[] = 'category_or_scope_no_match';
-            $fallbacks[] = 'fallback_to_positional';
-
-            $pair = $this->pickPositionalPair(
-                $candidates,
-                $attributeKey,
-                $positionProfile,
-                $positionalAdjacent,
-                $positionalSides,
-                10,
-                $maxCost,
-                $maxSel
-            );
-
-            if ($pair) {
-                $pickedA = $pair['a'];
-                $pickedB = $pair['b'];
-                $selectedPositionalMode = $pair['mode'];
-                $triesUsed = max($triesUsed, (int) ($pair['tries_used'] ?? 0));
-
-                foreach (($pair['fallbacks'] ?? []) as $fallback) {
-                    $fallbacks[] = $fallback;
-                }
-
-                $metaA = $this->expectedRatingMeta(
-                    $pickedA['rating'] ?? null,
-                    $pickedA['pos'] ?? null,
-                    $attributeKey,
-                    $pickedA['cost'] ?? null,
-                    $maxCost,
-                    $pickedA['sel'] ?? null,
-                    $maxSel
-                );
-
-                $metaB = $this->expectedRatingMeta(
-                    $pickedB['rating'] ?? null,
-                    $pickedB['pos'] ?? null,
-                    $attributeKey,
-                    $pickedB['cost'] ?? null,
-                    $maxCost,
-                    $pickedB['sel'] ?? null,
-                    $maxSel
-                );
-
-                $gap = abs(((float) $metaA['value']) - ((float) $metaB['value']));
             }
         }
 

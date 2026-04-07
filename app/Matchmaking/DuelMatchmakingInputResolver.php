@@ -4,9 +4,10 @@ namespace App\Matchmaking;
 
 final class DuelMatchmakingInputResolver
 {
-    public function handle(array $cfg): array
+    public function handle(array $context): array
     {
-        $debug = (string) request('debug') === '1';
+        $cfg = $context['cfg'] ?? [];
+        $debug = (bool) ($context['debug'] ?? false);
 
         $intentMix = $cfg['intent_mix'] ?? [
                 'calibration' => 0.10,
@@ -41,18 +42,18 @@ final class DuelMatchmakingInputResolver
         $gaps = $cfg['rating_gap'] ?? [
                 'close_max' => 6,
                 'medium_min' => 7,
-                'medium_max' => 16,
+                'medium_max' => 24,
                 'obvious_min' => 25,
             ];
 
         $needPow = (float) ($cfg['weights']['need_pow'] ?? 1.2);
 
-        $requestedIntent = request('intent');
+        $requestedIntent = $context['requested_intent'] ?? null;
         $intent = in_array($requestedIntent, ['calibration', 'production'], true)
             ? $requestedIntent
             : $this->rollFromMix($intentMix, 'production', ['calibration', 'production']);
 
-        $requestedTier = request('tier');
+        $requestedTier = $context['requested_tier'] ?? null;
         $tier = null;
 
         if ($intent === 'production') {
@@ -61,7 +62,7 @@ final class DuelMatchmakingInputResolver
                 : $this->rollFromMix($productionTierMix, 'A', ['A', 'B', 'C']);
         }
 
-        $requestedPositionProfile = request('position_profile');
+        $requestedPositionProfile = $context['requested_position_profile'] ?? null;
         $positionProfile = null;
 
         if ($intent === 'production') {
@@ -70,7 +71,7 @@ final class DuelMatchmakingInputResolver
                 : $this->rollFromMix($productionPositionProfileMix, 'adjacent', ['exact', 'adjacent', 'same_side', 'any']);
         }
 
-        $requestedGapProfile = request('gap_profile');
+        $requestedGapProfile = $context['requested_gap_profile'] ?? null;
         $gapProfile = null;
 
         if ($intent === 'production') {
@@ -96,7 +97,7 @@ final class DuelMatchmakingInputResolver
             'need_pow' => $needPow,
 
             'requested' => [
-                'attribute' => request('attribute'),
+                'attribute' => $context['requested_attribute'] ?? null,
                 'intent' => $requestedIntent,
                 'tier' => $requestedTier,
                 'position_profile' => $requestedPositionProfile,

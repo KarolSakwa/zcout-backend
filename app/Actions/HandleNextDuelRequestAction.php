@@ -16,6 +16,10 @@ final class HandleNextDuelRequestAction
     {
         $cfg = $context['cfg'] ?? config('zcout_matchmaking', []);
         $requestedAttribute = $context['requested_attribute'] ?? null;
+        $requestedIntent = $context['requested_intent'] ?? null;
+        $requestedTier = $context['requested_tier'] ?? null;
+        $requestedPositionProfile = $context['requested_position_profile'] ?? null;
+        $requestedGapProfile = $context['requested_gap_profile'] ?? null;
         $debug = (bool) ($context['debug'] ?? false);
         $maxAttempts = (int) ($context['max_attempts'] ?? 12);
 
@@ -73,6 +77,10 @@ final class HandleNextDuelRequestAction
             'voted' => $voterState['voted'] ?? [],
             'voter_hash' => $voterHash,
             'requested_attribute' => $requestedAttribute,
+            'requested_intent' => $requestedIntent,
+            'requested_tier' => $requestedTier,
+            'requested_position_profile' => $requestedPositionProfile,
+            'requested_gap_profile' => $requestedGapProfile,
             'debug' => $debug,
             'max_attempts' => $maxAttempts,
         ]);

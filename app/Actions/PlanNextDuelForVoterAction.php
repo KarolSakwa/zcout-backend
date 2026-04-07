@@ -20,6 +20,10 @@ final class PlanNextDuelForVoterAction
         $voted = $context['voted'] ?? [];
         $voterHash = (string) ($context['voter_hash'] ?? '');
         $requestedAttr = $context['requested_attribute'] ?? null;
+        $requestedIntent = $context['requested_intent'] ?? null;
+        $requestedTier = $context['requested_tier'] ?? null;
+        $requestedPositionProfile = $context['requested_position_profile'] ?? null;
+        $requestedGapProfile = $context['requested_gap_profile'] ?? null;
         $debug = (bool) ($context['debug'] ?? false);
         $maxAttempts = (int) ($context['max_attempts'] ?? 12);
 
@@ -28,9 +32,29 @@ final class PlanNextDuelForVoterAction
         }
 
         for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-            $attribute = $requestedAttr
-                ? Attribute::query()->where('key', $requestedAttr)->first()
-                : Attribute::query()->where('scope', 'both')->inRandomOrder()->first();
+            if ($requestedAttr) {
+                $attribute = Attribute::query()
+                    ->where('key', $requestedAttr)
+                    ->first();
+            } else {
+                $scopeMix = $cfg['attribute_scope_mix'] ?? [
+                        'both' => 0.90,
+                        'gk' => 0.10,
+                    ];
+
+                $scope = (mt_rand() / mt_getrandmax()) < (float) ($scopeMix['gk'] ?? 0.10) ? 'gk' : 'both';
+
+                $attribute = Attribute::query()
+                    ->where('scope', $scope)
+                    ->inRandomOrder()
+                    ->first();
+
+                if (!$attribute) {
+                    $attribute = Attribute::query()
+                        ->inRandomOrder()
+                        ->first();
+                }
+            }
 
             if (!$attribute) {
                 return [
@@ -47,6 +71,12 @@ final class PlanNextDuelForVoterAction
             $planned = $this->getNextDuelAction->handle([
                 'attribute' => $attribute,
                 'cfg' => $cfg,
+                'debug' => $debug,
+                'requested_attribute' => $requestedAttr,
+                'requested_intent' => $requestedIntent,
+                'requested_tier' => $requestedTier,
+                'requested_position_profile' => $requestedPositionProfile,
+                'requested_gap_profile' => $requestedGapProfile,
             ]);
 
             $pickedA = $planned['picked_a'] ?? null;
@@ -74,6 +104,7 @@ final class PlanNextDuelForVoterAction
                         'tries_used' => (int) ($planned['tries_used'] ?? 0),
                         'attempt' => $attempt + 1,
                         'force_gk' => (bool) ($planned['force_gk'] ?? false),
+                        'gap' => $planned['gap'] ?? null,
                     ] : null,
                 ];
             }
@@ -105,6 +136,7 @@ final class PlanNextDuelForVoterAction
                         'tries_used' => (int) ($planned['tries_used'] ?? 0),
                         'attempt' => $attempt + 1,
                         'force_gk' => (bool) ($planned['force_gk'] ?? false),
+                        'gap' => $planned['gap'] ?? null,
                     ] : null,
                 ];
             }
@@ -147,6 +179,7 @@ final class PlanNextDuelForVoterAction
                         'tries_used' => (int) ($planned['tries_used'] ?? 0),
                         'attempt' => $attempt + 1,
                         'force_gk' => (bool) ($planned['force_gk'] ?? false),
+                        'gap' => $planned['gap'] ?? null,
                     ] : null,
                 ];
             }
@@ -171,6 +204,7 @@ final class PlanNextDuelForVoterAction
                     'tries_used' => (int) ($planned['tries_used'] ?? 0),
                     'attempt' => $attempt + 1,
                     'force_gk' => (bool) ($planned['force_gk'] ?? false),
+                    'gap' => $planned['gap'] ?? null,
                 ] : null,
             ];
         }
