@@ -32,8 +32,16 @@ final class SelectNextDuelAttributeAction
 
         $scope = (mt_rand() / mt_getrandmax()) < $gkShare ? 'gk' : 'both';
 
-        $attribute = Attribute::query()
-            ->where('scope', $scope)
+        $allowedKeys = $cfg['attribute_selection']['organic_allowed_keys'] ?? null;
+
+        $query = Attribute::query()
+            ->where('scope', $scope);
+
+        if (is_array($allowedKeys) && $allowedKeys !== []) {
+            $query->whereIn('key', $allowedKeys);
+        }
+
+        $attribute = $query
             ->inRandomOrder()
             ->first();
 
@@ -41,7 +49,13 @@ final class SelectNextDuelAttributeAction
             return $attribute;
         }
 
-        return Attribute::query()
+        $fallbackQuery = Attribute::query();
+
+        if (is_array($allowedKeys) && $allowedKeys !== []) {
+            $fallbackQuery->whereIn('key', $allowedKeys);
+        }
+
+        return $fallbackQuery
             ->inRandomOrder()
             ->first();
     }

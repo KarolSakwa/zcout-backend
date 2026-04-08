@@ -1,6 +1,30 @@
 <?php
 
 return [
+    'density' => [
+        'pair_attribute_reuse_bias' => 0.0,
+        'pair_attribute_recent_window' => 10000,
+    ],
+
+
+    'attribute_selection' => [
+        'organic_allowed_keys' => [
+            'pace',
+            'ball_control',
+            'dribbling',
+            'finishing',
+            'passing',
+            'composure',
+            'tackling',
+            'strength',
+        ],
+    ],
+
+    'attribute_scope_mix' => [
+        'both' => 1.00,
+        'gk' => 0.00,
+    ],
+
     'intent_mix' => [
         'calibration' => 0.10,
         'production' => 0.90,
@@ -10,11 +34,6 @@ return [
         'A' => 0.75,
         'B' => 0.20,
         'C' => 0.05,
-    ],
-
-    'attribute_scope_mix' => [
-        'both' => 0.90,
-        'gk' => 0.10,
     ],
 
     'production_position_profile_mix' => [
