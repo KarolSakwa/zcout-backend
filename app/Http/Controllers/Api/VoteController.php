@@ -12,10 +12,12 @@ use App\Models\VoteWeightLog;
 use App\Services\RatingService;
 use App\Support\Seed;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Events\RecentVoteCreated;
 use App\Support\Live\RecentVoteItem;
+use App\Events\TopMoversMaybeChanged;
 
 class VoteController extends Controller
 {
@@ -255,6 +257,9 @@ class VoteController extends Controller
             if ($recentVoteRow) {
                 event(new RecentVoteCreated(RecentVoteItem::fromRow($recentVoteRow)));
             }
+
+            Cache::forget('live:top-movers-summary:7d:5');
+            event(new TopMoversMaybeChanged());
         } catch (\Illuminate\Database\QueryException $e) {
             $msg = (string) $e->getMessage();
             $code = (string) $e->getCode();

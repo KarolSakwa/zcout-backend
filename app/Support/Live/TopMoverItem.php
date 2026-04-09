@@ -18,12 +18,12 @@ class TopMoverItem
 
     private static function formatDelta(float $delta): string
     {
-        $rounded = round($delta, 3);
+        $rounded = round($delta, 2);
 
         if ($rounded > 0) {
-            return '+' . number_format($rounded, 3, '.', '');
+            return '+' . number_format($rounded, 2, '.', '');
         }
 
-        return number_format($rounded, 3, '.', '');
+        return number_format($rounded, 2, '.', '');
     }
 }
