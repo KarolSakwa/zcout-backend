@@ -328,14 +328,14 @@ class VoteController extends Controller
         ]);
     }
 
-    public function storeDirect(Request $request)
+    public function storeDirect(Request $request, \App\Actions\StoreDirectVoteAction $storeDirectVoteAction)
     {
         $payload = $this->payload($request);
 
         $v = Validator::make($payload, [
             'attribute_key' => ['required', 'string'],
             'player_id' => ['required', 'integer'],
-            'value' => ['required', 'integer', 'min:0', 'max:100'],
+            'value' => ['required', 'integer', 'min:1', 'max:99'],
         ]);
 
         if ($v->fails()) {
@@ -345,41 +345,12 @@ class VoteController extends Controller
             ], 422);
         }
 
-        $data = $v->validated();
+        $result = $storeDirectVoteAction->execute(
+            $v->validated(),
+            (int) auth()->id(),
+        );
 
-        $attribute = Attribute::query()
-            ->select('id', 'key')
-            ->where('key', $data['attribute_key'])
-            ->first();
-
-        if (!$attribute) {
-            return response()->json(['message' => 'Attribute not found.'], 404);
-        }
-
-        $vote = new Vote();
-        $vote->source = 'direct';
-        $vote->attribute_id = $attribute->id;
-        $vote->duel_id = null;
-        $vote->player_a_id = (int) $data['player_id'];
-        $vote->player_b_id = null;
-        $vote->winner_id = null;
-        $vote->user_id = auth()->id();
-        $vote->voter_hash = null;
-        $vote->weight_applied = 1.0;
-        $vote->confidence_weight_applied = 1.0;
-        $vote->weight_version = 1;
-        $vote->reputation_at_vote = null;
-        $vote->risk_score_at_vote = null;
-        $vote->value = (int) $data['value'];
-        $vote->created_at = now();
-        $vote->save();
-
-        return response()->json([
-            'vote_id' => $vote->id,
-            'attribute_id' => $attribute->id,
-            'player_id' => (int) $data['player_id'],
-            'value' => (int) $data['value'],
-        ], 201);
+        return response()->json($result['body'], $result['status']);
     }
 
     private function payload(Request $request): array

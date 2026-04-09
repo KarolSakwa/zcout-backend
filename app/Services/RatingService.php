@@ -307,4 +307,56 @@ class RatingService
 
         return [$newA, $newB, $deltaChange];
     }
+
+    public function applyDirectVote(
+        int $playerId,
+        int $attributeId,
+        int $value,
+        float $ratingWeight = 1.0,
+        float $confidenceWeight = 1.0
+    ): void {
+        $attribute = Attribute::query()
+            ->select('id', 'key')
+            ->findOrFail($attributeId);
+
+        $player = Player::query()
+            ->select('id', 'position_id')
+            ->with(['positionRef:id,short_label,key,label,group'])
+            ->whereKey($playerId)
+            ->firstOrFail();
+
+        $posCode = strtoupper((string) ($player->positionRef?->short_label ?? ''));
+
+        $row = PlayerAttributeRating::firstOrCreate(
+            ['player_id' => $playerId, 'attribute_id' => $attributeId],
+            [
+                'rating' => Seed::for($posCode, $attribute->key),
+                'rating_weight_sum' => 0,
+                'confidence_weight_sum' => 0,
+                'confidence' => 0,
+                'votes_count' => 0,
+                'last_vote_at' => null,
+            ]
+        );
+
+        $ratingWeight = max(0.0, (float) $ratingWeight);
+        $confidenceWeight = max(0.0, (float) $confidenceWeight);
+
+        $beforeRating = (float) $row->rating;
+        $beforeRatingWeightSum = (float) ($row->rating_weight_sum ?? 0);
+
+        $newRatingWeightSum = $beforeRatingWeightSum + $ratingWeight;
+
+        $afterRating = $newRatingWeightSum > 0
+            ? (($beforeRating * $beforeRatingWeightSum) + ((float) $value * $ratingWeight)) / $newRatingWeightSum
+            : $beforeRating;
+
+        $row->rating = round($this->clamp($afterRating, 0.0, 99.0), 3);
+        $row->votes_count = ((int) $row->votes_count) + 1;
+        $row->rating_weight_sum = $newRatingWeightSum;
+        $row->confidence_weight_sum = ((float) ($row->confidence_weight_sum ?? 0)) + $confidenceWeight;
+        $row->confidence = min(100.0, round((float) $row->confidence_weight_sum, 2));
+        $row->last_vote_at = now();
+        $row->save();
+    }
 }
