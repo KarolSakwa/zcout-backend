@@ -28,6 +28,23 @@ final class StoreDirectVoteAction
             ];
         }
 
+        $alreadyExists = Vote::query()
+            ->where('source', 'direct')
+            ->where('user_id', $userId)
+            ->where('player_a_id', (int) $data['player_id'])
+            ->where('attribute_id', $attribute->id)
+            ->exists();
+
+        if ($alreadyExists) {
+            return [
+                'ok' => false,
+                'status' => 409,
+                'body' => [
+                    'message' => 'Direct vote already exists for this player and attribute.',
+                ],
+            ];
+        }
+
         $vote = new Vote();
         $vote->source = 'direct';
         $vote->attribute_id = $attribute->id;

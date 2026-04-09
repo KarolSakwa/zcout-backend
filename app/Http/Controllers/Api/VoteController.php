@@ -353,6 +353,65 @@ class VoteController extends Controller
         return response()->json($result['body'], $result['status']);
     }
 
+    public function submitScoutReport(Request $request, \App\Actions\SubmitScoutReportAction $submitScoutReportAction)
+    {
+        $payload = $this->payload($request);
+
+        $v = Validator::make($payload, [
+            'player_id' => ['required', 'integer'],
+            'votes' => ['array'],
+            'votes.*.attribute_key' => ['required', 'string'],
+            'votes.*.value' => ['required', 'integer', 'min:1', 'max:99'],
+            'skipped_attribute_ids' => ['array'],
+            'skipped_attribute_ids.*' => ['integer'],
+        ]);
+
+        $v->after(function ($validator) use ($payload) {
+            $votes = $payload['votes'] ?? [];
+            $skips = $payload['skipped_attribute_ids'] ?? [];
+
+            if (count($votes) === 0 && count($skips) === 0) {
+                $validator->errors()->add('payload', 'At least one vote or one skip is required.');
+                return;
+            }
+
+            $voteKeys = collect($votes)->pluck('attribute_key')->filter()->values();
+
+            if ($voteKeys->count() !== $voteKeys->unique()->count()) {
+                $validator->errors()->add('votes', 'Duplicate attribute_key in votes payload.');
+            }
+
+            if (count($skips) !== collect($skips)->unique()->count()) {
+                $validator->errors()->add('skipped_attribute_ids', 'Duplicate attribute_id in skipped payload.');
+            }
+
+            if ($voteKeys->isNotEmpty() && count($skips) > 0) {
+                $overlapExists = \App\Models\Attribute::query()
+                    ->whereIn('key', $voteKeys->all())
+                    ->whereIn('id', $skips)
+                    ->exists();
+
+                if ($overlapExists) {
+                    $validator->errors()->add('payload', 'The same attribute cannot be voted and skipped in one submit.');
+                }
+            }
+        });
+
+        if ($v->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $v->errors(),
+            ], 422);
+        }
+
+        $result = $submitScoutReportAction->execute(
+            (int) auth()->id(),
+            $v->validated(),
+        );
+
+        return response()->json($result['body'], $result['status']);
+    }
+
     private function payload(Request $request): array
     {
         $json = $request->json()->all();
@@ -369,4 +428,5 @@ class VoteController extends Controller
         $all = $request->all();
         return is_array($all) ? $all : [];
     }
+
 }
