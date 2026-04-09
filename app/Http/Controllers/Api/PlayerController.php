@@ -10,6 +10,7 @@ use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Support\OverallConfig;
+use App\Models\Vote;
 
 class PlayerController extends Controller
 {
@@ -52,11 +53,27 @@ class PlayerController extends Controller
             ->get()
             ->keyBy('attribute_id');
 
+        $userId = auth('sanctum')->id();
+
+        $userDirectVotesByAttributeId = collect();
+
+        if ($userId) {
+            $userDirectVotesByAttributeId = Vote::query()
+                ->select('attribute_id', 'value', 'created_at')
+                ->where('source', 'direct')
+                ->where('user_id', $userId)
+                ->where('player_a_id', $player->id)
+                ->whereIn('attribute_id', $attributes->pluck('id'))
+                ->get()
+                ->keyBy('attribute_id');
+        }
+
         $payloadAttrs = [];
         $totalConfidenceWeight = 0.0;
 
         foreach ($attributes as $attr) {
             $row = $rows->get($attr->id);
+            $userVote = $userDirectVotesByAttributeId->get($attr->id);
 
             $rating = $row ? (float) $row->rating : (float) Seed::for($posCode, $attr->key);
             $confidence = $row ? (float) ($row->confidence ?? 0) : 0.0;
@@ -76,6 +93,8 @@ class PlayerController extends Controller
                 'confidence_weight_sum' => (float) $confidenceWeightSum,
                 'votes_count' => (int) $votesCount,
                 'last_vote_at' => $lastVoteAt,
+                'your_rating' => $userVote ? (int) $userVote->value : null,
+                'your_rating_updated_at' => $userVote?->created_at ? (string) $userVote->created_at : null,
             ];
 
             $totalConfidenceWeight += $confidenceWeightSum;
