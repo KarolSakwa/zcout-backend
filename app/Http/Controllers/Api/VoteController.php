@@ -412,6 +412,19 @@ class VoteController extends Controller
         return response()->json($result['body'], $result['status']);
     }
 
+    public function scoutReportAttributes(
+        \Illuminate\Http\Request $request,
+        \App\Models\Player $player,
+        \App\Actions\GetScoutReportAttributesAction $getScoutReportAttributesAction
+    ) {
+        $result = $getScoutReportAttributesAction->execute(
+            (int) auth()->id(),
+            (int) $player->id,
+        );
+
+        return response()->json($result['body'], $result['status']);
+    }
+
     private function payload(Request $request): array
     {
         $json = $request->json()->all();

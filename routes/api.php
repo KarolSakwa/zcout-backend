@@ -63,3 +63,4 @@ Route::get('/live/recent-votes', [LiveFeedController::class, 'recentVotes']);
 Route::get('/live/top-movers', [LiveFeedController::class, 'topMovers']);
 Route::get('/live/top-movers-summary', [LiveFeedController::class, 'topMoversSummary']);
 Route::post('/scout-reports', [VoteController::class, 'submitScoutReport'])->middleware('auth:sanctum');
+Route::get('/players/{player}/scout-report-attributes', [VoteController::class, 'scoutReportAttributes'])->middleware('auth:sanctum');
