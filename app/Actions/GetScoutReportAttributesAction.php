@@ -106,6 +106,7 @@ final class GetScoutReportAttributesAction
                 'label' => $item['label'],
                 'group' => $item['group'],
                 'is_skipped' => $item['is_skipped'],
+                'description' => (string) config("attribute_descriptions.{$item['key']}", ''),
             ])
             ->all();
 
