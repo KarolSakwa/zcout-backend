@@ -358,12 +358,12 @@ class VoteController extends Controller
         $payload = $this->payload($request);
 
         $v = Validator::make($payload, [
-            'player_id' => ['required', 'integer'],
-            'votes' => ['array'],
-            'votes.*.attribute_key' => ['required', 'string'],
+            'player_id' => ['required', 'integer', 'exists:players,id'],
+            'votes' => ['array', 'max:6'],
+            'votes.*.attribute_key' => ['required', 'string', 'exists:attributes,key'],
             'votes.*.value' => ['required', 'integer', 'min:1', 'max:99'],
-            'skipped_attribute_ids' => ['array'],
-            'skipped_attribute_ids.*' => ['integer'],
+            'skipped_attribute_ids' => ['array', 'max:6'],
+            'skipped_attribute_ids.*' => ['integer', 'exists:attributes,id'],
         ]);
 
         $v->after(function ($validator) use ($payload) {
@@ -375,20 +375,33 @@ class VoteController extends Controller
                 return;
             }
 
-            $voteKeys = collect($votes)->pluck('attribute_key')->filter()->values();
+            $voteKeys = collect($votes)
+                ->pluck('attribute_key')
+                ->filter()
+                ->values();
 
             if ($voteKeys->count() !== $voteKeys->unique()->count()) {
                 $validator->errors()->add('votes', 'Duplicate attribute_key in votes payload.');
             }
 
-            if (count($skips) !== collect($skips)->unique()->count()) {
+            $skipIds = collect($skips)
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            if ($skipIds->count() !== $skipIds->unique()->count()) {
                 $validator->errors()->add('skipped_attribute_ids', 'Duplicate attribute_id in skipped payload.');
             }
 
-            if ($voteKeys->isNotEmpty() && count($skips) > 0) {
+            $touchedCount = $voteKeys->count() + $skipIds->unique()->count();
+
+            if ($touchedCount > 6) {
+                $validator->errors()->add('payload', 'Scout report submit can contain at most 6 touched attributes.');
+            }
+
+            if ($voteKeys->isNotEmpty() && $skipIds->isNotEmpty()) {
                 $overlapExists = \App\Models\Attribute::query()
                     ->whereIn('key', $voteKeys->all())
-                    ->whereIn('id', $skips)
+                    ->whereIn('id', $skipIds->all())
                     ->exists();
 
                 if ($overlapExists) {
