@@ -208,4 +208,147 @@ class ScoutReportFlowTest extends TestCase
             'scope' => $data['scope'],
         ]);
     }
+
+    public function test_direct_vote_cannot_be_submitted_twice_for_same_player_and_attribute(): void
+    {
+        $user = User::factory()->create();
+
+        Sanctum::actingAs($user);
+
+        $positionId = $this->createPosition([
+            'short_label' => 'CM',
+            'key' => 'cm',
+            'label' => 'Central Midfielder',
+            'group' => 'MIDFIELD',
+        ]);
+
+        $playerId = $this->createPlayer([
+            'name' => 'Martin Odegaard',
+            'slug' => 'martin-odegaard',
+            'position_id' => $positionId,
+        ]);
+
+        $this->createAttribute([
+            'key' => 'passing',
+            'label' => 'Passing',
+            'group' => 'PASSING',
+            'scope' => 'both',
+        ]);
+
+        $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'passing',
+            'player_id' => $playerId,
+            'value' => 90,
+        ])->assertCreated();
+
+        $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'passing',
+            'player_id' => $playerId,
+            'value' => 95,
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Direct vote already exists for this player and attribute.');
+
+        $this->assertDatabaseCount('votes', 1);
+    }
+
+    public function test_scout_report_attributes_exclude_voted_and_push_skipped_out_of_top_six(): void
+    {
+        $user = User::factory()->create();
+
+        Sanctum::actingAs($user);
+
+        $positionId = $this->createPosition([
+            'short_label' => 'CM',
+            'key' => 'cm',
+            'label' => 'Central Midfielder',
+            'group' => 'MIDFIELD',
+        ]);
+
+        $playerId = $this->createPlayer([
+            'name' => 'Bruno Guimaraes',
+            'slug' => 'bruno-guimaraes',
+            'position_id' => $positionId,
+        ]);
+
+        $passingId = $this->createAttribute([
+            'key' => 'passing',
+            'label' => 'Passing',
+            'group' => 'PASSING',
+            'scope' => 'both',
+        ]);
+
+        $creativityId = $this->createAttribute([
+            'key' => 'creativity',
+            'label' => 'Creativity',
+            'group' => 'PASSING',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'ball_control',
+            'label' => 'Ball Control',
+            'group' => 'TECHNIQUE',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'work_rate',
+            'label' => 'Work Rate',
+            'group' => 'MENTAL',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'composure',
+            'label' => 'Composure',
+            'group' => 'MENTAL',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'stamina',
+            'label' => 'Stamina',
+            'group' => 'PHYSICAL',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'concentration',
+            'label' => 'Concentration',
+            'group' => 'MENTAL',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'dribbling',
+            'label' => 'Dribbling',
+            'group' => 'TECHNIQUE',
+            'scope' => 'both',
+        ]);
+
+        $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'passing',
+            'player_id' => $playerId,
+            'value' => 91,
+        ])->assertCreated();
+
+        $this->postJson('/api/scout-reports', [
+            'player_id' => $playerId,
+            'votes' => [],
+            'skipped_attribute_ids' => [$creativityId],
+        ])->assertCreated();
+
+        $response = $this->getJson("/api/players/{$playerId}/scout-report-attributes")
+            ->assertOk();
+
+        $items = collect($response->json('items'));
+        $keys = $items->pluck('key')->all();
+
+        $this->assertCount(6, $keys);
+        $this->assertNotContains('passing', $keys);
+        $this->assertNotContains('creativity', $keys);
+        $this->assertContains('ball_control', $keys);
+        $this->assertContains('work_rate', $keys);
+    }
 }
