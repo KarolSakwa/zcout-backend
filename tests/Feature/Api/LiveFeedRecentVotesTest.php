@@ -56,19 +56,21 @@ class LiveFeedRecentVotesTest extends TestCase
                 'items' => [
                     '*' => [
                         'id',
-                        'winner',
-                        'loser',
+                        'leftPlayer',
+                        'rightPlayer',
+                        'leftPlayerId',
+                        'rightPlayerId',
                         'winnerPlayerId',
-                        'loserPlayerId',
                         'attributeKey',
                         'attributeLabel',
                     ],
                 ],
             ])
-            ->assertJsonPath('items.0.winner', 'Bukayo Saka')
-            ->assertJsonPath('items.0.loser', 'Cole Palmer')
+            ->assertJsonPath('items.0.leftPlayer', 'Bukayo Saka')
+            ->assertJsonPath('items.0.rightPlayer', 'Cole Palmer')
+            ->assertJsonPath('items.0.leftPlayerId', $winnerId)
+            ->assertJsonPath('items.0.rightPlayerId', $loserId)
             ->assertJsonPath('items.0.winnerPlayerId', $winnerId)
-            ->assertJsonPath('items.0.loserPlayerId', $loserId)
             ->assertJsonPath('items.0.attributeKey', 'dribbling')
             ->assertJsonPath('items.0.attributeLabel', 'Dribbling');
 

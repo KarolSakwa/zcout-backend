@@ -61,3 +61,4 @@ Route::post('/duels/skip', [\App\Http\Controllers\Api\DuelController::class, 'sk
 Route::get('/search', [SearchController::class, 'index']);
 Route::get('/live/recent-votes', [LiveFeedController::class, 'recentVotes']);
 Route::get('/live/top-movers', [LiveFeedController::class, 'topMovers']);
+Route::get('/live/top-movers-summary', [LiveFeedController::class, 'topMoversSummary']);

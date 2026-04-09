@@ -12,10 +12,11 @@ class RecentVoteCreatedTest extends TestCase
     {
         $item = [
             'id' => '123',
-            'winner' => 'Bukayo Saka',
-            'loser' => 'Cole Palmer',
+            'leftPlayer' => 'Bukayo Saka',
+            'rightPlayer' => 'Cole Palmer',
+            'leftPlayerId' => 10,
+            'rightPlayerId' => 20,
             'winnerPlayerId' => 10,
-            'loserPlayerId' => 20,
             'attributeKey' => 'dribbling',
             'attributeLabel' => 'Dribbling',
         ];

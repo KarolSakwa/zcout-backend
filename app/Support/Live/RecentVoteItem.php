@@ -6,14 +6,13 @@ class RecentVoteItem
 {
     public static function fromRow(object $row): array
     {
-        $winnerIsPlayerA = (int) $row->winner_id === (int) $row->player_a_id;
-
         return [
             'id' => (string) $row->id,
-            'winner' => $row->winner_name,
-            'loser' => $winnerIsPlayerA ? $row->player_b_name : $row->player_a_name,
+            'leftPlayer' => $row->player_a_name,
+            'rightPlayer' => $row->player_b_name,
+            'leftPlayerId' => (int) $row->player_a_id,
+            'rightPlayerId' => (int) $row->player_b_id,
             'winnerPlayerId' => (int) $row->winner_id,
-            'loserPlayerId' => $winnerIsPlayerA ? (int) $row->player_b_id : (int) $row->player_a_id,
             'attributeKey' => $row->attribute_key,
             'attributeLabel' => $row->attribute_label,
         ];
