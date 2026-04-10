@@ -68,6 +68,53 @@ class PlayerController extends Controller
                 ->keyBy('attribute_id');
         }
 
+        $attributeKeysById = $attributes
+            ->mapWithKeys(fn (Attribute $attribute) => [(int) $attribute->id => (string) $attribute->key])
+            ->all();
+
+        $trendRows = Vote::query()
+            ->select([
+                'attribute_id',
+                'player_a_id',
+                'player_b_id',
+                'pre_rating_a',
+                'post_rating_a',
+                'pre_rating_b',
+                'post_rating_b',
+            ])
+            ->where('source', 'duel')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->whereNotNull('pre_rating_a')
+            ->whereNotNull('post_rating_a')
+            ->whereNotNull('pre_rating_b')
+            ->whereNotNull('post_rating_b')
+            ->where(function ($q) use ($player) {
+                $q->where('player_a_id', $player->id)
+                    ->orWhere('player_b_id', $player->id);
+            })
+            ->whereIn('attribute_id', $attributes->pluck('id'))
+            ->get();
+
+        $attributeDeltasByKey = [];
+
+        foreach ($trendRows as $vote) {
+            $attributeKey = $attributeKeysById[(int) $vote->attribute_id] ?? null;
+
+            if (! $attributeKey) {
+                continue;
+            }
+
+            if ((int) $vote->player_a_id === (int) $player->id) {
+                $delta = (float) $vote->post_rating_a - (float) $vote->pre_rating_a;
+            } elseif ((int) $vote->player_b_id === (int) $player->id) {
+                $delta = (float) $vote->post_rating_b - (float) $vote->pre_rating_b;
+            } else {
+                continue;
+            }
+
+            $attributeDeltasByKey[$attributeKey] = ($attributeDeltasByKey[$attributeKey] ?? 0.0) + $delta;
+        }
+
         $payloadAttrs = [];
         $totalConfidenceWeight = 0.0;
 
@@ -95,6 +142,9 @@ class PlayerController extends Controller
                 'last_vote_at' => $lastVoteAt,
                 'your_rating' => $userVote ? (int) $userVote->value : null,
                 'your_rating_updated_at' => $userVote?->created_at ? (string) $userVote->created_at : null,
+                'trend_7d' => array_key_exists((string) $attr->key, $attributeDeltasByKey)
+                    ? round((float) $attributeDeltasByKey[(string) $attr->key], 3)
+                    : null,
             ];
 
             $totalConfidenceWeight += $confidenceWeightSum;
@@ -103,6 +153,7 @@ class PlayerController extends Controller
         $overallConfidence = (float) min(100.0, round($totalConfidenceWeight, 2));
         $radarAxes = $this->buildRadarAxesPayload($posCode, $payloadAttrs);
         $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
+        $overallTrend7d = $this->computeOverallTrendDeltaFromPayload($posCode, $payloadAttrs);
 
         return response()->json([
             'id' => (int) $player->id,
@@ -125,6 +176,7 @@ class PlayerController extends Controller
                 'iso2' => $player->countryRef->iso2,
             ] : null,
             'overall_confidence' => $overallConfidence,
+            'overall_trend_7d' => $overallTrend7d,
             'radar_axes' => $radarAxes,
             'attributes' => $payloadAttrs,
             'overall' => $overall,
@@ -162,5 +214,43 @@ class PlayerController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    private function computeOverallTrendDeltaFromPayload(string $posCode, array $payloadAttrs): ?float
+    {
+        $hasAnyTrend = collect($payloadAttrs)->contains(
+            fn (array $attr) => is_numeric($attr['trend_7d'] ?? null) && abs((float) $attr['trend_7d']) > 0.0005
+        );
+
+        if (! $hasAnyTrend) {
+            return null;
+        }
+
+        $currentAxes = $this->buildRadarAxesPayload($posCode, $payloadAttrs);
+
+        $previousPayloadAttrs = collect($payloadAttrs)
+            ->map(function (array $attr) {
+                $delta = is_numeric($attr['trend_7d'] ?? null) ? (float) $attr['trend_7d'] : 0.0;
+
+                return [
+                    ...$attr,
+                    'rating' => max(0.0, min(99.0, (float) $attr['rating'] - $delta)),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $previousAxes = $this->buildRadarAxesPayload($posCode, $previousPayloadAttrs);
+
+        $currentOverall = OverallConfig::overallFromRadarAxes($posCode, $currentAxes);
+        $previousOverall = OverallConfig::overallFromRadarAxes($posCode, $previousAxes);
+
+        if ($currentOverall === null || $previousOverall === null) {
+            return null;
+        }
+
+        $delta = (float) $currentOverall - (float) $previousOverall;
+
+        return abs($delta) > 0.0005 ? round($delta, 3) : null;
     }
 }

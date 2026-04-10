@@ -351,4 +351,65 @@ class ScoutReportFlowTest extends TestCase
         $this->assertContains('ball_control', $keys);
         $this->assertContains('work_rate', $keys);
     }
+
+    public function test_direct_vote_persists_pre_and_post_rating_snapshots(): void
+    {
+        $user = User::factory()->create();
+
+        Sanctum::actingAs($user);
+
+        $positionId = $this->createPosition([
+            'short_label' => 'CM',
+            'key' => 'cm',
+            'label' => 'Central Midfielder',
+            'group' => 'MIDFIELD',
+        ]);
+
+        $playerId = $this->createPlayer([
+            'name' => 'Declan Rice',
+            'slug' => 'declan-rice',
+            'position_id' => $positionId,
+        ]);
+
+        $attributeId = $this->createAttribute([
+            'key' => 'creativity',
+            'label' => 'Creativity',
+            'group' => 'PASSING',
+            'scope' => 'both',
+        ]);
+
+        DB::table('player_attribute_ratings')->insert([
+            'player_id' => $playerId,
+            'attribute_id' => $attributeId,
+            'rating' => 80.0,
+            'rating_weight_sum' => 1.0,
+            'confidence_weight_sum' => 1.0,
+            'confidence' => 1.0,
+            'votes_count' => 1,
+            'last_vote_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'creativity',
+            'player_id' => $playerId,
+            'value' => 77,
+        ])->assertCreated();
+
+        $this->assertEquals(80.0, (float) $response->json('pre_rating_a'));
+        $this->assertEquals(78.5, (float) $response->json('post_rating_a'));
+        $this->assertEquals(-1.5, (float) $response->json('delta_rating_a'));
+
+        $voteId = (int) $response->json('vote_id');
+
+        $this->assertDatabaseHas('votes', [
+            'id' => $voteId,
+            'source' => 'direct',
+            'user_id' => $user->id,
+            'player_a_id' => $playerId,
+            'attribute_id' => $attributeId,
+            'value' => 77,
+            'pre_rating_a' => 80.0,
+            'post_rating_a' => 78.5,
+        ]);
+    }
 }

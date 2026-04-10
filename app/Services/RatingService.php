@@ -314,7 +314,7 @@ class RatingService
         int $value,
         float $ratingWeight = 1.0,
         float $confidenceWeight = 1.0
-    ): void {
+    ): array {
         $attribute = Attribute::query()
             ->select('id', 'key')
             ->findOrFail($attributeId);
@@ -351,12 +351,20 @@ class RatingService
             ? (($beforeRating * $beforeRatingWeightSum) + ((float) $value * $ratingWeight)) / $newRatingWeightSum
             : $beforeRating;
 
-        $row->rating = round($this->clamp($afterRating, 0.0, 99.0), 3);
+        $afterRating = round($this->clamp($afterRating, 0.0, 99.0), 3);
+
+        $row->rating = $afterRating;
         $row->votes_count = ((int) $row->votes_count) + 1;
         $row->rating_weight_sum = $newRatingWeightSum;
         $row->confidence_weight_sum = ((float) ($row->confidence_weight_sum ?? 0)) + $confidenceWeight;
         $row->confidence = min(100.0, round((float) $row->confidence_weight_sum, 2));
         $row->last_vote_at = now();
         $row->save();
+
+        return [
+            'pre_rating_a' => round($beforeRating, 3),
+            'post_rating_a' => $afterRating,
+            'delta_rating_a' => round($afterRating - $beforeRating, 3),
+        ];
     }
 }
