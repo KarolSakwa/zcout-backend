@@ -412,4 +412,70 @@ class ScoutReportFlowTest extends TestCase
             'post_rating_a' => 78.5,
         ]);
     }
+
+    public function test_scout_report_attributes_mark_report_as_completed_when_all_available_attributes_are_rated(): void
+    {
+        $user = User::factory()->create();
+
+        Sanctum::actingAs($user);
+
+        $positionId = $this->createPosition([
+            'short_label' => 'CM',
+            'key' => 'cm',
+            'label' => 'Central Midfielder',
+            'group' => 'MIDFIELD',
+        ]);
+
+        $playerId = $this->createPlayer([
+            'name' => 'Luka Modric',
+            'slug' => 'luka-modric',
+            'position_id' => $positionId,
+        ]);
+
+        $this->createAttribute([
+            'key' => 'passing',
+            'label' => 'Passing',
+            'group' => 'PASSING',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'creativity',
+            'label' => 'Creativity',
+            'group' => 'PASSING',
+            'scope' => 'both',
+        ]);
+
+        $this->createAttribute([
+            'key' => 'ball_control',
+            'label' => 'Ball Control',
+            'group' => 'TECHNIQUE',
+            'scope' => 'both',
+        ]);
+
+        $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'passing',
+            'player_id' => $playerId,
+            'value' => 92,
+        ])->assertCreated();
+
+        $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'creativity',
+            'player_id' => $playerId,
+            'value' => 94,
+        ])->assertCreated();
+
+        $this->postJson('/api/votes/direct', [
+            'attribute_key' => 'ball_control',
+            'player_id' => $playerId,
+            'value' => 91,
+        ])->assertCreated();
+
+        $this->getJson("/api/players/{$playerId}/scout-report-attributes")
+            ->assertOk()
+            ->assertJsonPath('player_id', $playerId)
+            ->assertJsonPath('is_completed', true)
+            ->assertJsonPath('remaining_attributes_count', 0)
+            ->assertJsonPath('items', []);
+    }
 }

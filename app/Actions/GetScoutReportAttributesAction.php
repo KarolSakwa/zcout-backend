@@ -58,6 +58,8 @@ final class GetScoutReportAttributesAction
             )
             ->get();
 
+        $remainingAttributesCount = $attributes->count();
+
         $ratingRows = PlayerAttributeRating::query()
             ->where('player_id', $playerId)
             ->whereIn('attribute_id', $attributes->pluck('id'))
@@ -116,6 +118,8 @@ final class GetScoutReportAttributesAction
             'body' => [
                 'player_id' => $playerId,
                 'items' => $items,
+                'is_completed' => $remainingAttributesCount === 0,
+                'remaining_attributes_count' => $remainingAttributesCount,
             ],
         ];
     }
