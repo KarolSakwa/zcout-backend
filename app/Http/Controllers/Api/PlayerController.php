@@ -74,6 +74,7 @@ class PlayerController extends Controller
 
         $trendRows = Vote::query()
             ->select([
+                'source',
                 'attribute_id',
                 'player_a_id',
                 'player_b_id',
@@ -82,12 +83,9 @@ class PlayerController extends Controller
                 'pre_rating_b',
                 'post_rating_b',
             ])
-            ->where('source', 'duel')
             ->where('created_at', '>=', now()->subDays(7))
             ->whereNotNull('pre_rating_a')
             ->whereNotNull('post_rating_a')
-            ->whereNotNull('pre_rating_b')
-            ->whereNotNull('post_rating_b')
             ->where(function ($q) use ($player) {
                 $q->where('player_a_id', $player->id)
                     ->orWhere('player_b_id', $player->id);
@@ -104,11 +102,19 @@ class PlayerController extends Controller
                 continue;
             }
 
+            $delta = null;
+
             if ((int) $vote->player_a_id === (int) $player->id) {
                 $delta = (float) $vote->post_rating_a - (float) $vote->pre_rating_a;
-            } elseif ((int) $vote->player_b_id === (int) $player->id) {
+            } elseif (
+                (int) $vote->player_b_id === (int) $player->id &&
+                $vote->pre_rating_b !== null &&
+                $vote->post_rating_b !== null
+            ) {
                 $delta = (float) $vote->post_rating_b - (float) $vote->pre_rating_b;
-            } else {
+            }
+
+            if ($delta === null) {
                 continue;
             }
 

@@ -61,12 +61,9 @@ class LiveFeedController extends Controller
 
         $rows = DB::table('votes as v')
             ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
-            ->where('v.source', 'duel')
             ->where('v.created_at', '>=', $since)
             ->whereNotNull('v.pre_rating_a')
             ->whereNotNull('v.post_rating_a')
-            ->whereNotNull('v.pre_rating_b')
-            ->whereNotNull('v.post_rating_b')
             ->orderByDesc('v.created_at')
             ->get([
                 'v.attribute_id',
@@ -84,10 +81,7 @@ class LiveFeedController extends Controller
 
         foreach ($rows as $row) {
             $deltaA = (float) $row->post_rating_a - (float) $row->pre_rating_a;
-            $deltaB = (float) $row->post_rating_b - (float) $row->pre_rating_b;
-
             $keyA = (int) $row->player_a_id . ':' . (int) $row->attribute_id;
-            $keyB = (int) $row->player_b_id . ':' . (int) $row->attribute_id;
 
             if (!isset($aggregated[$keyA])) {
                 $aggregated[$keyA] = [
@@ -99,18 +93,28 @@ class LiveFeedController extends Controller
                 ];
             }
 
-            if (!isset($aggregated[$keyB])) {
-                $aggregated[$keyB] = [
-                    'playerId' => (int) $row->player_b_id,
-                    'attributeId' => (int) $row->attribute_id,
-                    'attributeKey' => (string) $row->attribute_key,
-                    'attributeLabel' => (string) $row->attribute_label,
-                    'deltaValue' => 0.0,
-                ];
-            }
-
             $aggregated[$keyA]['deltaValue'] += $deltaA;
-            $aggregated[$keyB]['deltaValue'] += $deltaB;
+
+            if (
+                $row->player_b_id !== null &&
+                $row->pre_rating_b !== null &&
+                $row->post_rating_b !== null
+            ) {
+                $deltaB = (float) $row->post_rating_b - (float) $row->pre_rating_b;
+                $keyB = (int) $row->player_b_id . ':' . (int) $row->attribute_id;
+
+                if (!isset($aggregated[$keyB])) {
+                    $aggregated[$keyB] = [
+                        'playerId' => (int) $row->player_b_id,
+                        'attributeId' => (int) $row->attribute_id,
+                        'attributeKey' => (string) $row->attribute_key,
+                        'attributeLabel' => (string) $row->attribute_label,
+                        'deltaValue' => 0.0,
+                    ];
+                }
+
+                $aggregated[$keyB]['deltaValue'] += $deltaB;
+            }
         }
 
         $aggregated = array_values(array_filter($aggregated, function (array $item) use ($direction) {
@@ -160,12 +164,9 @@ class LiveFeedController extends Controller
 
             $rows = DB::table('votes as v')
                 ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
-                ->where('v.source', 'duel')
                 ->where('v.created_at', '>=', $since)
                 ->whereNotNull('v.pre_rating_a')
                 ->whereNotNull('v.post_rating_a')
-                ->whereNotNull('v.pre_rating_b')
-                ->whereNotNull('v.post_rating_b')
                 ->get([
                     'v.attribute_id',
                     'v.player_a_id',

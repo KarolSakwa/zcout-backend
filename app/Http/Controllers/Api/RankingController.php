@@ -126,6 +126,8 @@ class RankingController extends Controller
         $trendRows = \Illuminate\Support\Facades\DB::table('votes')
             ->where('attribute_id', $attribute->id)
             ->where('created_at', '>=', now()->subDays(7))
+            ->whereNotNull('pre_rating_a')
+            ->whereNotNull('post_rating_a')
             ->where(function ($q) use ($playerIds) {
                 $q->whereIn('player_a_id', $playerIds)
                     ->orWhereIn('player_b_id', $playerIds);
@@ -142,11 +144,20 @@ class RankingController extends Controller
         $trendByPlayer = [];
 
         foreach ($trendRows as $vote) {
-            $deltaA = (float) $vote->post_rating_a - (float) $vote->pre_rating_a;
-            $deltaB = (float) $vote->post_rating_b - (float) $vote->pre_rating_b;
+            if (in_array((int) $vote->player_a_id, $playerIds, true)) {
+                $deltaA = (float) $vote->post_rating_a - (float) $vote->pre_rating_a;
+                $trendByPlayer[(int) $vote->player_a_id] = ($trendByPlayer[(int) $vote->player_a_id] ?? 0.0) + $deltaA;
+            }
 
-            $trendByPlayer[(int) $vote->player_a_id] = ($trendByPlayer[(int) $vote->player_a_id] ?? 0.0) + $deltaA;
-            $trendByPlayer[(int) $vote->player_b_id] = ($trendByPlayer[(int) $vote->player_b_id] ?? 0.0) + $deltaB;
+            if (
+                $vote->player_b_id !== null &&
+                in_array((int) $vote->player_b_id, $playerIds, true) &&
+                $vote->pre_rating_b !== null &&
+                $vote->post_rating_b !== null
+            ) {
+                $deltaB = (float) $vote->post_rating_b - (float) $vote->pre_rating_b;
+                $trendByPlayer[(int) $vote->player_b_id] = ($trendByPlayer[(int) $vote->player_b_id] ?? 0.0) + $deltaB;
+            }
         }
 
         $items = [];
@@ -213,6 +224,8 @@ class RankingController extends Controller
 
         $trendRows = \Illuminate\Support\Facades\DB::table('votes')
             ->where('created_at', '>=', now()->subDays(7))
+            ->whereNotNull('pre_rating_a')
+            ->whereNotNull('post_rating_a')
             ->where(function ($q) use ($playerIds) {
                 $q->whereIn('player_a_id', $playerIds)
                     ->orWhereIn('player_b_id', $playerIds);
@@ -232,18 +245,28 @@ class RankingController extends Controller
         foreach ($trendRows as $vote) {
             $attributeKey = $attributeKeysById[$vote->attribute_id] ?? null;
 
-            if (!$attributeKey) {
+            if (! $attributeKey) {
                 continue;
             }
 
-            $deltaA = (float) $vote->post_rating_a - (float) $vote->pre_rating_a;
-            $deltaB = (float) $vote->post_rating_b - (float) $vote->pre_rating_b;
+            if (in_array((int) $vote->player_a_id, $playerIds, true)) {
+                $deltaA = (float) $vote->post_rating_a - (float) $vote->pre_rating_a;
 
-            $attributeDeltaByPlayer[(int) $vote->player_a_id][$attributeKey] =
-                ($attributeDeltaByPlayer[(int) $vote->player_a_id][$attributeKey] ?? 0.0) + $deltaA;
+                $attributeDeltaByPlayer[(int) $vote->player_a_id][$attributeKey] =
+                    ($attributeDeltaByPlayer[(int) $vote->player_a_id][$attributeKey] ?? 0.0) + $deltaA;
+            }
 
-            $attributeDeltaByPlayer[(int) $vote->player_b_id][$attributeKey] =
-                ($attributeDeltaByPlayer[(int) $vote->player_b_id][$attributeKey] ?? 0.0) + $deltaB;
+            if (
+                $vote->player_b_id !== null &&
+                in_array((int) $vote->player_b_id, $playerIds, true) &&
+                $vote->pre_rating_b !== null &&
+                $vote->post_rating_b !== null
+            ) {
+                $deltaB = (float) $vote->post_rating_b - (float) $vote->pre_rating_b;
+
+                $attributeDeltaByPlayer[(int) $vote->player_b_id][$attributeKey] =
+                    ($attributeDeltaByPlayer[(int) $vote->player_b_id][$attributeKey] ?? 0.0) + $deltaB;
+            }
         }
 
         $items = [];
