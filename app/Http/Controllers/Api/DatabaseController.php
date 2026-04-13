@@ -146,7 +146,7 @@ class DatabaseController extends Controller
 
             $items[] = [
                 'id' => $pid,
-                'name' => (string) $p->name,
+                'name' => (string) $p->effective_name,
                 'pos' => $pos,
                 'overall' => $overall,
                 'confidence' => $confidence,

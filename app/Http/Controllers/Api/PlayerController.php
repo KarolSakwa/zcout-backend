@@ -31,7 +31,20 @@ class PlayerController extends Controller
     public function show(Player $player)
     {
         $player = Player::query()
-            ->select('id', 'name', 'slug', 'club_id', 'country_id', 'position_id', 'number', 'date_of_birth')
+            ->select(
+                'id',
+                'name',
+                'slug',
+                'club_id',
+                'country_id',
+                'position_id',
+                'number',
+                'date_of_birth',
+                'fd_name',
+                'fd_number',
+                'manual_display_name',
+                'manual_number'
+            )
             ->with([
                 'clubRel:id,name,slug,color_primary,color_secondary,color_tertiary',
                 'countryRef:id,name,iso2',
@@ -163,9 +176,9 @@ class PlayerController extends Controller
 
         return response()->json([
             'id' => (int) $player->id,
-            'name' => (string) $player->name,
+            'name' => (string) $player->effective_name,
             'slug' => $player->slug,
-            'number' => $player->number,
+            'number' => $player->effective_number,
             'date_of_birth' => $player->date_of_birth,
             'position' => $player->positionRef?->short_label,
             'club' => $player->clubRel ? [

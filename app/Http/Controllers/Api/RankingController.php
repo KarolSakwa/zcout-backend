@@ -172,7 +172,7 @@ class RankingController extends Controller
             $items[] = [
                 'player' => [
                     'id' => (int) $p->id,
-                    'name' => (string) $p->name,
+                    'name' => (string) $p->effective_name,
                     'club' => [
                         'name' => (string) ($p->clubRel?->name ?? $p->club ?? ''),
                         'slug' => $p->clubRel?->slug,
@@ -298,7 +298,7 @@ class RankingController extends Controller
             $items[] = [
                 'player' => [
                     'id' => (int) $p->id,
-                    'name' => (string) $p->name,
+                    'name' => (string) $p->effective_name,
                     'club' => [
                         'name' => (string) ($p->clubRel?->name ?? $p->club ?? ''),
                         'slug' => $p->clubRel?->slug,

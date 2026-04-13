@@ -28,9 +28,9 @@ final class BuildNextDuelPayloadAction
         $toApi = function (Player $p) {
             return [
                 'id' => $p->id,
-                'name' => $p->name,
+                'name' => $p->effective_name,
+                'number' => $p->effective_number,
                 'slug' => $p->slug,
-                'number' => $p->number,
                 'position' => $p->positionRef?->short_label
                     ?? $p->positionRef?->key
                     ?? $p->positionRef?->label

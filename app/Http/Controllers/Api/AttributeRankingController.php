@@ -33,7 +33,7 @@ class AttributeRankingController extends Controller
         $rows = collect($paginator->items())->map(fn ($par) => [
             'player' => [
                 'id'       => $par->player->id,
-                'name'     => $par->player->name,
+                'name' => (string) $par->player->effective_name,
                 'slug'     => $par->player->slug,
                 'country'  => $par->player->country,
                 'club'     => $par->player->club,

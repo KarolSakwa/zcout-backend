@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
+        $schedule->command('zcout:sync-football-data-player-metadata')->weeklyOn(1, '03:00');
     }
 
     /**

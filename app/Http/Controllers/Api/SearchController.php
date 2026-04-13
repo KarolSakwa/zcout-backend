@@ -136,7 +136,7 @@ class SearchController extends Controller
 
                 return [
                     'id' => $pid,
-                    'name' => (string) $player->name,
+                    'name' => (string) $player->effective_name,
                     'slug' => $player->slug ? (string) $player->slug : null,
                     'position' => $player->position ? (string) $player->position : null,
                     'club' => $player->club_name ? (string) $player->club_name : null,
