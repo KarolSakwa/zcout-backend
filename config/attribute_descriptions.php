@@ -29,7 +29,7 @@ return [
     'gk_one_on_ones' => 'Ability to handle direct duels with an attacker.',
     'gk_handling' => 'Security and cleanliness when catching or controlling the ball.',
     'gk_command_of_area' => 'Authority and effectiveness dealing with crosses and crowded box situations.',
-    'gk_passing' => 'Quality of goalkeeper distribution with the feet.',
+    'gk_kicking' => 'Quality of goalkeeper distribution with the feet.',
     'gk_throwing' => 'Accuracy and usefulness of goalkeeper throws to start attacks.',
     'gk_rushing_out' => 'Judgement and effectiveness when leaving the line aggressively.',
     'gk_eccentricity' => 'Tendency to play unusually adventurous or unconventional actions.',

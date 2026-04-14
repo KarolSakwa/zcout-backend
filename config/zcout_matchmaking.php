@@ -13,7 +13,7 @@ return [
             'ball_control',
             'dribbling',
             'finishing',
-            'passing',
+            'gk_kicking',
             'composure',
             'tackling',
             'strength',
@@ -21,8 +21,8 @@ return [
     ],
 
     'attribute_scope_mix' => [
-        'both' => 1.00,
-        'gk' => 0.00,
+        'both' => 0.90,
+        'gk' => 0.10,
     ],
 
     'intent_mix' => [

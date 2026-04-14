@@ -7,7 +7,7 @@ return [
             'gk_one_on_ones' => 100,
             'gk_handling' => 100,
             'gk_command_of_area' => 95,
-            'gk_passing' => 80,
+            'gk_kicking' => 80,
             'gk_throwing' => 80,
             'gk_rushing_out' => 75,
             'gk_eccentricity' => 40,

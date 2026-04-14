@@ -66,7 +66,7 @@ class DatabaseController extends Controller
         $coreKeys = [
             'pace',
             'dribbling',
-            'passing',
+            'gk_kicking',
             'vision',
             'tackling',
             'finishing',

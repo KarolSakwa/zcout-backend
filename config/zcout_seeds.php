@@ -14,7 +14,7 @@ $base = array_fill_keys($attrs, $default);
 
 $GK = array_merge($base, [
     'pace' => 45, 'acceleration' => 48, 'agility' => 50, 'stamina' => 45, 'strength' => 55,
-    'dribbling' => 30, 'first_touch' => 38, 'passing' => 40, 'vision' => 38, 'crossing' => 30,
+    'dribbling' => 30, 'first_touch' => 38, 'gk_kicking' => 40, 'vision' => 38, 'crossing' => 30,
     'finishing' => 25, 'long_shots' => 30, 'heading' => 30,
     'tackling' => 30, 'marking' => 35, 'positioning' => 55,
     'aggression' => 45, 'bravery' => 55, 'composure' => 65, 'concentration' => 70,

@@ -55,10 +55,28 @@ class PlayerController extends Controller
 
         $posCode = strtoupper((string) ($player->positionRef?->short_label ?? ''));
 
+        $attributeKeys = collect($posCode === 'GK'
+            ? config('zcout_attributes.gk', [])
+            : config('zcout_attributes.outfield', [])
+        )->pluck('key');
+
+        $attributeConfig = $posCode === 'GK'
+            ? config('zcout_attributes.gk', [])
+            : config('zcout_attributes.outfield', []);
+
+        $attributeKeys = collect($attributeConfig)->pluck('key')->values();
+        $attributeOrder = $attributeKeys
+            ->values()
+            ->flip()
+            ->map(fn ($index) => (int) $index)
+            ->all();
+
         $attributes = Attribute::query()
             ->select('id', 'key', 'label', 'group')
-            ->orderBy('key')
-            ->get();
+            ->whereIn('key', $attributeKeys)
+            ->get()
+            ->sortBy(fn (Attribute $attribute) => $attributeOrder[$attribute->key] ?? PHP_INT_MAX)
+            ->values();
 
         $rows = PlayerAttributeRating::query()
             ->where('player_id', $player->id)

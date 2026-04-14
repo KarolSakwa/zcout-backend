@@ -62,7 +62,7 @@ return [
         ['key' => 'gk_handling', 'label' => 'Handling', 'group' => 'SHOT_STOPPING'],
         ['key' => 'gk_command_of_area', 'label' => 'Command of Area', 'group' => 'AERIAL'],
 
-        ['key' => 'passing', 'label' => 'Passing', 'group' => 'DISTRIBUTION'],
+        ['key' => 'gk_kicking', 'label' => 'Kicking', 'group' => 'DISTRIBUTION'],
         ['key' => 'gk_throwing', 'label' => 'Throwing', 'group' => 'DISTRIBUTION'],
 
         ['key' => 'gk_rushing_out', 'label' => 'Rushing Out', 'group' => 'RUSHING_OUT'],
@@ -71,7 +71,7 @@ return [
 
     'gk_axes' => [
         'SHOT_STOPPING' => ['gk_reflexes', 'gk_one_on_ones', 'gk_handling'],
-        'DISTRIBUTION' => ['passing', 'gk_throwing'],
+        'DISTRIBUTION' => ['gk_kicking', 'gk_throwing'],
         'AERIAL' => ['gk_command_of_area', 'strength', 'height_score'],
         'ECCENTRICITY' => ['gk_eccentricity'],
         'RUSHING_OUT' => ['gk_rushing_out'],
