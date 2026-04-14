@@ -14,8 +14,12 @@ final class GetScoutReportAttributesAction
     public function execute(int $userId, int $playerId): array
     {
         $player = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label,key,label,group'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with([
+                'positionRef:id,short_label,key,label,group',
+                'fdPositionRef:id,short_label,key,label,group',
+                'manualPositionRef:id,short_label,key,label,group',
+            ])
             ->whereKey($playerId)
             ->first();
 
@@ -27,7 +31,7 @@ final class GetScoutReportAttributesAction
             ];
         }
 
-        $posCode = strtoupper((string) ($player->positionRef?->short_label ?? ''));
+        $posCode = strtoupper((string) ($player->effective_position_short ?? ''));
         $isGk = $posCode === 'GK';
 
         $votedAttributeIds = Vote::query()

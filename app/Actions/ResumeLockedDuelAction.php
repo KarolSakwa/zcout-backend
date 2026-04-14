@@ -92,11 +92,15 @@ final class ResumeLockedDuelAction
                 'fd_number',
                 'manual_display_name',
                 'manual_number',
+                'fd_position_id',
+                'manual_position_id',
             ])
             ->with([
                 'clubRel:id,name,color_primary,color_secondary,color_tertiary',
                 'countryRef:id,name,iso2',
                 'positionRef:id,short_label,label,key',
+                'fdPositionRef:id,short_label,key,label',
+                'manualPositionRef:id,short_label,key,label',
             ])
             ->whereIn('id', $playerIds)
             ->get()

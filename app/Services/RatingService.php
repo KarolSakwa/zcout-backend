@@ -12,9 +12,9 @@ class RatingService
 {
     private function posCode(Player $p): string
     {
-        $code = $p->positionRef?->short_label
-            ?? $p->positionRef?->key
-            ?? $p->positionRef?->label
+        $code = $p->effective_position_short
+            ?? $p->effective_position_key
+            ?? $p->effective_position_label
             ?? 'ST';
 
         return strtoupper((string) $code);
@@ -25,19 +25,27 @@ class RatingService
         $attr = Attribute::select('id', 'key')->findOrFail($attributeId);
 
         $winnerPlayer = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label,key,label,group'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with([
+                'positionRef:id,short_label,key,label,group',
+                'fdPositionRef:id,short_label,key,label,group',
+                'manualPositionRef:id,short_label,key,label,group',
+            ])
             ->whereKey($winnerId)
             ->firstOrFail();
 
         $loserPlayer = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label,key,label,group'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with([
+                'positionRef:id,short_label,key,label,group',
+                'fdPositionRef:id,short_label,key,label,group',
+                'manualPositionRef:id,short_label,key,label,group',
+            ])
             ->whereKey($loserId)
             ->firstOrFail();
 
-        $winnerPos = strtoupper((string) ($winnerPlayer->positionRef?->short_label ?? ''));
-        $loserPos  = strtoupper((string) ($loserPlayer->positionRef?->short_label ?? ''));
+        $winnerPos = strtoupper((string) ($winnerPlayer->effective_position_short ?? ''));
+        $loserPos = strtoupper((string) ($loserPlayer->effective_position_short ?? ''));
 
         $w = PlayerAttributeRating::firstOrCreate(
             ['player_id' => $winnerId, 'attribute_id' => $attributeId],
@@ -116,7 +124,7 @@ class RatingService
 
         return [
             'winner_seed_pos' => $winnerPos,
-            'loser_seed_pos'  => $loserPos,
+            'loser_seed_pos' => $loserPos,
         ];
     }
 
@@ -132,8 +140,8 @@ class RatingService
     ): array {
         $Sexp = 14.0;
 
-        $K0   = 3.0;
-        $n0   = 5.0;
+        $K0 = 3.0;
+        $n0 = 5.0;
         $kMin = 0.02;
         $kMax = 1.50;
 
@@ -221,7 +229,9 @@ class RatingService
     private function oppQualityMultiplier(float $rOpp, float $q0 = 60.0, float $rQ = 10.0, float $betaQ = 1.5): float
     {
         $d = max(0.0, $q0 - $rOpp);
-        if ($d <= 0.0) return 1.0;
+        if ($d <= 0.0) {
+            return 1.0;
+        }
 
         $x = pow($d / $rQ, $betaQ);
         return 1.0 / (1.0 + $x);
@@ -295,8 +305,12 @@ class RatingService
 
         $deltaChange = $Seff * $logEff * $this->fSqrt($n, $C) * $this->fBlocks($n, $aBlocks, $floorBlocks);
 
-        if ($deltaChange > $cap) $deltaChange = $cap;
-        if ($deltaChange < -$cap) $deltaChange = -$cap;
+        if ($deltaChange > $cap) {
+            $deltaChange = $cap;
+        }
+        if ($deltaChange < -$cap) {
+            $deltaChange = -$cap;
+        }
 
         $Dold = $ratingA - $ratingB;
         $Dnew = $Dold + $deltaChange;
@@ -320,12 +334,16 @@ class RatingService
             ->findOrFail($attributeId);
 
         $player = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label,key,label,group'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with([
+                'positionRef:id,short_label,key,label,group',
+                'fdPositionRef:id,short_label,key,label,group',
+                'manualPositionRef:id,short_label,key,label,group',
+            ])
             ->whereKey($playerId)
             ->firstOrFail();
 
-        $posCode = strtoupper((string) ($player->positionRef?->short_label ?? ''));
+        $posCode = strtoupper((string) ($player->effective_position_short ?? ''));
 
         $row = PlayerAttributeRating::firstOrCreate(
             ['player_id' => $playerId, 'attribute_id' => $attributeId],

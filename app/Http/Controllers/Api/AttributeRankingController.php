@@ -37,7 +37,7 @@ class AttributeRankingController extends Controller
                 'slug'     => $par->player->slug,
                 'country'  => $par->player->country,
                 'club'     => $par->player->club,
-                'position' => $par->player->position,
+                'position' => $par->player->effective_position_short,
             ],
             'rating'      => $par->rating,
             'votes_count' => $par->votes_count,

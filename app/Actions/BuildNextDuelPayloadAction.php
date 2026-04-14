@@ -31,9 +31,9 @@ final class BuildNextDuelPayloadAction
                 'name' => $p->effective_name,
                 'number' => $p->effective_number,
                 'slug' => $p->slug,
-                'position' => $p->positionRef?->short_label
-                    ?? $p->positionRef?->key
-                    ?? $p->positionRef?->label
+                'position' => $p->effective_position_short
+                    ?? $p->effective_position_key
+                    ?? $p->effective_position_label
                     ?? null,
                 'country' => $p->countryRef ? [
                     'id' => $p->countryRef->id,

@@ -89,8 +89,9 @@ class DatabaseController extends Controller
         $attrIds = array_values($keyToId);
 
         $players = \App\Models\Player::query()
-            ->select('id', 'name', 'position_id')
-            ->with(['positionRef:id,short_label'])
+            ->select('id', 'name', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with(['positionRef:id,short_label', 'fdPositionRef:id,short_label,key,label',
+                'manualPositionRef:id,short_label,key,label'])
             ->where('club', (string) $club->name)
             ->orderBy('name')
             ->limit($limit)
@@ -120,7 +121,7 @@ class DatabaseController extends Controller
         $items = [];
         foreach ($players as $p) {
             $pid = (int) $p->id;
-            $pos = strtoupper((string) ($p->positionRef?->short_label ?? ''));
+            $pos = strtoupper((string) ($p->effective_position_short ?? ''));
 
             $sum = 0.0;
             $confSum = 0.0;

@@ -43,17 +43,40 @@ class PlayerController extends Controller
                 'fd_name',
                 'fd_number',
                 'manual_display_name',
-                'manual_number'
+                'manual_number',
+                'fd_position_id',
+                'manual_position_id',
             )
             ->with([
                 'clubRel:id,name,slug,color_primary,color_secondary,color_tertiary',
                 'countryRef:id,name,iso2',
                 'positionRef:id,short_label',
+                'fdPositionRef:id,short_label,key,label',
+                'manualPositionRef:id,short_label,key,label',
             ])
             ->whereKey($player->id)
             ->firstOrFail();
 
-        $posCode = strtoupper((string) ($player->positionRef?->short_label ?? ''));
+        $posCode = strtoupper((string) ($player->effective_position_short ?? ''));
+
+        $attributeKeys = collect($posCode === 'GK'
+            ? config('zcout_attributes.gk', [])
+            : config('zcout_attributes.outfield', [])
+        )->pluck('key');
+
+        $attributeConfig = $posCode === 'GK'
+            ? config('zcout_attributes.gk', [])
+            : config('zcout_attributes.outfield', []);
+
+        $attributeMetaByKey = collect($attributeConfig)
+            ->keyBy('key');
+
+        $attributeKeys = collect($attributeConfig)->pluck('key')->values();
+        $attributeOrder = $attributeKeys
+            ->values()
+            ->flip()
+            ->map(fn ($index) => (int) $index)
+            ->all();
 
         $attributes = Attribute::query()
             ->select('id', 'key', 'label', 'group')
@@ -151,8 +174,8 @@ class PlayerController extends Controller
             $payloadAttrs[] = [
                 'id' => (int) $attr->id,
                 'key' => (string) $attr->key,
-                'label' => (string) $attr->label,
-                'group' => $attr->group,
+                'label' => (string) ($attributeMetaByKey->get($attr->key)['label'] ?? $attr->label),
+                'group' => (string) ($attributeMetaByKey->get($attr->key)['group'] ?? $attr->group),
                 'rating' => (float) $rating,
                 'confidence' => (float) min(100.0, round($confidence, 2)),
                 'rating_weight_sum' => (float) $ratingWeightSum,
@@ -180,7 +203,7 @@ class PlayerController extends Controller
             'slug' => $player->slug,
             'number' => $player->effective_number,
             'date_of_birth' => $player->date_of_birth,
-            'position' => $player->positionRef?->short_label,
+            'position' => $player->effective_position_short,
             'club' => $player->clubRel ? [
                 'id' => (int) $player->clubRel->id,
                 'name' => (string) $player->clubRel->name,

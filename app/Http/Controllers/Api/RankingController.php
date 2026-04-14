@@ -11,6 +11,7 @@ use App\Support\OverallConfig;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class RankingController extends Controller
@@ -87,17 +88,41 @@ class RankingController extends Controller
         $sort = $this->normalizeSort((string) $request->query('sort', 'rank'));
         $dir = $this->normalizeDir((string) $request->query('dir', 'asc'));
 
+        $positionId = null;
+        if ($position !== '') {
+            $positionId = Position::query()
+                ->where('short_label', $position)
+                ->value('id');
+        }
+
         $playersQuery = Player::query()
-            ->select('id', 'name', 'club', 'club_id', 'position_id')
+            ->select(
+                'id',
+                'name',
+                'fd_name',
+                'manual_display_name',
+                'club',
+                'club_id',
+                'position_id',
+                'fd_position_id',
+                'manual_position_id'
+            )
             ->with([
-                'positionRef:id,short_label',
+                'positionRef:id,short_label,key,label',
+                'fdPositionRef:id,short_label,key,label',
+                'manualPositionRef:id,short_label,key,label',
                 'clubRel:id,name,slug',
             ]);
 
         if ($position !== '') {
-            $playersQuery->whereHas('positionRef', function ($q) use ($position) {
-                $q->where('short_label', $position);
-            });
+            if ($positionId === null) {
+                $playersQuery->whereRaw('1 = 0');
+            } else {
+                $playersQuery->whereRaw(
+                    'COALESCE(players.manual_position_id, players.fd_position_id, players.position_id) = ?',
+                    [$positionId]
+                );
+            }
         }
 
         $players = $playersQuery->get();
@@ -123,7 +148,7 @@ class RankingController extends Controller
             ->get()
             ->keyBy('player_id');
 
-        $trendRows = \Illuminate\Support\Facades\DB::table('votes')
+        $trendRows = DB::table('votes')
             ->where('attribute_id', $attribute->id)
             ->where('created_at', '>=', now()->subDays(7))
             ->whereNotNull('pre_rating_a')
@@ -162,7 +187,7 @@ class RankingController extends Controller
 
         $items = [];
         foreach ($players as $p) {
-            $pos = strtoupper((string) ($p->positionRef?->short_label ?? ''));
+            $pos = strtoupper((string) ($p->effective_position_short ?? ''));
             $row = $ratingRows[$p->id] ?? null;
 
             $rating = (float) ($row?->rating ?? Seed::for($pos, $attribute->key));
@@ -222,7 +247,7 @@ class RankingController extends Controller
         $playerIds = $players->pluck('id')->all();
         $attributeKeysById = $attributes->pluck('key', 'id')->all();
 
-        $trendRows = \Illuminate\Support\Facades\DB::table('votes')
+        $trendRows = DB::table('votes')
             ->where('created_at', '>=', now()->subDays(7))
             ->whereNotNull('pre_rating_a')
             ->whereNotNull('post_rating_a')
@@ -272,7 +297,7 @@ class RankingController extends Controller
         $items = [];
 
         foreach ($players as $p) {
-            $pos = strtoupper((string) ($p->positionRef?->short_label ?? ''));
+            $pos = strtoupper((string) ($p->effective_position_short ?? ''));
             $playerRows = $rowsByPlayer->get($p->id, collect())->keyBy('attribute_id');
 
             $payloadAttrs = [];

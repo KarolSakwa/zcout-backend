@@ -20,7 +20,7 @@ class PlayerResource extends JsonResource
             'slug' => $this->slug,
             'country' => $this->country,
             'club' => $this->club,
-            'position' => $this->position,
+            'position' => $this->effective_position_short,
         ];
     }
 
