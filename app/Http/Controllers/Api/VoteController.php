@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\RecentVoteCreated;
+use App\Events\TopMoversMaybeChanged;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\Duel;
@@ -10,14 +12,13 @@ use App\Models\PlayerAttributeRating;
 use App\Models\Vote;
 use App\Models\VoteWeightLog;
 use App\Services\RatingService;
+use App\Support\Live\RecentVoteItem;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Events\RecentVoteCreated;
-use App\Support\Live\RecentVoteItem;
-use App\Events\TopMoversMaybeChanged;
 
 class VoteController extends Controller
 {
@@ -267,6 +268,17 @@ class VoteController extends Controller
             if ($code === '23505' || stripos($msg, 'votes_unique_duel_voterhash') !== false) {
                 DB::table('voter_duel_locks')->whereIn('voter_hash', $lockKeys)->delete();
 
+                Log::warning('vote.duel_duplicate_vote', [
+                    'duel_id' => $duel->id ?? null,
+                    'attribute_id' => $attribute->id ?? null,
+                    'player_a_id' => $playerA ?? null,
+                    'player_b_id' => $playerB ?? null,
+                    'winner_id' => $winnerId ?? null,
+                    'user_id' => $currentUserId,
+                    'voter_hash' => $voterHash ?? null,
+                    'error_code' => $code,
+                ]);
+
                 return response()->json([
                     'message' => 'You already voted on this duel.',
                 ], 409);
@@ -339,6 +351,14 @@ class VoteController extends Controller
         ]);
 
         if ($v->fails()) {
+            Log::warning('direct_vote.validation_failed', [
+                'user_id' => auth()->id(),
+                'player_id' => $payload['player_id'] ?? null,
+                'attribute_key' => $payload['attribute_key'] ?? null,
+                'value' => $payload['value'] ?? null,
+                'errors' => $v->errors()->toArray(),
+            ]);
+
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $v->errors(),
@@ -349,6 +369,17 @@ class VoteController extends Controller
             $v->validated(),
             (int) auth()->id(),
         );
+
+        if (($result['status'] ?? 500) >= 400) {
+            Log::warning('direct_vote.submit_failed', [
+                'user_id' => auth()->id(),
+                'player_id' => $payload['player_id'] ?? null,
+                'attribute_key' => $payload['attribute_key'] ?? null,
+                'value' => $payload['value'] ?? null,
+                'status' => $result['status'] ?? null,
+                'body' => $result['body'] ?? null,
+            ]);
+        }
 
         return response()->json($result['body'], $result['status']);
     }
@@ -411,6 +442,14 @@ class VoteController extends Controller
         });
 
         if ($v->fails()) {
+            Log::warning('scout_report.validation_failed', [
+                'user_id' => auth()->id(),
+                'player_id' => $payload['player_id'] ?? null,
+                'votes_count' => count($payload['votes'] ?? []),
+                'skips_count' => count($payload['skipped_attribute_ids'] ?? []),
+                'errors' => $v->errors()->toArray(),
+            ]);
+
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $v->errors(),
@@ -421,6 +460,17 @@ class VoteController extends Controller
             (int) auth()->id(),
             $v->validated(),
         );
+
+        if (($result['status'] ?? 500) >= 400) {
+            Log::warning('scout_report.submit_failed', [
+                'user_id' => auth()->id(),
+                'player_id' => $payload['player_id'] ?? null,
+                'votes_count' => count($payload['votes'] ?? []),
+                'skips_count' => count($payload['skipped_attribute_ids'] ?? []),
+                'status' => $result['status'] ?? null,
+                'body' => $result['body'] ?? null,
+            ]);
+        }
 
         return response()->json($result['body'], $result['status']);
     }
@@ -454,5 +504,4 @@ class VoteController extends Controller
         $all = $request->all();
         return is_array($all) ? $all : [];
     }
-
 }
