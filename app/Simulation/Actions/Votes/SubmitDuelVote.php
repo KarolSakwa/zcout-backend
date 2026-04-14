@@ -56,8 +56,8 @@ final class SubmitDuelVote
         $playerB = max($reqA, $reqB);
 
         $players = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with(['positionRef:id,short_label', 'fdPositionRef:id,short_label,key,label', 'manualPositionRef:id,short_label,key,label'])
             ->whereIn('id', [$playerA, $playerB])
             ->get()
             ->keyBy('id');
@@ -66,8 +66,8 @@ final class SubmitDuelVote
             throw new RuntimeException('Player not found.');
         }
 
-        $posA = strtoupper((string) ($players[$playerA]->positionRef?->short_label ?? ''));
-        $posB = strtoupper((string) ($players[$playerB]->positionRef?->short_label ?? ''));
+        $posA = strtoupper((string) ($players[$playerA]->effective_position_short ?? ''));
+        $posB = strtoupper((string) ($players[$playerB]->effective_position_short ?? ''));
 
         $beforeRows = PlayerAttributeRating::query()
             ->where('attribute_id', $attribute->id)

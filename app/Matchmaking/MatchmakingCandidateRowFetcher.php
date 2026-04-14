@@ -15,12 +15,14 @@ final class MatchmakingCandidateRowFetcher
 
         $rowsQ = DB::table('players as p')
             ->join('player_reputation_stats as prs', 'prs.player_id', '=', 'p.id')
-            ->leftJoin('positions as pos', 'pos.id', '=', 'p.position_id')
+            ->leftJoin('positions as pos', function ($join) {
+                $join->on('pos.id', '=', DB::raw('COALESCE(p.manual_position_id, p.fd_position_id, p.position_id)'));
+            })
             ->leftJoin('player_attribute_ratings as par', function ($join) use ($attributeId) {
                 $join->on('par.player_id', '=', 'p.id')
                     ->where('par.attribute_id', '=', $attributeId);
             })
-            ->whereNotNull('p.position_id');
+            ->whereNotNull(DB::raw('COALESCE(p.manual_position_id, p.fd_position_id, p.position_id)'));
 
         if ($intent === 'production' && $selectedTier !== null) {
             $rowsQ->where('prs.tier', '=', $selectedTier);

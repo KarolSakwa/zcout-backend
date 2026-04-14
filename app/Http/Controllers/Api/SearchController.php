@@ -10,6 +10,7 @@ use App\Models\PlayerAttributeRating;
 use App\Support\OverallConfig;
 use App\Support\Seed;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SearchController extends Controller
 {
@@ -42,7 +43,9 @@ class SearchController extends Controller
                 'players.slug',
                 'players.position_id',
                 'clubs.name as club_name',
-                'positions.short_label as position'
+                DB::raw('COALESCE(manual_pos.short_label, fd_pos.short_label, base_pos.short_label) as position'),
+                'players.fd_position_id',
+                'players.manual_position_id',
             )
             ->selectRaw(
                 "CASE
@@ -54,7 +57,9 @@ class SearchController extends Controller
                 [$needle, $prefix, $prefix]
             )
             ->leftJoin('clubs', 'clubs.id', '=', 'players.club_id')
-            ->leftJoin('positions', 'positions.id', '=', 'players.position_id')
+            ->leftJoin('positions as base_pos', 'base_pos.id', '=', 'players.position_id')
+            ->leftJoin('positions as fd_pos', 'fd_pos.id', '=', 'players.fd_position_id')
+            ->leftJoin('positions as manual_pos', 'manual_pos.id', '=', 'players.manual_position_id')
             ->where(function ($query) use ($contains) {
                 $query
                     ->whereRaw('LOWER(COALESCE(players.manual_display_name, players.fd_name, players.name)) LIKE ?', [$contains])

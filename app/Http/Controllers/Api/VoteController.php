@@ -76,8 +76,9 @@ class VoteController extends Controller
         $playerB = max($reqA, $reqB);
 
         $players = Player::query()
-            ->select('id', 'position_id')
-            ->with(['positionRef:id,short_label'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with(['positionRef:id,short_label', 'fdPositionRef:id,short_label,key,label',
+                'manualPositionRef:id,short_label,key,label'])
             ->whereIn('id', [$playerA, $playerB])
             ->get()
             ->keyBy('id');
@@ -86,8 +87,8 @@ class VoteController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
-        $posA = strtoupper((string) ($players[$playerA]->positionRef?->short_label ?? ''));
-        $posB = strtoupper((string) ($players[$playerB]->positionRef?->short_label ?? ''));
+        $posA = strtoupper((string) ($players[$playerA]->effective_position_short ?? ''));
+        $posB = strtoupper((string) ($players[$playerB]->effective_position_short ?? ''));
 
         $beforeRows = PlayerAttributeRating::query()
             ->where('attribute_id', $attribute->id)
@@ -247,9 +248,9 @@ class VoteController extends Controller
                     'v.winner_id',
                     'v.player_a_id',
                     'v.player_b_id',
-                    'winner_player.name as winner_name',
-                    'player_a.name as player_a_name',
-                    'player_b.name as player_b_name',
+                    DB::raw('COALESCE(winner_player.manual_display_name, winner_player.fd_name, winner_player.name) as winner_name'),
+                    DB::raw('COALESCE(player_a.manual_display_name, player_a.fd_name, player_a.name) as player_a_name'),
+                    DB::raw('COALESCE(player_b.manual_display_name, player_b.fd_name, player_b.name) as player_b_name'),
                     'a.key as attribute_key',
                     'a.label as attribute_label',
                 ])

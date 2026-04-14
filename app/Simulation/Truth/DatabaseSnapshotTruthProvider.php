@@ -20,8 +20,12 @@ final class DatabaseSnapshotTruthProvider implements TruthProvider
             ->get();
 
         $players = Player::query()
-            ->select(['id', 'position_id'])
-            ->with(['positionRef:id,short_label'])
+            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
+            ->with([
+                'positionRef:id,short_label,key,label,group',
+                'fdPositionRef:id,short_label,key,label,group',
+                'manualPositionRef:id,short_label,key,label,group',
+            ])
             ->orderBy('id')
             ->get();
 
@@ -43,7 +47,7 @@ final class DatabaseSnapshotTruthProvider implements TruthProvider
         $payload = [];
 
         foreach ($players as $player) {
-            $pos = strtoupper((string) ($player->positionRef?->short_label ?? 'CM'));
+            $pos = strtoupper((string) ($player->effective_position_short ?? 'CM'));
 
             foreach ($attributes as $attribute) {
                 $mapKey = (int) $player->id . '|' . (string) $attribute->key;
