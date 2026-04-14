@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\EventLogController;
 use App\Http\Controllers\Api\LiveFeedController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -64,3 +65,4 @@ Route::get('/live/top-movers', [LiveFeedController::class, 'topMovers']);
 Route::get('/live/top-movers-summary', [LiveFeedController::class, 'topMoversSummary']);
 Route::post('/scout-reports', [VoteController::class, 'submitScoutReport'])->middleware('auth:sanctum');
 Route::get('/players/{player}/scout-report-attributes', [VoteController::class, 'scoutReportAttributes'])->middleware('auth:sanctum');
+Route::post('/log-event', [EventLogController::class, 'store']);
