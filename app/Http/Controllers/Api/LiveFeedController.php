@@ -30,9 +30,9 @@ class LiveFeedController extends Controller
                 'v.winner_id',
                 'v.player_a_id',
                 'v.player_b_id',
-                'winner_player.name as winner_name',
-                'player_a.name as player_a_name',
-                'player_b.name as player_b_name',
+                DB::raw('COALESCE(winner_player.manual_display_name, winner_player.fd_name, winner_player.name) as winner_name'),
+                DB::raw('COALESCE(player_a.manual_display_name, player_a.fd_name, player_a.name) as player_a_name'),
+                DB::raw('COALESCE(player_b.manual_display_name, player_b.fd_name, player_b.name) as player_b_name'),
                 'a.key as attribute_key',
                 'a.label as attribute_label',
             ]);
@@ -135,7 +135,8 @@ class LiveFeedController extends Controller
 
         $playerNamesById = DB::table('players')
             ->whereIn('id', array_column($aggregated, 'playerId'))
-            ->pluck('name', 'id');
+            ->selectRaw('id, COALESCE(manual_display_name, fd_name, name) as effective_name')
+            ->pluck('effective_name', 'id');
 
         $items = array_map(function (array $item) use ($playerNamesById) {
             return TopMoverItem::fromArray(
@@ -224,7 +225,8 @@ class LiveFeedController extends Controller
                 ? collect()
                 : DB::table('players')
                     ->whereIn('id', $playerIds)
-                    ->pluck('name', 'id');
+                    ->selectRaw('id, COALESCE(manual_display_name, fd_name, name) as effective_name')
+                    ->pluck('effective_name', 'id');
 
             return [
                 'risers' => array_map(function (array $item) use ($playerNamesById) {

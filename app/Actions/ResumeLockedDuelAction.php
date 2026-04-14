@@ -80,7 +80,19 @@ final class ResumeLockedDuelAction
         $playerIds = [(int) $lockedDuel->player_a_id, (int) $lockedDuel->player_b_id];
 
         $players = Player::query()
-            ->select(['id', 'name', 'slug', 'number', 'club_id', 'country_id', 'position_id'])
+            ->select([
+                'id',
+                'name',
+                'slug',
+                'number',
+                'club_id',
+                'country_id',
+                'position_id',
+                'fd_name',
+                'fd_number',
+                'manual_display_name',
+                'manual_number',
+            ])
             ->with([
                 'clubRel:id,name,color_primary,color_secondary,color_tertiary',
                 'countryRef:id,name,iso2',

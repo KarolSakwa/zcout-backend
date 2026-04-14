@@ -37,6 +37,8 @@ class SearchController extends Controller
             ->select(
                 'players.id',
                 'players.name',
+                'players.fd_name',
+                'players.manual_display_name',
                 'players.slug',
                 'players.position_id',
                 'clubs.name as club_name',
@@ -44,22 +46,22 @@ class SearchController extends Controller
             )
             ->selectRaw(
                 "CASE
-                    WHEN LOWER(players.name) = ? THEN 0
-                    WHEN LOWER(players.name) LIKE ? THEN 1
-                    WHEN LOWER(players.slug) LIKE ? THEN 2
-                    ELSE 3
-                END as match_rank",
+            WHEN LOWER(COALESCE(players.manual_display_name, players.fd_name, players.name)) = ? THEN 0
+            WHEN LOWER(COALESCE(players.manual_display_name, players.fd_name, players.name)) LIKE ? THEN 1
+            WHEN LOWER(players.slug) LIKE ? THEN 2
+            ELSE 3
+        END as match_rank",
                 [$needle, $prefix, $prefix]
             )
             ->leftJoin('clubs', 'clubs.id', '=', 'players.club_id')
             ->leftJoin('positions', 'positions.id', '=', 'players.position_id')
             ->where(function ($query) use ($contains) {
                 $query
-                    ->whereRaw('LOWER(players.name) LIKE ?', [$contains])
+                    ->whereRaw('LOWER(COALESCE(players.manual_display_name, players.fd_name, players.name)) LIKE ?', [$contains])
                     ->orWhereRaw('LOWER(players.slug) LIKE ?', [$contains]);
             })
             ->orderBy('match_rank')
-            ->orderBy('players.name')
+            ->orderByRaw('COALESCE(players.manual_display_name, players.fd_name, players.name)')
             ->limit(8)
             ->get();
 
