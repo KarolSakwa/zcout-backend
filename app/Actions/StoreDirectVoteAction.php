@@ -4,13 +4,12 @@ namespace App\Actions;
 
 use App\Models\Attribute;
 use App\Models\Vote;
-use App\Services\RatingService;
 use Illuminate\Support\Facades\DB;
 
 final class StoreDirectVoteAction
 {
     public function __construct(
-        private readonly RatingService $ratingService,
+        private readonly ApplyVoteEventToRatingsAction $applyVoteEventToRatingsAction,
     ) {
     }
 
@@ -49,13 +48,15 @@ final class StoreDirectVoteAction
         return DB::transaction(function () use ($data, $userId, $attribute) {
             $weightApplied = 1.0;
             $confidenceWeightApplied = 1.0;
+            $occurredAt = now();
 
-            $ratingResult = $this->ratingService->applyDirectVote(
+            $ratingResult = $this->applyVoteEventToRatingsAction->executeDirect(
                 playerId: (int) $data['player_id'],
                 attributeId: (int) $attribute->id,
                 value: (int) $data['value'],
                 ratingWeight: $weightApplied,
                 confidenceWeight: $confidenceWeightApplied,
+                occurredAt: $occurredAt,
             );
 
             $vote = new Vote();
@@ -77,7 +78,7 @@ final class StoreDirectVoteAction
             $vote->pre_rating_b = null;
             $vote->post_rating_a = $ratingResult['post_rating_a'];
             $vote->post_rating_b = null;
-            $vote->created_at = now();
+            $vote->created_at = $occurredAt;
             $vote->save();
 
             return [

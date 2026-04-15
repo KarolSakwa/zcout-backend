@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ApplyVoteEventToRatingsAction;
 use App\Events\RecentVoteCreated;
 use App\Events\TopMoversMaybeChanged;
 use App\Http\Controllers\Controller;
@@ -11,7 +12,6 @@ use App\Models\Player;
 use App\Models\PlayerAttributeRating;
 use App\Models\Vote;
 use App\Models\VoteWeightLog;
-use App\Services\RatingService;
 use App\Support\Live\RecentVoteItem;
 use App\Support\Seed;
 use Illuminate\Http\Request;
@@ -35,7 +35,7 @@ class VoteController extends Controller
     private const ACTIVITY_FACTOR_DEFAULT = 1.0;
     private const ROLE_FACTOR_DEFAULT = 1.0;
 
-    public function store(Request $request, RatingService $ratingService)
+    public function store(Request $request, ApplyVoteEventToRatingsAction $applyVoteEventToRatingsAction)
     {
         $payload = $this->payload($request);
 
@@ -77,8 +77,11 @@ class VoteController extends Controller
 
         $players = Player::query()
             ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
-            ->with(['positionRef:id,short_label', 'fdPositionRef:id,short_label,key,label',
-                'manualPositionRef:id,short_label,key,label'])
+            ->with([
+                'positionRef:id,short_label',
+                'fdPositionRef:id,short_label,key,label',
+                'manualPositionRef:id,short_label,key,label',
+            ])
             ->whereIn('id', [$playerA, $playerB])
             ->get()
             ->keyBy('id');
@@ -144,8 +147,12 @@ class VoteController extends Controller
         $anonId = trim((string) $request->header('X-Zcout-Anon'));
 
         $lockKeys = [];
-        if ($anonId !== '') $lockKeys[] = $anonId;
-        if ($isAuthed) $lockKeys[] = 'user:' . $currentUserId;
+        if ($anonId !== '') {
+            $lockKeys[] = $anonId;
+        }
+        if ($isAuthed) {
+            $lockKeys[] = 'user:' . $currentUserId;
+        }
 
         $lockKey = $anonId !== '' ? $anonId : ($isAuthed ? ('user:' . $currentUserId) : null);
 
@@ -156,6 +163,7 @@ class VoteController extends Controller
         }
 
         $voterHash = hash_hmac('sha256', $lockKey, (string) config('app.key'));
+        $occurredAt = now();
 
         try {
             DB::transaction(function () use (
@@ -164,7 +172,6 @@ class VoteController extends Controller
                 $playerA,
                 $playerB,
                 $winnerId,
-                $ratingService,
                 $loserId,
                 $beforeA,
                 $beforeB,
@@ -184,7 +191,9 @@ class VoteController extends Controller
                 $integrityFactor,
                 $biasFactor,
                 $activityFactor,
-                $roleFactor
+                $roleFactor,
+                $applyVoteEventToRatingsAction,
+                $occurredAt
             ) {
                 $vote = new Vote();
                 $vote->source = 'duel';
@@ -203,6 +212,7 @@ class VoteController extends Controller
                 $vote->value = null;
                 $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
                 $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
+                $vote->created_at = $occurredAt;
                 $vote->save();
 
                 VoteWeightLog::create([
@@ -221,16 +231,22 @@ class VoteController extends Controller
                     'confidence_weight_applied' => $confidenceWeight,
                 ]);
 
-                $ratingService->applyVote($winnerId, $loserId, $attribute->id, $ratingWeight, $confidenceWeight);
+                $applyResult = $applyVoteEventToRatingsAction->executeDuel(
+                    attributeId: $attribute->id,
+                    winnerId: $winnerId,
+                    loserId: $loserId,
+                    ratingWeight: $ratingWeight,
+                    confidenceWeight: $confidenceWeight,
+                    occurredAt: $occurredAt,
+                );
 
-                $afterRows = PlayerAttributeRating::query()
-                    ->where('attribute_id', $attribute->id)
-                    ->whereIn('player_id', [$playerA, $playerB])
-                    ->get()
-                    ->keyBy('player_id');
-
-                $afterA = (float) ($afterRows[$playerA]->rating ?? $beforeA);
-                $afterB = (float) ($afterRows[$playerB]->rating ?? $beforeB);
+                if ($winnerId === $playerA) {
+                    $afterA = (float) $applyResult['winner']['post_rating'];
+                    $afterB = (float) $applyResult['loser']['post_rating'];
+                } else {
+                    $afterA = (float) $applyResult['loser']['post_rating'];
+                    $afterB = (float) $applyResult['winner']['post_rating'];
+                }
 
                 $vote->post_rating_a = number_format($afterA, 3, '.', '');
                 $vote->post_rating_b = number_format($afterB, 3, '.', '');

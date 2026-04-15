@@ -2,6 +2,7 @@
 
 namespace App\Actions\Votes;
 
+use App\Actions\ApplyVoteEventToRatingsAction;
 use App\Models\Attribute;
 use App\Models\Duel;
 use App\Models\Player;
@@ -29,7 +30,7 @@ final class SubmitDuelVote
     private const ROLE_FACTOR_DEFAULT = 1.0;
 
     public function __construct(
-        private readonly RatingService $ratingService = new RatingService(),
+        private readonly ApplyVoteEventToRatingsAction $applyVoteEventToRatingsAction = new ApplyVoteEventToRatingsAction(new RatingService()),
     ) {
     }
 
@@ -114,6 +115,8 @@ final class SubmitDuelVote
             * $activityFactor
             * $roleFactor;
 
+        $occurredAt = now();
+
         $vote = null;
         $afterA = $beforeA;
         $afterB = $beforeB;
@@ -141,6 +144,7 @@ final class SubmitDuelVote
             $roleFactor,
             $ratingWeight,
             $confidenceWeight,
+            $occurredAt,
             &$vote,
             &$afterA,
             &$afterB
@@ -162,6 +166,7 @@ final class SubmitDuelVote
             $vote->value = null;
             $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
             $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
+            $vote->created_at = $occurredAt;
             $vote->save();
 
             VoteWeightLog::query()->create([
@@ -180,7 +185,14 @@ final class SubmitDuelVote
                 'confidence_weight_applied' => $confidenceWeight,
             ]);
 
-            $this->ratingService->applyVote($winnerId, $loserId, $attribute->id, $ratingWeight, $confidenceWeight);
+            $this->applyVoteEventToRatingsAction->executeDuel(
+                attributeId: $attribute->id,
+                winnerId: $winnerId,
+                loserId: $loserId,
+                ratingWeight: $ratingWeight,
+                confidenceWeight: $confidenceWeight,
+                occurredAt: $occurredAt,
+            );
 
             $afterRows = PlayerAttributeRating::query()
                 ->where('attribute_id', $attribute->id)
