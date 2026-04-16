@@ -119,30 +119,16 @@ class VoteController extends Controller
 
         $weightVersion = self::WEIGHT_VERSION;
         $ratingAlgorithmVersion = self::RATING_ALGORITHM_VERSION;
-        $baseDuelWeight = self::BASE_DUEL_WEIGHT;
-        $authFactor = $isAuthed ? self::AUTH_FACTOR_AUTHED : self::AUTH_FACTOR_ANON;
-        $trustRatingFactor = self::TRUST_RATING_FACTOR_DEFAULT;
-        $trustConfidenceFactor = $isAuthed ? self::TRUST_CONFIDENCE_FACTOR_AUTHED : self::TRUST_CONFIDENCE_FACTOR_ANON;
-        $integrityFactor = self::INTEGRITY_FACTOR_DEFAULT;
-        $biasFactor = self::BIAS_FACTOR_DEFAULT;
-        $activityFactor = self::ACTIVITY_FACTOR_DEFAULT;
-        $roleFactor = self::ROLE_FACTOR_DEFAULT;
+        /** @var \App\Support\VoteWeightResolver $voteWeightResolver */
+        $voteWeightResolver = app(\App\Support\VoteWeightResolver::class);
 
-        $ratingWeight = $baseDuelWeight
-            * $authFactor
-            * $trustRatingFactor
-            * $integrityFactor
-            * $biasFactor
-            * $activityFactor
-            * $roleFactor;
+        $weights = $voteWeightResolver->resolve(
+            isAnonymous: ! $isAuthed,
+            influenceProfile: $request->user()?->getAttribute('influence_profile'),
+        );
 
-        $confidenceWeight = $baseDuelWeight
-            * $authFactor
-            * $trustConfidenceFactor
-            * $integrityFactor
-            * $biasFactor
-            * $activityFactor
-            * $roleFactor;
+        $ratingWeight = $weights->ratingWeight;
+        $confidenceWeight = $weights->confidenceWeight;
 
         $anonId = trim((string) $request->header('X-Zcout-Anon'));
 
@@ -184,14 +170,6 @@ class VoteController extends Controller
                 $confidenceWeight,
                 $weightVersion,
                 $ratingAlgorithmVersion,
-                $baseDuelWeight,
-                $authFactor,
-                $trustRatingFactor,
-                $trustConfidenceFactor,
-                $integrityFactor,
-                $biasFactor,
-                $activityFactor,
-                $roleFactor,
                 $applyVoteEventToRatingsAction,
                 $occurredAt
             ) {
@@ -219,14 +197,7 @@ class VoteController extends Controller
                     'vote_id' => $vote->id,
                     'weight_version' => $weightVersion,
                     'rating_algorithm_version' => $ratingAlgorithmVersion,
-                    'base_duel_weight' => $baseDuelWeight,
-                    'auth_factor' => $authFactor,
-                    'trust_rating_factor' => $trustRatingFactor,
-                    'trust_confidence_factor' => $trustConfidenceFactor,
-                    'integrity_factor' => $integrityFactor,
-                    'bias_factor' => $biasFactor,
-                    'activity_factor' => $activityFactor,
-                    'role_factor' => $roleFactor,
+                    'base_duel_weight' => 1.0,
                     'rating_weight_applied' => $ratingWeight,
                     'confidence_weight_applied' => $confidenceWeight,
                 ]);

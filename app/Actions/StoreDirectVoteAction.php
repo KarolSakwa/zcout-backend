@@ -3,7 +3,9 @@
 namespace App\Actions;
 
 use App\Models\Attribute;
+use App\Models\User;
 use App\Models\Vote;
+use App\Support\VoteWeightResolver;
 use Illuminate\Support\Facades\DB;
 
 final class StoreDirectVoteAction
@@ -46,8 +48,18 @@ final class StoreDirectVoteAction
         }
 
         return DB::transaction(function () use ($data, $userId, $attribute) {
-            $weightApplied = 1.0;
-            $confidenceWeightApplied = 1.0;
+            $user = User::query()->findOrFail($userId);
+
+            /** @var VoteWeightResolver $voteWeightResolver */
+            $voteWeightResolver = app(VoteWeightResolver::class);
+
+            $weights = $voteWeightResolver->resolve(
+                isAnonymous: false,
+                influenceProfile: $user->getAttribute('influence_profile'),
+            );
+
+            $weightApplied = $weights->ratingWeight;
+            $confidenceWeightApplied = $weights->confidenceWeight;
             $occurredAt = now();
 
             $ratingResult = $this->applyVoteEventToRatingsAction->executeDirect(

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Enums\InfluenceProfile;
+use App\Enums\UserRole;
+use App\Support\ValidateUserAccessCombination;
 
 class User extends Authenticatable
 {
@@ -42,4 +44,24 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'role' => UserRole::class,
+            'influence_profile' => InfluenceProfile::class,
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $user): void {
+            app(ValidateUserAccessCombination::class)->validate(
+                $user->role,
+                $user->influence_profile,
+            );
+        });
+    }
 }
