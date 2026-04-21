@@ -1,0 +1,39 @@
+services:
+  app:
+    image: zcout-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8080:8000"
+    depends_on:
+      - pgsql
+      - soketi
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  pgsql:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgsql_data_prod:/var/lib/postgresql/data
+
+  soketi:
+    image: quay.io/soketi/soketi:latest-16-alpine
+    restart: unless-stopped
+    environment:
+      SOKETI_DEBUG: "1"
+      SOKETI_METRICS_SERVER_PORT: "9601"
+      SOKETI_DEFAULT_APP_ID: "zcout"
+      SOKETI_DEFAULT_APP_KEY: "zcout-key"
+      SOKETI_DEFAULT_APP_SECRET: "zcout-secret"
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+
+volumes:
+  pgsql_data_prod:
