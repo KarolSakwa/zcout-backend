@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -42,10 +43,14 @@ class GoogleAuthController extends Controller
                 'password' => bcrypt(str()->random(32)),
                 'google_id' => $googleUser->getId(),
                 'avatar_url' => $googleUser->getAvatar(),
+                'role' => UserRole::USER,
             ]);
         } else {
             $user->google_id = $user->google_id ?: $googleUser->getId();
             $user->avatar_url = $googleUser->getAvatar();
+            if ($user->role === null) {
+                $user->role = UserRole::USER;
+            }
             $user->save();
         }
 
