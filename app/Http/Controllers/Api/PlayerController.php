@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\Player;
 use App\Models\PlayerAttributeRating;
+use App\Support\RadarAxesBuilder;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -211,7 +212,8 @@ class PlayerController extends Controller
         }
 
         $overallConfidence = (float) min(100.0, round($totalConfidenceWeight, 2));
-        $radarAxes = $this->buildRadarAxesPayload($posCode, $payloadAttrs);
+
+        $radarAxes = RadarAxesBuilder::build($posCode, $payloadAttrs);
         $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
         $overallTrend7d = $this->computeOverallTrendDeltaFromPayload($posCode, $payloadAttrs);
 
@@ -245,24 +247,49 @@ class PlayerController extends Controller
 
     private function buildRadarAxesPayload(string $posCode, array $payloadAttrs): array
     {
-        $axisConfigKey = $posCode === 'GK'
-            ? 'zcout_attributes.gk_axes'
-            : 'zcout_attributes.outfield_axes';
+        $axes = $posCode === 'GK'
+            ? config('zcout_attributes.gk_axes')
+            : config('zcout_attributes.outfield_axes');
+
+        $attributeAxisCount = [];
+
+        foreach ($axes as $attributes) {
+            foreach ($attributes as $attr) {
+                if (!isset($attributeAxisCount[$attr])) {
+                    $attributeAxisCount[$attr] = 0;
+                }
+                $attributeAxisCount[$attr]++;
+            }
+        }
 
         $ratingsByKey = collect($payloadAttrs)
             ->mapWithKeys(fn (array $attr) => [
                 (string) $attr['key'] => (float) $attr['rating'],
             ]);
 
-        return collect(config($axisConfigKey, []))
-            ->map(function (array $attributeKeys, string $key) use ($ratingsByKey) {
-                $values = collect($attributeKeys)
-                    ->map(fn (string $attributeKey) => $ratingsByKey->get($attributeKey))
-                    ->filter(fn ($value) => is_numeric($value))
-                    ->values();
+        return collect($axes)
+            ->map(function (array $attributeKeys, string $key) use ($ratingsByKey, $attributeAxisCount) {
 
-                $value = $values->isNotEmpty()
-                    ? round((float) $values->avg(), 1)
+                $weightedSum = 0.0;
+                $weightSum = 0.0;
+
+                foreach ($attributeKeys as $attributeKey) {
+                    $raw = $ratingsByKey->get($attributeKey);
+
+                    if (!is_numeric($raw)) {
+                        continue;
+                    }
+
+                    $count = $attributeAxisCount[$attributeKey] ?? 1;
+
+                    $weight = 1 / $count;
+
+                    $weightedSum += ((float) $raw) * $weight;
+                    $weightSum += $weight;
+                }
+
+                $value = $weightSum > 0
+                    ? round($weightedSum / $weightSum, 1)
                     : 0.0;
 
                 return [

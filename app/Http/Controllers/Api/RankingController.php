@@ -8,6 +8,7 @@ use App\Models\Player;
 use App\Models\PlayerAttributeRating;
 use App\Models\Position;
 use App\Support\OverallConfig;
+use App\Support\RadarAxesBuilder;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -317,7 +318,7 @@ class RankingController extends Controller
                 $totalConfidenceWeight += $confidenceWeightSum;
             }
 
-            $radarAxes = $this->buildRadarAxesPayload($pos, $payloadAttrs);
+            $radarAxes = RadarAxesBuilder::build($pos, $payloadAttrs);
             $overall = OverallConfig::overallFromRadarAxes($pos, $radarAxes);
 
             $items[] = [
@@ -378,10 +379,10 @@ class RankingController extends Controller
         }
 
         if ($search !== '') {
-            $needle = mb_strtolower($search);
+            $needle = $this->normalizeSearchText($search);
 
             $items = array_values(array_filter($items, function (array $item) use ($needle) {
-                $name = mb_strtolower((string) ($item['player']['name'] ?? ''));
+                $name = $this->normalizeSearchText((string) ($item['player']['name'] ?? ''));
 
                 return str_contains($name, $needle);
             }));
@@ -569,5 +570,13 @@ class RankingController extends Controller
         }
 
         return round($weightedSum / $weightSum, 3);
+    }
+
+    private function normalizeSearchText(string $value): string
+    {
+        $value = mb_strtolower(trim($value));
+        $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+
+        return $converted !== false ? $converted : $value;
     }
 }

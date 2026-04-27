@@ -2,20 +2,14 @@
 
 namespace App\Simulation\Actions;
 
+use App\Actions\ApplyVoteEventToRatingsAction;
 use App\Http\Controllers\Api\VoteController;
-use App\Services\RatingService;
 use App\Simulation\Data\SimulatedDuelVote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 final class SubmitSimulatedDuelVoteToApp
 {
-    public function __construct(
-        private readonly VoteController $voteController = new VoteController(),
-        private readonly RatingService $ratingService = new RatingService(),
-    ) {
-    }
-
     public function handle(SimulatedDuelVote $vote): int
     {
         if ($vote->decisionType !== 'vote' || $vote->winnerPlayerId === null) {
@@ -40,7 +34,10 @@ final class SubmitSimulatedDuelVoteToApp
 
         app()->instance('request', $request);
 
-        $response = $this->voteController->store($request, $this->ratingService);
+        $response = app(VoteController::class)->store(
+            $request,
+            app(ApplyVoteEventToRatingsAction::class)
+        );
 
         Auth::forgetGuards();
 

@@ -44,19 +44,12 @@ class OverallConfig
 
     public static function resolvedAxisWeightsForPosition(?string $position): array
     {
-        $cfg = self::forPosition($position);
-        $axisWeights = $cfg['axis_weights'] ?? [];
-        $weights = $cfg['weights'] ?? [];
+        $axisWeights = self::axisWeightsForArchetype(self::archetypeForPosition($position));
 
-        $resolved = [];
-
-        foreach ($axisWeights as $axis => $level) {
-            if (isset($weights[$level])) {
-                $resolved[$axis] = $weights[$level];
-            }
-        }
-
-        return $resolved;
+        return collect($axisWeights)
+            ->filter(fn ($w) => is_numeric($w))
+            ->map(fn ($w) => (float) $w)
+            ->all();
     }
 
     public static function overallFromRadarAxes(?string $position, array $radarAxes): ?float
@@ -87,6 +80,22 @@ class OverallConfig
             return null;
         }
 
-        return round($weightedSum / $weightSum, 2);
+        return round($weightedSum, 2);
+    }
+
+    private static function buildAttributeAxisCountMap(array $axes): array
+    {
+        $map = [];
+
+        foreach ($axes as $attributes) {
+            foreach ($attributes as $attr) {
+                if (!isset($map[$attr])) {
+                    $map[$attr] = 0;
+                }
+                $map[$attr]++;
+            }
+        }
+
+        return $map;
     }
 }

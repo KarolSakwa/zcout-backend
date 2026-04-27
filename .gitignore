@@ -26,3 +26,4 @@ pl_players_snapshot.json
 img.png
 
 cookies_next.txt
+.env.production.backend.private
