@@ -478,6 +478,10 @@ class VoteController extends Controller
 
     private function payload(Request $request): array
     {
+        if (strlen((string) $request->getContent()) > 8192) {
+            abort(response()->json(['message' => 'Payload too large.'], 413));
+        }
+
         $json = $request->json()->all();
         if (is_array($json) && count($json) > 0) {
             return $json;

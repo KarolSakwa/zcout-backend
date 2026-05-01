@@ -11,6 +11,10 @@ class EventLogController extends Controller
 {
     public function store(Request $request)
     {
+        if (strlen((string) $request->getContent()) > 8192) {
+            return response()->json(['message' => 'Payload too large.'], 413);
+        }
+
         $data = $request->validate([
             'event_type' => ['required', 'string', 'max:64'],
             'payload' => ['nullable', 'array'],

@@ -25,7 +25,6 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::post('/players', [PlayerController::class, 'store']);
 Route::get('/players/{player}', [PlayerController::class, 'show']);
 
 Route::get('/attributes', [AttributeController::class, 'index']);
@@ -34,7 +33,6 @@ Route::get('/attributes/{key}/ranking', [AttributeRankingController::class, 'ind
 Route::get('/duels/next', [DuelController::class, 'next']);
 
 Route::post('/votes', [VoteController::class, 'store']);
-Route::post('/votes/direct', [VoteController::class, 'storeDirect']);
 
 Route::get('/rankings/meta', [RankingController::class, 'meta']);
 Route::get('/rankings/{attributeKey}', [RankingController::class, 'attribute']);
