@@ -163,58 +163,45 @@ class LiveFeedController extends Controller
                 default => now()->subDays(7),
             };
 
-            $rows = DB::table('votes as v')
-                ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
-                ->where('v.created_at', '>=', $since)
-                ->whereNotNull('v.pre_rating_a')
-                ->whereNotNull('v.post_rating_a')
-                ->get([
-                    'v.attribute_id',
-                    'v.player_a_id',
-                    'v.player_b_id',
-                    'v.pre_rating_a',
-                    'v.post_rating_a',
-                    'v.pre_rating_b',
-                    'v.post_rating_b',
-                    'a.key as attribute_key',
-                    'a.label as attribute_label',
-                ]);
+            $baseRows = DB::query()
+            ->fromSub(function ($query) use ($since) {
+                $query->from('votes as v')
+                    ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
+                    ->where('v.created_at', '>=', $since)
+                    ->whereNotNull('v.pre_rating_a')
+                    ->whereNotNull('v.post_rating_a')
+                    ->whereNotNull('v.pre_rating_b')
+                    ->whereNotNull('v.post_rating_b')
+                    ->selectRaw('v.player_a_id as player_id, v.attribute_id, a.key as attribute_key, a.label as attribute_label, (v.post_rating_a::numeric - v.pre_rating_a::numeric) as delta_value')
+                    ->unionAll(
+                        DB::table('votes as v')
+                            ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
+                            ->where('v.created_at', '>=', $since)
+                            ->whereNotNull('v.pre_rating_a')
+                            ->whereNotNull('v.post_rating_a')
+                            ->whereNotNull('v.pre_rating_b')
+                            ->whereNotNull('v.post_rating_b')
+                            ->selectRaw('v.player_b_id as player_id, v.attribute_id, a.key as attribute_key, a.label as attribute_label, (v.post_rating_b::numeric - v.pre_rating_b::numeric) as delta_value')
+                    );
+            }, 'movers')
+            ->selectRaw('player_id as "playerId", attribute_id as "attributeId", attribute_key as "attributeKey", attribute_label as "attributeLabel", SUM(delta_value) as "deltaValue"')
+            ->groupBy('player_id', 'attribute_id', 'attribute_key', 'attribute_label');
 
-            $aggregated = [];
+            $risersRaw = (clone $baseRows)
+                ->havingRaw('SUM(delta_value) > 0')
+                ->orderByDesc('deltaValue')
+                ->limit($limit)
+                ->get()
+                ->map(fn ($row) => (array) $row)
+                ->all();
 
-            foreach ($rows as $row) {
-                $deltaA = (float) $row->post_rating_a - (float) $row->pre_rating_a;
-                $deltaB = (float) $row->post_rating_b - (float) $row->pre_rating_b;
-
-                $keyA = (int) $row->player_a_id . ':' . (int) $row->attribute_id;
-                $keyB = (int) $row->player_b_id . ':' . (int) $row->attribute_id;
-
-                if (!isset($aggregated[$keyA])) {
-                    $aggregated[$keyA] = [
-                        'playerId' => (int) $row->player_a_id,
-                        'attributeId' => (int) $row->attribute_id,
-                        'attributeKey' => (string) $row->attribute_key,
-                        'attributeLabel' => (string) $row->attribute_label,
-                        'deltaValue' => 0.0,
-                    ];
-                }
-
-                if (!isset($aggregated[$keyB])) {
-                    $aggregated[$keyB] = [
-                        'playerId' => (int) $row->player_b_id,
-                        'attributeId' => (int) $row->attribute_id,
-                        'attributeKey' => (string) $row->attribute_key,
-                        'attributeLabel' => (string) $row->attribute_label,
-                        'deltaValue' => 0.0,
-                    ];
-                }
-
-                $aggregated[$keyA]['deltaValue'] += $deltaA;
-                $aggregated[$keyB]['deltaValue'] += $deltaB;
-            }
-
-            $risersRaw = $this->pickTopMovers($aggregated, 'risers', $limit);
-            $fallersRaw = $this->pickTopMovers($aggregated, 'fallers', $limit);
+            $fallersRaw = (clone $baseRows)
+                ->havingRaw('SUM(delta_value) < 0')
+                ->orderBy('deltaValue')
+                ->limit($limit)
+                ->get()
+                ->map(fn ($row) => (array) $row)
+                ->all();
 
             $playerIds = array_values(array_unique(array_merge(
                 array_column($risersRaw, 'playerId'),

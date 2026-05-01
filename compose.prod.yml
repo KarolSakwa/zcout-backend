@@ -20,7 +20,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - pgsql_data_prod:/var/lib/postgresql/data
+      - pgsql_data_prod:/var/lib/postgresql
 
   soketi:
     image: quay.io/soketi/soketi:latest-16-alpine
