@@ -120,6 +120,27 @@ This allows tuning the system without relying on real production traffic.
 
 ---
 
+# External Integrations
+
+Zcout integrates with external football data providers for player metadata, club information and bootstrapping workflows.
+
+Current integrations include:
+
+- Fantasy Premier League API
+- Football-Data.org
+- Sportmonks
+
+These integrations are used for:
+
+- player metadata synchronization,
+- club and competition data,
+- initial seeding/bootstrap workflows,
+- normalization pipelines.
+
+Core player ratings, rankings and attribute evolution are generated internally by the Zcout system itself.
+
+---
+
 # Project Structure
 
 ```text
