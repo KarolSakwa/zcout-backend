@@ -1,0 +1,33 @@
+1. UFW:
+   - default deny incoming
+   - default deny outgoing
+
+2. Docker:
+   - iptables -I DOCKER-USER -j DROP
+
+3. Ports:
+   - wszystko tylko 127.0.0.1
+
+4. Nginx:
+   - jedyny publiczny entrypoint
+
+5. Soketi:
+   - localhost only / najlepiej off na start
+
+6. Frontend:
+   - next start (prod)
+
+7. Node:
+   - brak zbędnych binarek
+
+8. Deploy:
+   - fresh build --no-cache
+
+9. Kontenery:
+   - NIE jako root
+
+10. Filesystem:
+   - read-only + tmpfs
+
+11. Build:
+   - .dockerignore
