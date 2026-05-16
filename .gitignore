@@ -6,8 +6,6 @@
 /storage/*.key
 /vendor
 .env
-.env.backup
-.env.production
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
@@ -18,12 +16,22 @@ BACKLOG.md
 /.fleet
 /.idea
 /.vscode
+database/seed-baselines/*backup*.json
+database/seed-baselines/*snapshot*.json
+.env
+.env.*
+!.env.example
 
-cookies.txt
-cookies_auth.txt
+cookies*.txt
+*.dump
+*.sql
+
 payload.json
 pl_players_snapshot.json
 img.png
 
-cookies_next.txt
 .env.production.backend.private
+zcout_env_backup.txt
+zcout-secure-checklist.txt
+compose.simulation.yaml
+
