@@ -10,10 +10,10 @@ class CountriesIso2Seeder extends Seeder
     public function run(): void
     {
         $map = [
-            'ENGLAND' => 'GB',
-            'SCOTLAND' => 'GB',
-            'WALES' => 'GB',
-            'NORTHERN IRELAND' => 'GB',
+            'ENGLAND' => 'ENG',
+            'SCOTLAND' => 'SCO',
+            'WALES' => 'WAL',
+            'NORTHERN IRELAND' => 'NIR',
 
             'SPAIN' => 'ES',
             'FRANCE' => 'FR',
