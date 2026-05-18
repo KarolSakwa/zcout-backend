@@ -41,6 +41,45 @@ Architecture highlights:
 
 ---
 
+# Infrastructure & Deployment
+
+Production infrastructure is separated from application repositories.
+
+Zcout uses:
+
+- dedicated infrastructure repository,
+- Docker-based runtime environment,
+- GitHub Actions CI pipelines,
+- GitHub Container Registry (GHCR),
+- artifact-based deployments,
+- isolated Docker networking,
+- automated healthchecks and backup workflows.
+
+Frontend and backend images are built in GitHub Actions and pushed to GHCR.
+
+The production VPS acts as a runtime-only environment:
+
+- no frontend builds on production,
+- no Composer installs on production,
+- no npm installs on production.
+
+Deployment flow:
+
+```text
+git push
+    ↓
+GitHub Actions
+    ↓
+Docker image build
+    ↓
+GHCR push
+    ↓
+VPS image pull
+    ↓
+Docker Compose deployment
+```
+---
+
 # Product Philosophy
 
 Zcout is designed around a simple gameplay loop:
