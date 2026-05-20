@@ -44,6 +44,7 @@ class VoteController extends Controller
             'player_a_id' => ['required', 'integer'],
             'player_b_id' => ['required', 'integer', 'different:player_a_id'],
             'winner_id' => ['required', 'integer'],
+            'duel_id' => ['required', 'integer'],
         ]);
 
         if ($v->fails()) {
@@ -64,8 +65,14 @@ class VoteController extends Controller
             return response()->json(['message' => 'Attribute not found.'], 404);
         }
 
-        $reqA = (int) $data['player_a_id'];
-        $reqB = (int) $data['player_b_id'];
+        $duel = Duel::query()->find((int) $data['duel_id']);
+
+        if (!$duel) {
+            return response()->json(['message' => 'Duel not found.'], 404);
+        }
+
+        $reqA = (int) $duel->player_a_id;
+        $reqB = (int) $duel->player_b_id;
         $winnerId = (int) $data['winner_id'];
 
         if ($winnerId !== $reqA && $winnerId !== $reqB) {
@@ -102,11 +109,7 @@ class VoteController extends Controller
         $beforeA = (float) ($beforeRows[$playerA]->rating ?? Seed::for($posA, $attribute->key));
         $beforeB = (float) ($beforeRows[$playerB]->rating ?? Seed::for($posB, $attribute->key));
 
-        $duel = Duel::firstOrCreate([
-            'attribute_id' => $attribute->id,
-            'player_a_id' => $playerA,
-            'player_b_id' => $playerB,
-        ]);
+        $duel = Duel::query()->find((int) $data['duel_id']);
 
         $loserId = $winnerId === $reqA ? $reqB : $reqA;
 
