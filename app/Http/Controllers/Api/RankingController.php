@@ -7,6 +7,7 @@ use App\Models\Attribute;
 use App\Models\Player;
 use App\Models\PlayerAttributeRating;
 use App\Models\Position;
+use App\Support\OverallConfidence;
 use App\Support\OverallConfig;
 use App\Support\RadarAxesBuilder;
 use App\Support\Seed;
@@ -302,24 +303,22 @@ class RankingController extends Controller
             $playerRows = $rowsByPlayer->get($p->id, collect())->keyBy('attribute_id');
 
             $payloadAttrs = [];
-            $totalConfidenceWeight = 0.0;
 
             foreach ($attributes as $attr) {
                 $row = $playerRows->get($attr->id);
 
                 $rating = $row ? (float) $row->rating : (float) Seed::for($pos, $attr->key);
-                $confidenceWeightSum = $row ? (float) ($row->confidence_weight_sum ?? 0) : 0.0;
 
                 $payloadAttrs[] = [
                     'key' => (string) $attr->key,
                     'rating' => (float) $rating,
+                    'confidence' => (float) ($row?->confidence ?? 0),
                 ];
-
-                $totalConfidenceWeight += $confidenceWeightSum;
             }
 
             $radarAxes = RadarAxesBuilder::build($pos, $payloadAttrs);
             $overall = OverallConfig::overallFromRadarAxes($pos, $radarAxes);
+            $overallConfidence = OverallConfidence::fromAttributePayload($payloadAttrs);
 
             $items[] = [
                 'player' => [
@@ -332,7 +331,7 @@ class RankingController extends Controller
                 ],
                 'pos' => $pos,
                 'rating' => (float) round((float) ($overall ?? 0), 3),
-                'confidence' => (float) min(100.0, round($totalConfidenceWeight, 2)),
+                'confidence' => $overallConfidence,
                 'last_vote_at' => null,
                 'trend_7d' => $this->computeOverallTrendDelta($pos, $attributeDeltaByPlayer[$p->id] ?? []),
             ];

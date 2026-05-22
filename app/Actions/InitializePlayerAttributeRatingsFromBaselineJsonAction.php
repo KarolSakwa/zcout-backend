@@ -95,9 +95,9 @@ final class InitializePlayerAttributeRatingsFromBaselineJsonAction
                     'attribute_id' => (int) $attribute->id,
                     'rating' => round($rating, 3),
                     'votes_count' => 0,
-                    'rating_weight_sum' => 0,
-                    'confidence_weight_sum' => 0,
-                    'confidence' => 0,
+                    'rating_weight_sum' => config('rating.baseline.confidence_weight_sum'),
+                    'confidence_weight_sum' => config('rating.baseline.confidence_weight_sum'),
+                    'confidence' => config('rating.baseline.confidence'),
                     'last_vote_at' => null,
                 ];
 

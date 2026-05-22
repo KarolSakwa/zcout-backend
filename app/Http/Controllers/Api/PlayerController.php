@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Support\OverallConfig;
 use App\Models\Vote;
+use App\Support\OverallConfidence;
 
 class PlayerController extends Controller
 {
@@ -177,7 +178,6 @@ class PlayerController extends Controller
         }
 
         $payloadAttrs = [];
-        $totalConfidenceWeight = 0.0;
 
         foreach ($attributes as $attr) {
             $row = $rows->get($attr->id);
@@ -207,11 +207,9 @@ class PlayerController extends Controller
                     ? round((float) $attributeDeltasByKey[(string) $attr->key], 3)
                     : null,
             ];
-
-            $totalConfidenceWeight += $confidenceWeightSum;
         }
 
-        $overallConfidence = (float) min(100.0, round($totalConfidenceWeight, 2));
+        $overallConfidence = OverallConfidence::fromAttributePayload($payloadAttrs);
 
         $radarAxes = RadarAxesBuilder::build($posCode, $payloadAttrs);
         $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
