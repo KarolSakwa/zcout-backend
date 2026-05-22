@@ -8,6 +8,7 @@ final class SimulatedDuelVote
         public readonly string $simulatedUserId,
         public readonly bool $isLogged,
         public readonly ?int $appUserId,
+        public readonly int $duelId,
         public readonly int $playerAId,
         public readonly int $playerBId,
         public readonly string $playerAName,

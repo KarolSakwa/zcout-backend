@@ -58,6 +58,7 @@ final class ProcessSimulatedDuelDecision
             simulatedUserId: $user->id,
             isLogged: $user->isLogged,
             appUserId: $user->appUserId,
+            duelId: (int) $opportunity->payload['duel_id'],
             playerAId: (int) $opportunity->payload['player_a_id'],
             playerBId: (int) $opportunity->payload['player_b_id'],
             playerAName: (string) ($opportunity->payload['player_a_name'] ?? ''),

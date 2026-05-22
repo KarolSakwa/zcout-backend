@@ -32,9 +32,9 @@ final class InitializeSimulationStateFromTruthSnapshot
                         'attribute_id' => $attributeId,
                         'rating' => round((float) $row->truth_rating, 3),
                         'votes_count' => 0,
-                        'rating_weight_sum' => 0,
-                        'confidence_weight_sum' => 0,
-                        'confidence' => 0,
+                        'rating_weight_sum' => config('rating.baseline.rating_weight_sum'),
+                        'confidence_weight_sum' => config('rating.baseline.confidence_weight_sum'),
+                        'confidence' => config('rating.baseline.confidence'),
                         'last_vote_at' => null,
                     ];
                 }

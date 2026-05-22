@@ -17,6 +17,10 @@ final class MaterializeSimulatedDuelVote
     {
         $statusCode = $this->appVoteSubmitter->handle($vote);
 
+        logger()->info('SIM STATUS', [
+            'status' => $statusCode,
+        ]);
+
         if ($statusCode === 409) {
             return 409;
         }

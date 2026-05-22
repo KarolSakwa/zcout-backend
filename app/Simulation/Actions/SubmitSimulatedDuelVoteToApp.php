@@ -17,6 +17,7 @@ final class SubmitSimulatedDuelVoteToApp
         }
 
         $body = json_encode([
+            'duel_id' => $vote->duelId,
             'attribute_key' => $vote->attributeKey,
             'player_a_id' => $vote->playerAId,
             'player_b_id' => $vote->playerBId,
@@ -40,6 +41,11 @@ final class SubmitSimulatedDuelVoteToApp
         );
 
         Auth::forgetGuards();
+
+        logger()->info('SIM RESPONSE', [
+            'status' => $response->getStatusCode(),
+            'content' => $response->getContent(),
+        ]);
 
         return $response->getStatusCode();
     }

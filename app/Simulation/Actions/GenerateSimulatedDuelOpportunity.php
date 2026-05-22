@@ -65,6 +65,7 @@ final class GenerateSimulatedDuelOpportunity
             source: 'duel',
             type: 'pair',
             payload: [
+                'duel_id' => (int) ($payload['duel_id'] ?? 0),
                 'player_a_id' => $playerAId,
                 'player_b_id' => $playerBId,
                 'player_a_name' => (string) ($players[0]['name'] ?? ''),
