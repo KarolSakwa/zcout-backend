@@ -84,9 +84,19 @@ final class InitializePlayerAttributeRatingsFromBaselineJsonAction
 
                 if (array_key_exists($mapKey, $jsonRatings)) {
                     $rating = $jsonRatings[$mapKey];
+
+                    $ratingWeightSum = config('rating.baseline.confidence_weight_sum');
+                    $confidenceWeightSum = config('rating.baseline.confidence_weight_sum');
+                    $confidence = config('rating.baseline.confidence');
+
                     $baselineJsonCount++;
                 } else {
                     $rating = (float) Seed::for($position, $attribute->key);
+
+                    $ratingWeightSum = 0;
+                    $confidenceWeightSum = 0;
+                    $confidence = 0;
+
                     $seedFallbackCount++;
                 }
 
@@ -95,9 +105,9 @@ final class InitializePlayerAttributeRatingsFromBaselineJsonAction
                     'attribute_id' => (int) $attribute->id,
                     'rating' => round($rating, 3),
                     'votes_count' => 0,
-                    'rating_weight_sum' => config('rating.baseline.confidence_weight_sum'),
-                    'confidence_weight_sum' => config('rating.baseline.confidence_weight_sum'),
-                    'confidence' => config('rating.baseline.confidence'),
+                    'rating_weight_sum' => $ratingWeightSum,
+                    'confidence_weight_sum' => $confidenceWeightSum,
+                    'confidence' => $confidence,
                     'last_vote_at' => null,
                 ];
 
