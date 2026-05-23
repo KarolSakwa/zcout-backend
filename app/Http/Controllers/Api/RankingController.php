@@ -235,9 +235,14 @@ class RankingController extends Controller
 
     private function overall(Collection $players, string $position, int $limit, int $page, string $sort, string $dir, string $search = '')
     {
+        $attributeKeys = collect($position === 'GK'
+            ? config('zcout_attributes.gk', [])
+            : config('zcout_attributes.outfield', [])
+        )->pluck('key');
+
         $attributes = Attribute::query()
             ->select('id', 'key', 'label', 'group')
-            ->orderBy('key')
+            ->whereIn('key', $attributeKeys)
             ->get();
 
         $rowsByPlayer = PlayerAttributeRating::query()
@@ -318,7 +323,13 @@ class RankingController extends Controller
 
             $radarAxes = RadarAxesBuilder::build($pos, $payloadAttrs);
             $overall = OverallConfig::overallFromRadarAxes($pos, $radarAxes);
+
+            logger()->info('RANKING ATTR COUNT', [
+                'player_id' => $p->id,
+                'count' => count($payloadAttrs),
+            ]);
             $overallConfidence = OverallConfidence::fromAttributePayload($payloadAttrs);
+
 
             $items[] = [
                 'player' => [

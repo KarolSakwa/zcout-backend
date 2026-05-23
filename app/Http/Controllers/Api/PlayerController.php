@@ -209,6 +209,12 @@ class PlayerController extends Controller
             ];
         }
 
+
+        logger()->info('RANKING ATTR COUNT', [
+            'player_id' => $player->id,
+            'count' => count($payloadAttrs),
+        ]);
+
         $overallConfidence = OverallConfidence::fromAttributePayload($payloadAttrs);
 
         $radarAxes = RadarAxesBuilder::build($posCode, $payloadAttrs);
