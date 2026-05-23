@@ -59,6 +59,11 @@ final class RunSimulationSmokeTest extends Command
             $this->line("[run #{$runRecord->id}] {$message}");
         };
 
+        if ((string) $this->option('reset') === '1') {
+            $logPhase('resetting live state');
+            (new ResetSimulationState())->handle();
+        }
+
         if ($truthRunId !== null) {
             $logPhase("copying truth from run #{$truthRunId}");
             (new CopySimulationRunTruthFromExistingRun())->handle($truthRunId, $runRecord);
@@ -71,9 +76,6 @@ final class RunSimulationSmokeTest extends Command
         }
 
         if ((string) $this->option('reset') === '1') {
-            $logPhase('resetting live state');
-            (new ResetSimulationState())->handle();
-
             $logPhase('initializing live state from truth snapshot');
             (new InitializeSimulationStateFromTruthSnapshot())->handle($runRecord->id);
         }

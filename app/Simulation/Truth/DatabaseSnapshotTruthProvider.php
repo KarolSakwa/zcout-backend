@@ -52,9 +52,11 @@ final class DatabaseSnapshotTruthProvider implements TruthProvider
             foreach ($attributes as $attribute) {
                 $mapKey = (int) $player->id . '|' . (string) $attribute->key;
 
-                $truthRating = array_key_exists($mapKey, $existingMap)
-                    ? $existingMap[$mapKey]
-                    : (float) Seed::for($pos, $attribute->key);
+                if (! array_key_exists($mapKey, $existingMap)) {
+                    continue;
+                }
+
+                $truthRating = $existingMap[$mapKey];
 
                 $payload[] = [
                     'simulation_run_id' => $run->id,

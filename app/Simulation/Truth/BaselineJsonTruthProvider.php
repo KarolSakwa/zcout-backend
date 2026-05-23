@@ -86,8 +86,7 @@ final class BaselineJsonTruthProvider implements TruthProvider
                     $truthRating = $jsonRatings[$mapKey];
                     $sourceLabel = 'baseline_json';
                 } else {
-                    $truthRating = (float) Seed::for($position, $attribute->key);
-                    $sourceLabel = 'baseline_json_seed_fallback';
+                    continue;
                 }
 
                 $payload[] = [
