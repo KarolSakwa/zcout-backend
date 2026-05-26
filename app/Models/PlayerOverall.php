@@ -12,4 +12,9 @@ class PlayerOverall extends Model
         'overall',
         'confidence',
     ];
+
+    public function player()
+    {
+        return $this->belongsTo(Player::class);
+    }
 }

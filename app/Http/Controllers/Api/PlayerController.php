@@ -225,6 +225,38 @@ class PlayerController extends Controller
             : 0;
         $overallTrend7d = $this->computeOverallTrendDeltaFromPayload($posCode, $payloadAttrs);
 
+        $previousPlayer = PlayerOverall::query()
+            ->where('position', $posCode)
+            ->where(function ($query) use ($overall, $player) {
+                $query
+                    ->where('overall', '>', $overall)
+                    ->orWhere(function ($query) use ($overall, $player) {
+                        $query
+                            ->where('overall', $overall)
+                            ->where('player_id', '>', $player->id);
+                    });
+            })
+            ->orderBy('overall')
+            ->orderBy('player_id')
+            ->with('player:id,slug')
+            ->first();
+
+        $nextPlayer = PlayerOverall::query()
+            ->where('position', $posCode)
+            ->where(function ($query) use ($overall, $player) {
+                $query
+                    ->where('overall', '<', $overall)
+                    ->orWhere(function ($query) use ($overall, $player) {
+                        $query
+                            ->where('overall', $overall)
+                            ->where('player_id', '<', $player->id);
+                    });
+            })
+            ->orderByDesc('overall')
+            ->orderByDesc('player_id')
+            ->with('player:id,slug')
+            ->first();
+
         return response()->json([
             'id' => (int) $player->id,
             'name' => (string) $player->effective_name,
@@ -250,6 +282,8 @@ class PlayerController extends Controller
             'radar_axes' => $radarAxes,
             'attributes' => $payloadAttrs,
             'overall' => $overall,
+            'previous_player_slug' => $previousPlayer?->player?->slug,
+            'next_player_slug' => $nextPlayer?->player?->slug,
         ]);
     }
 
