@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\PlayerOverall;
 
 class RankingController extends Controller
 {
@@ -321,15 +322,13 @@ class RankingController extends Controller
                 ];
             }
 
-            $radarAxes = RadarAxesBuilder::build($pos, $payloadAttrs);
-            $overall = OverallConfig::overallFromRadarAxes($pos, $radarAxes);
+            $persistedOverall = PlayerOverall::query()
+                ->where('player_id', $p->id)
+                ->where('position', $pos)
+                ->first();
 
-            logger()->info('RANKING ATTR COUNT', [
-                'player_id' => $p->id,
-                'count' => count($payloadAttrs),
-            ]);
-            $overallConfidence = OverallConfidence::fromAttributePayload($payloadAttrs);
-
+            $overall = $persistedOverall?->overall;
+            $overallConfidence = $persistedOverall?->confidence ?? 0;
 
             $items[] = [
                 'player' => [

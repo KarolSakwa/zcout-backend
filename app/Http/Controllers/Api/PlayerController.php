@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use App\Support\OverallConfig;
 use App\Models\Vote;
 use App\Support\OverallConfidence;
+use App\Models\PlayerOverall;
 
 class PlayerController extends Controller
 {
@@ -209,16 +210,19 @@ class PlayerController extends Controller
             ];
         }
 
-
-        logger()->info('RANKING ATTR COUNT', [
-            'player_id' => $player->id,
-            'count' => count($payloadAttrs),
-        ]);
-
-        $overallConfidence = OverallConfidence::fromAttributePayload($payloadAttrs);
-
         $radarAxes = RadarAxesBuilder::build($posCode, $payloadAttrs);
-        $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
+        $persistedOverall = PlayerOverall::query()
+            ->where('player_id', $player->id)
+            ->where('position', $posCode)
+            ->first();
+
+        $overall = $persistedOverall
+            ? (float) $persistedOverall->overall
+            : null;
+
+        $overallConfidence = $persistedOverall
+            ? (float) $persistedOverall->confidence
+            : 0;
         $overallTrend7d = $this->computeOverallTrendDeltaFromPayload($posCode, $payloadAttrs);
 
         return response()->json([

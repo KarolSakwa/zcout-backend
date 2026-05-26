@@ -11,6 +11,7 @@ use App\Support\OverallConfig;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\PlayerOverall;
 
 class SearchController extends Controller
 {
@@ -139,7 +140,14 @@ class SearchController extends Controller
                     ->values()
                     ->all();
 
-                $overall = OverallConfig::overallFromRadarAxes($posCode, $radarAxes);
+                $persistedOverall = PlayerOverall::query()
+                    ->where('player_id', $pid)
+                    ->where('position', $posCode)
+                    ->first();
+
+                $overall = $persistedOverall
+                    ? (float) $persistedOverall->overall
+                    : null;
 
                 return [
                     'id' => $pid,

@@ -9,11 +9,13 @@ use App\Services\RatingService;
 use App\Support\Seed;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 final class ApplyVoteEventToRatingsAction
 {
     public function __construct(
         private readonly RatingService $ratingService,
+        private readonly RecalculatePlayerOverallAction $recalculatePlayerOverallAction,
     ) {
     }
 
@@ -93,6 +95,9 @@ final class ApplyVoteEventToRatingsAction
             occurredAt: $voteAt,
         );
 
+        $this->recalculatePlayerOverallAction->execute($winnerPlayer);
+        $this->recalculatePlayerOverallAction->execute($loserPlayer);
+
         return [
             'winner_seed_pos' => $winnerPos,
             'loser_seed_pos' => $loserPos,
@@ -161,6 +166,8 @@ final class ApplyVoteEventToRatingsAction
             confidenceWeight: $confidenceWeight,
             occurredAt: $voteAt,
         );
+
+        $this->recalculatePlayerOverallAction->execute($player);
 
         return [
             'player_seed_pos' => $posCode,

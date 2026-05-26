@@ -42,11 +42,6 @@ final class SubmitSimulatedDuelVoteToApp
 
         Auth::forgetGuards();
 
-        logger()->info('SIM RESPONSE', [
-            'status' => $response->getStatusCode(),
-            'content' => $response->getContent(),
-        ]);
-
         return $response->getStatusCode();
     }
 }

@@ -187,6 +187,8 @@ final class RebuildRatingsFromBaseline extends Command
             $this->error('Rebuild failed: ' . $e->getMessage());
             report($e);
 
+            $this->call('zcout:recalculate-player-overalls');
+
             return self::FAILURE;
         }
     }

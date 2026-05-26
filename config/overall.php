@@ -1,7 +1,7 @@
 <?php
 
 return array (
-  'position_to_archetype' => 
+  'position_to_archetype' =>
   array (
     'GK' => 'GK',
     'RB' => 'FULL_BACK',
@@ -19,9 +19,9 @@ return array (
     'MID' => 'CM',
     'ATT' => 'ST',
   ),
-  'archetype_axis_weights' => 
+  'archetype_axis_weights' =>
   array (
-    'ST' => 
+    'ST' =>
     array (
       'ATTACK' => 0.3052,
       'PACE' => 0.2289,
@@ -32,7 +32,7 @@ return array (
       'PASSING' => 0.0545,
       'DEFENCE' => 0.0545,
     ),
-    'WINGER' => 
+    'WINGER' =>
     array (
       'PACE' => 0.2616,
       'TECHNIQUE' => 0.2071,
@@ -43,7 +43,7 @@ return array (
       'DEFENCE' => 0.0545,
       'AERIAL' => 0.0327,
     ),
-    'AM' => 
+    'AM' =>
     array (
       'ATTACK' => 0.2398,
       'TECHNIQUE' => 0.218,
@@ -54,7 +54,7 @@ return array (
       'DEFENCE' => 0.0436,
       'AERIAL' => 0.0436,
     ),
-    'CM' => 
+    'CM' =>
     array (
       'PASSING' => 0.2398,
       'TECHNIQUE' => 0.1962,
@@ -65,7 +65,7 @@ return array (
       'PACE' => 0.0545,
       'AERIAL' => 0.0545,
     ),
-    'DM' => 
+    'DM' =>
     array (
       'DEFENCE' => 0.2398,
       'MENTALITY' => 0.1962,
@@ -76,7 +76,7 @@ return array (
       'PACE' => 0.0545,
       'ATTACK' => 0.0545,
     ),
-    'FULL_BACK' => 
+    'FULL_BACK' =>
     array (
       'DEFENCE' => 0.2398,
       'PACE' => 0.218,
@@ -87,7 +87,7 @@ return array (
       'ATTACK' => 0.0545,
       'AERIAL' => 0.0545,
     ),
-    'CB' => 
+    'CB' =>
     array (
       'DEFENCE' => 0.2725,
       'PHYSICALITY' => 0.218,
@@ -98,7 +98,7 @@ return array (
       'TECHNIQUE' => 0.0545,
       'ATTACK' => 0.0545,
     ),
-    'GK' => 
+    'GK' =>
     array (
       'SHOT_STOPPING' => 0.330656,
       'AERIAL' => 0.187572,
@@ -108,6 +108,13 @@ return array (
       'PHYSICALITY' => 0.062524,
       'PACE' => 0.041683,
       'ECCENTRICITY' => 0.0,
+//        'SHOT_STOPPING' => 0.42,
+//        'AERIAL' => 0.16,
+//        'RUSHING_OUT' => 0.12,
+//        'DISTRIBUTION' => 0.10,
+//        'MENTALITY' => 0.10,
+//        'PHYSICALITY' => 0.06,
+//        'PACE' => 0.04,
     ),
   ),
 );
