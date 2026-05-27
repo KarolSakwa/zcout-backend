@@ -282,8 +282,8 @@ class PlayerController extends Controller
             'radar_axes' => $radarAxes,
             'attributes' => $payloadAttrs,
             'overall' => $overall,
-            'previous_player_slug' => $previousPlayer?->player?->slug,
-            'next_player_slug' => $nextPlayer?->player?->slug,
+            'previous_player_id' => $previousPlayer?->player_id,
+            'next_player_id' => $nextPlayer?->player_id,
         ]);
     }
 
