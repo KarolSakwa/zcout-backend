@@ -226,7 +226,6 @@ class PlayerController extends Controller
         $overallTrend7d = $this->computeOverallTrendDeltaFromPayload($posCode, $payloadAttrs);
 
         $previousPlayer = PlayerOverall::query()
-            ->where('position', $posCode)
             ->where(function ($query) use ($overall, $player) {
                 $query
                     ->where('overall', '>', $overall)
@@ -242,7 +241,6 @@ class PlayerController extends Controller
             ->first();
 
         $nextPlayer = PlayerOverall::query()
-            ->where('position', $posCode)
             ->where(function ($query) use ($overall, $player) {
                 $query
                     ->where('overall', '<', $overall)
