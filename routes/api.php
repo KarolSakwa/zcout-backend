@@ -26,6 +26,7 @@ Route::get('/health', function () {
 });
 
 Route::prefix('players')->group(function () {
+    Route::get('/featured', [PlayerController::class, 'featured']);
     Route::get('/{player}', [PlayerController::class, 'show']);
 
     Route::middleware('auth:sanctum')->group(function () {

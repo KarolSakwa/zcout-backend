@@ -327,8 +327,13 @@ class RankingController extends Controller
                 ->where('position', $pos)
                 ->first();
 
-            $overall = $persistedOverall?->overall;
-            $overallConfidence = $persistedOverall?->confidence ?? 0;
+            $overall = $persistedOverall
+                ? (float) $persistedOverall->overall
+                : null;
+
+            $overallConfidence = $persistedOverall
+                ? (float) $persistedOverall->confidence
+                : 0;
 
             $items[] = [
                 'player' => [

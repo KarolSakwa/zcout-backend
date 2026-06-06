@@ -31,7 +31,31 @@ class PlayerController extends Controller
         return response()->json(['id' => $player->id], 201);
     }
 
-    public function show(Player $player)
+    public function featured()
+    {
+        $player = Player::query()
+            ->join('player_reputation_stats as prs', 'prs.player_id', '=', 'players.id')
+            ->where('prs.tier', 'A')
+            ->inRandomOrder()
+            ->select('players.*')
+            ->firstOrFail();
+
+        $overall = PlayerOverall::query()
+            ->where('player_id', $player->id)
+            ->first();
+
+        $rank = null;
+
+        if ($overall) {
+            $rank = PlayerOverall::query()
+                    ->where('overall', '>', $overall->overall)
+                    ->count() + 1;
+        }
+
+        return $this->show($player, $rank);
+    }
+
+    public function show(Player $player, ?int $rank = null)
     {
         $player = Player::query()
             ->select(
@@ -282,6 +306,7 @@ class PlayerController extends Controller
             'overall' => $overall,
             'previous_player_id' => $previousPlayer?->player_id,
             'next_player_id' => $nextPlayer?->player_id,
+            'rank' => $rank,
         ]);
     }
 
