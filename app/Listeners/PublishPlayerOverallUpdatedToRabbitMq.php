@@ -22,6 +22,10 @@ class PublishPlayerOverallUpdatedToRabbitMq
      */
     public function handle(PlayerOverallUpdated $event): void
     {
-        Log::info('PlayerOverallUpdated listener fired');
+        Log::info('PlayerOverallUpdated listener fired', [
+            'player_id' => $event->playerId,
+            'overall' => $event->overall,
+            'confidence' => $event->confidence,
+        ]);
     }
 }

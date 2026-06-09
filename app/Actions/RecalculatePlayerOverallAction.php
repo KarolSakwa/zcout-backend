@@ -10,6 +10,7 @@ use App\Support\OverallConfidence;
 use App\Support\OverallConfig;
 use App\Support\RadarAxesBuilder;
 use App\Support\Seed;
+use App\Events\PlayerOverallUpdated;
 
 class RecalculatePlayerOverallAction
 {
@@ -65,5 +66,11 @@ class RecalculatePlayerOverallAction
                 'confidence' => round((float) $confidence, 2),
             ]
         );
+
+        event(new PlayerOverallUpdated(
+            playerId: $player->id,
+            overall: round((float) ($overall ?? 0), 2),
+            confidence: round((float) $confidence, 2),
+        ));
     }
 }
