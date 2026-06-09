@@ -3,6 +3,7 @@
 namespace App\Services\RabbitMq;
 
 use PhpAmqpLib\Message\AMQPMessage;
+use Illuminate\Support\Facades\Log;
 
 class RabbitMqPublisher
 {
@@ -38,6 +39,11 @@ class RabbitMqPublisher
             exchange: $exchange,
             routing_key: $routingKey,
         );
+
+        Log::info('RabbitMQ publish executed', [
+            'exchange' => $exchange,
+            'routing_key' => $routingKey,
+        ]);
 
         $channel->close();
         $connection->close();
