@@ -69,6 +69,15 @@ services:
         - '9601:9601'
       networks:
         - sail
+
+    rabbitmq:
+      image: rabbitmq:4-management
+      ports:
+        - "5672:5672"
+        - "15672:15672"
+      networks:
+        - sail
+
 networks:
     sail:
         driver: bridge
