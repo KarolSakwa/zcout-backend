@@ -12,6 +12,7 @@
         "laravel/socialite": "^5.24",
         "laravel/tinker": "^2.8",
         "php-amqplib/php-amqplib": "3.7",
+        "predis/predis": "^3.5",
         "pusher/pusher-php-server": "^7.2"
     },
     "require-dev": {

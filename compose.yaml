@@ -78,6 +78,13 @@ services:
       networks:
         - sail
 
+    redis:
+      image: redis:8-alpine
+      ports:
+        - "6379:6379"
+      networks:
+        - sail
+
 networks:
     sail:
         driver: bridge

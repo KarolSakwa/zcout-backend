@@ -2,52 +2,63 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Services\RabbitMq\RabbitMqConnection;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Redis;
 use PhpAmqpLib\Message\AMQPMessage;
 
 class ConsumeRankingProjectionQueueCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'app:consume-ranking-projection-queue-command';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Command description';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(RabbitMqConnection $rabbitMqConnection): int
     {
         $connection = $rabbitMqConnection->create();
 
         $channel = $connection->channel();
 
-        $message = $channel->basic_get('ranking.projections');
+        $channel->basic_qos(
+            0,
+            1,
+            false,
+        );
 
-        if (!$message instanceof AMQPMessage) {
-            $this->info('Queue is empty');
+        $this->info('Waiting for messages...');
 
-            $channel->close();
-            $connection->close();
+        $channel->basic_consume(
+            'ranking.projections',
+            '',
+            false,
+            false,
+            false,
+            false,
+            function (AMQPMessage $message) {
+                $this->info($message->getBody());
 
-            return self::SUCCESS;
+                $payload = json_decode(
+                    $message->getBody(),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR,
+                );
+
+                Redis::zadd(
+                    'ranking:overall',
+                    (float) $payload['overall'],
+                    (string) $payload['player_id'],
+                );
+
+                $message->ack();
+
+                $this->info('Message processed');
+            }
+        );
+
+        while ($channel->is_consuming()) {
+            $channel->wait();
         }
-
-        $this->info($message->getBody());
-
-        $channel->basic_ack($message->getDeliveryTag());
-
-        $channel->close();
-        $connection->close();
 
         return self::SUCCESS;
     }
