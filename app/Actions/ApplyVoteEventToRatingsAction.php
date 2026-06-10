@@ -10,6 +10,7 @@ use App\Support\Seed;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
 use RuntimeException;
+use App\Events\PlayerAttributeRatingUpdated;
 
 final class ApplyVoteEventToRatingsAction
 {
@@ -87,6 +88,13 @@ final class ApplyVoteEventToRatingsAction
             occurredAt: $voteAt,
         );
 
+        event(new PlayerAttributeRatingUpdated(
+            playerId: $winnerId,
+            attributeKey: $attribute->key,
+            rating: $afterWinner,
+            confidence: (float) $winnerRow->confidence,
+        ));
+
         $this->persistRow(
             row: $loserRow,
             afterRating: $afterLoser,
@@ -94,6 +102,13 @@ final class ApplyVoteEventToRatingsAction
             confidenceWeight: $confidenceWeight,
             occurredAt: $voteAt,
         );
+
+        event(new PlayerAttributeRatingUpdated(
+            playerId: $loserId,
+            attributeKey: $attribute->key,
+            rating: $afterLoser,
+            confidence: (float) $loserRow->confidence,
+        ));
 
         $this->recalculatePlayerOverallAction->execute($winnerPlayer);
         $this->recalculatePlayerOverallAction->execute($loserPlayer);
@@ -166,6 +181,13 @@ final class ApplyVoteEventToRatingsAction
             confidenceWeight: $confidenceWeight,
             occurredAt: $voteAt,
         );
+
+        event(new PlayerAttributeRatingUpdated(
+            playerId: $playerId,
+            attributeKey: $attribute->key,
+            rating: $afterRating,
+            confidence: (float) $row->confidence,
+        ));
 
         $this->recalculatePlayerOverallAction->execute($player);
 

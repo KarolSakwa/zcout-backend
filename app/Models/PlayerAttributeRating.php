@@ -19,6 +19,11 @@ class PlayerAttributeRating extends Model
         'last_vote_at',
     ];
 
+    public function attribute()
+    {
+        return $this->belongsTo(Attribute::class);
+    }
+
     protected function casts(): array
     {
         return [
