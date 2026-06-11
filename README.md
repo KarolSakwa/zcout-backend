@@ -38,6 +38,38 @@ Architecture highlights:
 - Materialized state for fast reads
 - Domain-oriented matchmaking layer
 - Simulation-based tuning workflow
+- Event-driven ranking projections (RabbitMQ + Redis)
+
+### Event-Driven Projections
+
+Zcout uses asynchronous projection pipelines for ranking generation.
+
+Player rating updates emit domain events which are published to RabbitMQ.
+
+Dedicated projection consumers process these events and maintain Redis sorted sets used for fast ranking lookups.
+
+Flow:
+
+```text
+Vote / Scout Report
+        ↓
+Domain Event
+        ↓
+RabbitMQ
+        ↓
+Projection Consumers
+        ↓
+Redis Sorted Sets
+        ↓
+Fast Rank Queries
+```
+
+Current projections:
+
+- Overall player rankings
+- Attribute-specific rankings (Pace, Dribbling, Passing, etc.)
+
+Redis projections can be rebuilt at any time from PostgreSQL source-of-truth data using dedicated rebuild commands.
 
 ---
 
