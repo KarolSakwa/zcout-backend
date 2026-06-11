@@ -35,7 +35,11 @@ class VoteController extends Controller
     private const ACTIVITY_FACTOR_DEFAULT = 1.0;
     private const ROLE_FACTOR_DEFAULT = 1.0;
 
-    public function store(Request $request, ApplyVoteEventToRatingsAction $applyVoteEventToRatingsAction)
+    public function store(
+        Request $request,
+        ApplyVoteEventToRatingsAction $applyVoteEventToRatingsAction,
+        \App\Services\Ranking\AttributeRankingService $attributeRankingService,
+    )
     {
         $payload = $this->payload($request);
 
@@ -290,6 +294,11 @@ class VoteController extends Controller
             $afterRow = $afterRows[$pid] ?? null;
             $after = (float) ($afterRow?->rating ?? $before);
 
+            $badgeData = $attributeRankingService->getBadgeData(
+                $attribute->key,
+                (int) $pid,
+            );
+
             $playersPayload[] = [
                 'id' => (int) $pid,
                 'rating_before' => $before,
@@ -300,6 +309,8 @@ class VoteController extends Controller
                 'confidence_weight_sum' => (float) ($afterRow?->confidence_weight_sum ?? 0),
                 'confidence' => (float) ($afterRow?->confidence ?? 0),
                 'last_vote_at' => $afterRow?->last_vote_at,
+                'attribute_rank' => $badgeData['rank'],
+                'is_top_ten' => $badgeData['is_top_ten'],
             ];
         }
 
