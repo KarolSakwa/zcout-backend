@@ -105,4 +105,9 @@ class Player extends Model
             ?? $this->fdPositionRef?->label
             ?? $this->positionRef?->label);
     }
+
+    public function archetype()
+    {
+        return $this->hasOne(PlayerArchetype::class);
+    }
 }
