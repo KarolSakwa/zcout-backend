@@ -60,42 +60,58 @@ class GeneratePlayerArchetypesCommand extends Command
                 continue;
             }
 
-            $inputSnapshot = $buildInputSnapshot->execute($player);
+            try {
+                $inputSnapshot = $buildInputSnapshot->execute($player);
 
-            if (!$inputSnapshot) {
-                $this->warn($player->id . ' | ' . $player->effective_name . ' | SKIP (insufficient data)');
-                continue;
-            }
+                if (!$inputSnapshot) {
+                    $this->warn($player->id . ' | ' . $player->effective_name . ' | SKIP (insufficient data)');
+                    continue;
+                }
 
-            $prompt = $buildPrompt->execute($inputSnapshot);
+                $prompt = $buildPrompt->execute($inputSnapshot);
 
-            $label = $llmClient->generate(
-                $prompt['system'],
-                $prompt['user'],
-            );
-
-            $label = $validateLabel->execute($label, $player);
-
-            if (!$this->option('dry-run')) {
-                PlayerArchetype::updateOrCreate(
-                    [
-                        'player_id' => $player->id,
-                        'language' => 'en',
-                    ],
-                    [
-                        'label' => $label,
-                        'fingerprint_hash' => $fingerprint['hash'],
-                        'fingerprint_payload' => $fingerprint['payload'],
-                        'input_snapshot' => $inputSnapshot,
-                        'prompt_version' => 'player_archetype_v1',
-                        'model' => config('services.openai.player_archetype_model'),
-                        'generated_at' => now(),
-                        'last_error' => null,
-                    ]
+                $label = $llmClient->generate(
+                    $prompt['system'],
+                    $prompt['user'],
                 );
+
+                $label = $validateLabel->execute($label, $player);
+
+                if (!$this->option('dry-run')) {
+                    PlayerArchetype::updateOrCreate(
+                        [
+                            'player_id' => $player->id,
+                            'language' => 'en',
+                        ],
+                        [
+                            'label' => $label,
+                            'fingerprint_hash' => $fingerprint['hash'],
+                            'fingerprint_payload' => $fingerprint['payload'],
+                            'input_snapshot' => $inputSnapshot,
+                            'prompt_version' => 'player_archetype_v1',
+                            'model' => config('services.openai.player_archetype_model'),
+                            'generated_at' => now(),
+                            'last_error' => null,
+                        ]
+                    );
+                }
+
+                $this->info($player->id . ' | ' . $player->effective_name . ' | LABEL: ' . $label);
+            } catch (\Throwable $e) {
+                if (!$this->option('dry-run')) {
+                    PlayerArchetype::updateOrCreate(
+                        [
+                            'player_id' => $player->id,
+                            'language' => 'en',
+                        ],
+                        [
+                            'last_error' => $e->getMessage(),
+                        ]
+                    );
+                }
+                $this->error($player->id . ' | ' . $player->effective_name . ' | ERROR: ' . $e->getMessage());
             }
 
-            $this->info($player->id . ' | ' . $player->effective_name . ' | LABEL: ' . $label);
         }
 
         return self::SUCCESS;
