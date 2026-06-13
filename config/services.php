@@ -36,4 +36,9 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'player_archetype_model' => env('OPENAI_PLAYER_ARCHETYPE_MODEL', 'gpt-4o-mini'),
+    ],
 ];
