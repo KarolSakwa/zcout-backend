@@ -14,7 +14,7 @@ use App\Services\LlmPlayerArchetypeClient;
 
 class GeneratePlayerArchetypesCommand extends Command
 {
-    protected $signature = 'zcout:generate-player-archetypes {--player-id=} {--limit=10} {--force} {--dry-run}';
+    protected $signature = 'zcout:generate-player-archetypes {--player-id=} {--from-id=} {--to-id=} {--limit=10} {--force} {--dry-run}';
 
     protected $description = 'Generate AI scouting archetype labels for players';
 
@@ -32,6 +32,16 @@ class GeneratePlayerArchetypesCommand extends Command
         if ($this->option('player-id')) {
             $query->where('id', $this->option('player-id'));
         }
+
+        if ($this->option('from-id')) {
+            $query->where('id', '>=', (int) $this->option('from-id'));
+        }
+
+        if ($this->option('to-id')) {
+            $query->where('id', '<=', (int) $this->option('to-id'));
+        }
+
+        $query->orderBy('id');
 
         $players = $query->limit((int) $this->option('limit'))->get();
 

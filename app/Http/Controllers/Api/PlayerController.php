@@ -80,6 +80,7 @@ class PlayerController extends Controller
                 'positionRef:id,short_label',
                 'fdPositionRef:id,short_label,key,label',
                 'manualPositionRef:id,short_label,key,label',
+                'archetype:id,player_id,label',
             ])
             ->whereKey($player->id)
             ->firstOrFail();
@@ -283,6 +284,9 @@ class PlayerController extends Controller
             'id' => (int) $player->id,
             'name' => (string) $player->effective_name,
             'slug' => $player->slug,
+            'archetype' => $player->archetype ? [
+                'label' => $player->archetype->label,
+            ] : null,
             'number' => $player->effective_number,
             'date_of_birth' => $player->date_of_birth,
             'position' => $player->effective_position_short,
