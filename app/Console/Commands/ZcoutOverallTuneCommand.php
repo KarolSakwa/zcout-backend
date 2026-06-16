@@ -12,6 +12,7 @@ class ZcoutOverallTuneCommand extends Command
     protected $signature = 'zcout:overall-tune';
 
     protected $description = 'Tune overall weights';
+    protected int $playersNum = 200;
 
     public function handle(): int
     {
@@ -22,7 +23,7 @@ class ZcoutOverallTuneCommand extends Command
 
         $beforeRows = $this->buildRows($players, $currentWeights);
 
-        $this->showGlobalTop('Global TOP 20 before', $beforeRows);
+        $this->showGlobalTop('Global TOP ' . $this->playersNum . ' before', $beforeRows);
 
         $outfieldCurrentSum = $this->avgOutfieldSum($currentWeights);
         $gkCurrentSum = array_sum($currentWeights['GK']);
@@ -39,7 +40,7 @@ class ZcoutOverallTuneCommand extends Command
 
         $afterRows = $this->buildRows($players, $newWeights);
 
-        $this->showGlobalComparison('Global TOP 20 before/after', $beforeRows, $afterRows);
+        $this->showGlobalComparison('Global TOP ' . $this->playersNum . ' before/after', $beforeRows, $afterRows);
 
         if ($this->confirm('Tune specific archetype distribution?', false)) {
             $archetype = $this->choice('Choose archetype', array_keys($newWeights));
@@ -48,7 +49,7 @@ class ZcoutOverallTuneCommand extends Command
 
             $afterRows = $this->buildRows($players, $newWeights);
 
-            $this->showGlobalComparison('Final Global TOP 20 before/after', $beforeRows, $afterRows);
+            $this->showGlobalComparison('Final Global TOP ' . $this->playersNum . ' before/after', $beforeRows, $afterRows);
         }
 
         if ($this->confirm('Write changes to config/overall.php?', false)) {
@@ -142,7 +143,7 @@ class ZcoutOverallTuneCommand extends Command
 
         $this->table(
             ['#', 'Player', 'Pos', 'Archetype', 'Overall'],
-            $rows->take(20)->values()->map(fn ($row, $i) => [
+            $rows->take($this->playersNum)->values()->map(fn ($row, $i) => [
                 $i + 1,
                 $row['name'],
                 $row['position'],
@@ -162,7 +163,7 @@ class ZcoutOverallTuneCommand extends Command
 
         $this->table(
             ['#', 'Player', 'Pos', 'Archetype', 'Before', 'After', 'Delta'],
-            $afterRows->take(20)->values()->map(function ($row, $i) use ($beforeById) {
+            $afterRows->take($this->playersNum)->values()->map(function ($row, $i) use ($beforeById) {
                 $before = $beforeById[$row['id']]['overall'] ?? null;
                 $after = $row['overall'];
 
