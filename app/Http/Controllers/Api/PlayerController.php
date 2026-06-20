@@ -6,17 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\Player;
 use App\Models\PlayerAttributeRating;
+use App\Services\Ranking\AttributeRankingService;
 use App\Support\RadarAxesBuilder;
 use App\Support\Seed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Support\OverallConfig;
 use App\Models\Vote;
-use App\Support\OverallConfidence;
 use App\Models\PlayerOverall;
 
 class PlayerController extends Controller
 {
+    public function __construct(
+        private readonly AttributeRankingService $attributeRankingService,
+    ) {
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -47,9 +52,10 @@ class PlayerController extends Controller
         $rank = null;
 
         if ($overall) {
-            $rank = PlayerOverall::query()
-                    ->where('overall', '>', $overall->overall)
-                    ->count() + 1;
+            $rank = $this->attributeRankingService->getRank(
+                'overall',
+                $player->id,
+            );
         }
 
         return $this->show($player, $rank);

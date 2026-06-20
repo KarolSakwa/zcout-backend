@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AttributeRankingController;
 use App\Http\Controllers\Api\DatabaseController;
 use App\Http\Controllers\Api\DuelController;
 use App\Http\Controllers\Api\EventLogController;
+use App\Http\Controllers\Api\HomepageController;
 use App\Http\Controllers\Api\LiveFeedController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\RankingController;
@@ -66,6 +67,10 @@ Route::prefix('live')->group(function () {
     Route::get('/recent-votes', [LiveFeedController::class, 'recentVotes']);
     Route::get('/top-movers', [LiveFeedController::class, 'topMovers']);
     Route::get('/top-movers-summary', [LiveFeedController::class, 'topMoversSummary']);
+});
+
+Route::prefix('homepage')->group(function () {
+    Route::get('/needs-more-ratings', [HomepageController::class, 'needsMoreRatings']);
 });
 
 Route::get('/search', [SearchController::class, 'index']);
