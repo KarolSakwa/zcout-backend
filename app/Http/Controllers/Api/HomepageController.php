@@ -32,6 +32,7 @@ class HomepageController extends Controller
                 DB::raw('COALESCE(p.manual_display_name, p.fd_name, p.name) as player_name'),
                 DB::raw('COALESCE(c.name, p.club) as club_name'),
                 DB::raw('COALESCE(manual_pos.short_label, fd_pos.short_label, pos.short_label) as position_short'),
+                'po.overall',
                 'po.confidence',
             ]);
 

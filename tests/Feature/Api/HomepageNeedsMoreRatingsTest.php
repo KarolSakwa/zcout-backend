@@ -121,6 +121,7 @@ class HomepageNeedsMoreRatingsTest extends TestCase
                         'slug',
                         'club',
                         'position',
+                        'overall',
                         'confidence',
                     ],
                 ],
@@ -130,6 +131,7 @@ class HomepageNeedsMoreRatingsTest extends TestCase
             ->assertJsonPath('items.0.slug', 'bukayo-saka')
             ->assertJsonPath('items.0.club', 'Arsenal')
             ->assertJsonPath('items.0.position', 'RW')
+            ->assertJsonPath('items.0.overall', 82.5)
             ->assertJsonPath('items.0.confidence', 8.5)
             ->assertJsonPath('items.1.playerId', $playerBId)
             ->assertJsonPath('items.1.slug', null)

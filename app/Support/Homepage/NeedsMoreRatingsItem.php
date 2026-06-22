@@ -13,6 +13,7 @@ class NeedsMoreRatingsItem
             'slug' => $row->player_slug ? (string) $row->player_slug : null,
             'club' => $row->club_name ? (string) $row->club_name : null,
             'position' => $row->position_short ? (string) $row->position_short : null,
+            'overall' => round((float) $row->overall, 2),
             'confidence' => round((float) $row->confidence, 2),
         ];
     }
