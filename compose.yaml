@@ -10,6 +10,7 @@ services:
             - 'host.docker.internal:host-gateway'
         ports:
           - "8080:80"
+
         environment:
             WWWUSER: '${WWWUSER}'
             LARAVEL_SAIL: 1
@@ -24,8 +25,10 @@ services:
             PUSHER_PORT: '6001'
             PUSHER_SCHEME: 'http'
             PUSHER_APP_CLUSTER: 'mt1'
+            PHP_IDE_CONFIG: 'serverName=0.0.0.0'
         volumes:
-            - '.:/var/www/html'
+          - '.:/var/www/html'
+          - './docker/php/xdebug.ini:/etc/php/8.5/cli/conf.d/99-xdebug-debug.ini:ro'
         networks:
             - sail
         depends_on:
