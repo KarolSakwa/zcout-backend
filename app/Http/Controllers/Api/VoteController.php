@@ -7,6 +7,8 @@ use App\Actions\StoreDirectVoteAction;
 use App\Actions\StoreDuelVoteAction;
 use App\Actions\SubmitScoutReportAction;
 use App\Http\Controllers\Controller;
+use App\Requests\StoreDirectVoteRequest;
+use App\Requests\StoreDuelVoteRequest;
 use App\Support\VoteRequestPayloadResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -15,62 +17,24 @@ use Illuminate\Support\Facades\Validator;
 class VoteController extends Controller
 {
     public function store(
-        Request $request,
-        VoteRequestPayloadResolver $voteRequestPayloadResolver,
+        StoreDuelVoteRequest $request,
         StoreDuelVoteAction $storeDuelVoteAction,
     ) {
-        $payload = $voteRequestPayloadResolver->resolve($request);
+        $validated = $request->validated();
 
-        $v = Validator::make($payload, [
-            'attribute_key' => ['required', 'string'],
-            'player_a_id' => ['required', 'integer'],
-            'player_b_id' => ['required', 'integer', 'different:player_a_id'],
-            'winner_id' => ['required', 'integer'],
-            'duel_id' => ['required', 'integer'],
-        ]);
-
-        if ($v->fails()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $v->errors(),
-            ], 422);
-        }
-
-        $result = $storeDuelVoteAction->execute($v->validated(), $request);
+        $result = $storeDuelVoteAction->execute($validated, $request);
 
         return response()->json($result['body'], $result['status']);
     }
 
     public function storeDirect(
-        Request $request,
-        VoteRequestPayloadResolver $voteRequestPayloadResolver,
+        StoreDirectVoteRequest $request,
         StoreDirectVoteAction $storeDirectVoteAction,
     ) {
-        $payload = $voteRequestPayloadResolver->resolve($request);
-
-        $v = Validator::make($payload, [
-            'attribute_key' => ['required', 'string'],
-            'player_id' => ['required', 'integer'],
-            'value' => ['required', 'integer', 'min:1', 'max:99'],
-        ]);
-
-        if ($v->fails()) {
-            Log::warning('direct_vote.validation_failed', [
-                'user_id' => auth()->id(),
-                'player_id' => $payload['player_id'] ?? null,
-                'attribute_key' => $payload['attribute_key'] ?? null,
-                'value' => $payload['value'] ?? null,
-                'errors' => $v->errors()->toArray(),
-            ]);
-
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $v->errors(),
-            ], 422);
-        }
+        $validated = $request->validated();
 
         $result = $storeDirectVoteAction->execute(
-            $v->validated(),
+            $validated,
             (int) auth()->id(),
         );
 
