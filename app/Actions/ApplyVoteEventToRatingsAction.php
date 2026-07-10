@@ -42,19 +42,32 @@ final class ApplyVoteEventToRatingsAction
         $winnerPos = $this->posCode($winnerPlayer);
         $loserPos = $this->posCode($loserPlayer);
 
-        $winnerRow = $this->firstOrCreateRatingRow(
-            playerId: $winnerId,
-            attributeId: $attribute->id,
-            attributeKey: $attribute->key,
-            posCode: $winnerPos,
-        );
+        $playerIds = [$winnerId, $loserId];
+        sort($playerIds);
 
-        $loserRow = $this->firstOrCreateRatingRow(
-            playerId: $loserId,
-            attributeId: $attribute->id,
-            attributeKey: $attribute->key,
-            posCode: $loserPos,
-        );
+        foreach ($playerIds as $playerId) {
+            $player = $players[$playerId] ?? null;
+
+            if ($player === null) {
+                throw new RuntimeException('Player not found for duel vote application.');
+            }
+
+            $this->firstOrCreateRatingRow(
+                playerId: $playerId,
+                attributeId: $attribute->id,
+                attributeKey: $attribute->key,
+                posCode: $this->posCode($player),
+            );
+        }
+
+        $lockedRows = $this->lockRatingRowsForPlayers($attribute->id, $playerIds);
+
+        if ($lockedRows->count() !== 2) {
+            throw new RuntimeException('Expected two locked rating rows for duel vote application.');
+        }
+
+        $winnerRow = $lockedRows[$winnerId];
+        $loserRow = $lockedRows[$loserId];
 
         $beforeWinner = (float) $winnerRow->rating;
         $beforeLoser = (float) $loserRow->rating;
@@ -265,6 +278,20 @@ final class ApplyVoteEventToRatingsAction
                 'last_vote_at' => null,
             ]
         );
+    }
+
+    /**
+     * @param  list<int>  $playerIds  Must already be sorted ascending by player_id.
+     */
+    private function lockRatingRowsForPlayers(int $attributeId, array $playerIds): \Illuminate\Support\Collection
+    {
+        return PlayerAttributeRating::query()
+            ->where('attribute_id', $attributeId)
+            ->whereIn('player_id', $playerIds)
+            ->orderBy('player_id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('player_id');
     }
 
     private function persistRow(

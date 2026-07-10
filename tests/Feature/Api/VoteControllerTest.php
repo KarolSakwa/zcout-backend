@@ -99,6 +99,65 @@ class VoteControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_duel_vote_rating_before_matches_vote_pre_rating_snapshot(): void
+    {
+        $fixture = $this->createDuelFixture();
+
+        $canonicalPlayerAId = min($fixture['player_a_id'], $fixture['player_b_id']);
+
+        DB::table('player_attribute_ratings')->insert([
+            [
+                'player_id' => $canonicalPlayerAId,
+                'attribute_id' => $fixture['attribute_id'],
+                'rating' => 85.24,
+                'votes_count' => 1,
+                'rating_weight_sum' => 1,
+                'confidence_weight_sum' => 1,
+                'confidence' => 1,
+                'last_vote_at' => now(),
+            ],
+            [
+                'player_id' => max($fixture['player_a_id'], $fixture['player_b_id']),
+                'attribute_id' => $fixture['attribute_id'],
+                'rating' => 68.0,
+                'votes_count' => 0,
+                'rating_weight_sum' => 0,
+                'confidence_weight_sum' => 0,
+                'confidence' => 0,
+                'last_vote_at' => null,
+            ],
+        ]);
+
+        $response = $this->postJson(
+            '/api/votes',
+            [
+                'attribute_key' => 'passing',
+                'player_a_id' => $fixture['player_a_id'],
+                'player_b_id' => $fixture['player_b_id'],
+                'winner_id' => $fixture['player_a_id'],
+                'duel_id' => $fixture['duel_id'],
+            ],
+            [
+                'X-Zcout-Anon' => 'vote-controller-pre-rating-anon',
+            ],
+        );
+
+        $response->assertOk();
+
+        $vote = DB::table('votes')->where('duel_id', $fixture['duel_id'])->first();
+        $winnerPlayerPayload = collect($response->json('players'))
+            ->firstWhere('id', $canonicalPlayerAId);
+
+        $this->assertNotNull($vote);
+        $this->assertNotNull($winnerPlayerPayload);
+        $this->assertEqualsWithDelta((float) $vote->pre_rating_a, $winnerPlayerPayload['rating_before'], 0.001);
+        $this->assertEqualsWithDelta(
+            $winnerPlayerPayload['rating_after'] - (float) $vote->pre_rating_a,
+            $winnerPlayerPayload['delta'],
+            0.001,
+        );
+    }
+
     public function test_store_duel_vote_returns_400_when_voter_id_missing(): void
     {
         $fixture = $this->createDuelFixture();

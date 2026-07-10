@@ -49,8 +49,6 @@ final class PersistDuelVoteAction
             $vote->reputation_at_vote = null;
             $vote->risk_score_at_vote = null;
             $vote->value = null;
-            $vote->pre_rating_a = number_format($context->ratingBeforeA, 3, '.', '');
-            $vote->pre_rating_b = number_format($context->ratingBeforeB, 3, '.', '');
             $vote->created_at = $occurredAt;
             $vote->save();
 
@@ -73,13 +71,19 @@ final class PersistDuelVoteAction
             );
 
             if ($context->winnerId === $context->canonicalPlayerAId) {
+                $ratingBeforeA = (float) $applyResult['winner']['pre_rating'];
+                $ratingBeforeB = (float) $applyResult['loser']['pre_rating'];
                 $ratingAfterA = (float) $applyResult['winner']['post_rating'];
                 $ratingAfterB = (float) $applyResult['loser']['post_rating'];
             } else {
+                $ratingBeforeA = (float) $applyResult['loser']['pre_rating'];
+                $ratingBeforeB = (float) $applyResult['winner']['pre_rating'];
                 $ratingAfterA = (float) $applyResult['loser']['post_rating'];
                 $ratingAfterB = (float) $applyResult['winner']['post_rating'];
             }
 
+            $vote->pre_rating_a = number_format($ratingBeforeA, 3, '.', '');
+            $vote->pre_rating_b = number_format($ratingBeforeB, 3, '.', '');
             $vote->post_rating_a = number_format($ratingAfterA, 3, '.', '');
             $vote->post_rating_b = number_format($ratingAfterB, 3, '.', '');
             $vote->save();

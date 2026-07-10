@@ -3,6 +3,7 @@
 namespace Tests\Unit\Actions;
 
 use App\Actions\PersistDuelVoteAction;
+use App\Actions\StoreDuelVoteAction;
 use App\Data\DuelVote\DuelVoteContext;
 use App\Data\DuelVote\VoterIdentity;
 use App\Models\Attribute;
@@ -14,6 +15,19 @@ use Tests\TestCase;
 class PersistDuelVoteActionTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mock(\App\Services\Ranking\AttributeRankingService::class, function ($mock): void {
+            $mock->shouldReceive('getBadgeData')
+                ->andReturn([
+                    'rank' => null,
+                    'is_top_ten' => false,
+                ]);
+        });
+    }
 
     public function test_it_persists_vote_and_vote_weight_log_in_transaction(): void
     {
@@ -74,6 +88,97 @@ class PersistDuelVoteActionTest extends TestCase
         $this->assertNotNull($result->vote->post_rating_b);
         $this->assertIsFloat($result->ratingAfterA);
         $this->assertIsFloat($result->ratingAfterB);
+    }
+
+    public function test_it_persists_pre_rating_from_apply_result_not_context(): void
+    {
+        $fixture = $this->createDuelFixture();
+
+        $canonicalPlayerAId = min($fixture['player_a_id'], $fixture['player_b_id']);
+        $canonicalPlayerBId = max($fixture['player_a_id'], $fixture['player_b_id']);
+
+        DB::table('player_attribute_ratings')->insert([
+            [
+                'player_id' => $canonicalPlayerAId,
+                'attribute_id' => $fixture['attribute_id'],
+                'rating' => 85.24,
+                'votes_count' => 1,
+                'rating_weight_sum' => 1,
+                'confidence_weight_sum' => 1,
+                'confidence' => 1,
+                'last_vote_at' => now(),
+            ],
+            [
+                'player_id' => $canonicalPlayerBId,
+                'attribute_id' => $fixture['attribute_id'],
+                'rating' => 68.0,
+                'votes_count' => 0,
+                'rating_weight_sum' => 0,
+                'confidence_weight_sum' => 0,
+                'confidence' => 0,
+                'last_vote_at' => null,
+            ],
+        ]);
+
+        $attribute = Attribute::query()->findOrFail($fixture['attribute_id']);
+        $duel = Duel::query()->findOrFail($fixture['duel_id']);
+
+        $context = new DuelVoteContext(
+            attribute: $attribute,
+            duel: $duel,
+            winnerId: $fixture['player_a_id'],
+            loserId: $fixture['player_b_id'],
+            canonicalPlayerAId: $canonicalPlayerAId,
+            canonicalPlayerBId: $canonicalPlayerBId,
+            duelPlayerAId: $fixture['player_a_id'],
+            duelPlayerBId: $fixture['player_b_id'],
+            ratingBeforeA: 85.20,
+            ratingBeforeB: 68.0,
+        );
+
+        $identity = new VoterIdentity(
+            userId: null,
+            isAuthenticated: false,
+            lockKeys: ['persist-test-pre-rating'],
+            lockKey: 'persist-test-pre-rating',
+            voterHash: hash_hmac('sha256', 'persist-test-pre-rating', (string) config('app.key')),
+        );
+
+        $result = app(PersistDuelVoteAction::class)->execute(
+            context: $context,
+            identity: $identity,
+            ratingWeight: 0.5,
+            confidenceWeight: 0.1,
+            occurredAt: now(),
+        );
+
+        $this->assertEqualsWithDelta(85.24, (float) $result->vote->pre_rating_a, 0.001);
+        $this->assertNotEqualsWithDelta(85.20, (float) $result->vote->pre_rating_a, 0.001);
+
+        $buildSuccessPayload = new \ReflectionMethod(StoreDuelVoteAction::class, 'buildSuccessPayload');
+        $buildSuccessPayload->setAccessible(true);
+
+        $payload = $buildSuccessPayload->invoke(
+            app(StoreDuelVoteAction::class),
+            $context,
+            $result,
+        );
+
+        $winnerPlayerPayload = collect($payload['players'])
+            ->firstWhere('id', $canonicalPlayerAId);
+
+        $this->assertNotNull($winnerPlayerPayload);
+        $this->assertEqualsWithDelta(85.24, $winnerPlayerPayload['rating_before'], 0.001);
+        $this->assertEqualsWithDelta(
+            $winnerPlayerPayload['rating_after'] - 85.24,
+            $winnerPlayerPayload['delta'],
+            0.001,
+        );
+        $this->assertNotEqualsWithDelta(
+            $winnerPlayerPayload['rating_after'] - 85.20,
+            $winnerPlayerPayload['delta'],
+            0.001,
+        );
     }
 
     /**

@@ -131,8 +131,8 @@ final class StoreDuelVoteAction
         $playersPayload = [];
         foreach ([$context->canonicalPlayerAId, $context->canonicalPlayerBId] as $playerId) {
             $before = $playerId === $context->canonicalPlayerAId
-                ? $context->ratingBeforeA
-                : $context->ratingBeforeB;
+                ? (float) $persisted->vote->pre_rating_a
+                : (float) $persisted->vote->pre_rating_b;
             $afterRow = $afterRows[$playerId] ?? null;
             $after = (float) ($afterRow?->rating ?? $before);
 
