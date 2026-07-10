@@ -4,8 +4,12 @@ namespace Tests\Feature\Api;
 
 use App\Enums\InfluenceProfile;
 use App\Enums\UserRole;
+use App\Events\RecentVoteCreated;
+use App\Events\TopMoversMaybeChanged;
 use App\Models\User;
+use App\Services\Ranking\AttributeRankingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -13,6 +17,21 @@ use Tests\TestCase;
 class VoteControllerTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Event::fake();
+
+        $this->mock(AttributeRankingService::class, function ($mock): void {
+            $mock->shouldReceive('getBadgeData')
+                ->andReturn([
+                    'rank' => null,
+                    'is_top_ten' => false,
+                ]);
+        });
+    }
 
     public function test_store_duel_vote_returns_expected_contract(): void
     {
@@ -107,8 +126,13 @@ class VoteControllerTest extends TestCase
 
         $response
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Validation failed.')
-            ->assertJsonStructure(['errors']);
+            ->assertJsonValidationErrors([
+                'attribute_key',
+                'player_a_id',
+                'player_b_id',
+                'winner_id',
+                'duel_id',
+            ]);
     }
 
     public function test_store_duel_vote_returns_404_when_attribute_not_found(): void
@@ -178,6 +202,28 @@ class VoteControllerTest extends TestCase
         $response
             ->assertStatus(422)
             ->assertJsonPath('message', 'winner_id must be one of the duel players.');
+    }
+
+    public function test_store_duel_vote_dispatches_post_vote_events(): void
+    {
+        $fixture = $this->createDuelFixture();
+
+        $this->postJson(
+            '/api/votes',
+            [
+                'attribute_key' => 'passing',
+                'player_a_id' => $fixture['player_a_id'],
+                'player_b_id' => $fixture['player_b_id'],
+                'winner_id' => $fixture['player_a_id'],
+                'duel_id' => $fixture['duel_id'],
+            ],
+            [
+                'X-Zcout-Anon' => 'vote-controller-events-1',
+            ],
+        )->assertOk();
+
+        Event::assertDispatched(RecentVoteCreated::class);
+        Event::assertDispatched(TopMoversMaybeChanged::class);
     }
 
     public function test_store_duel_vote_returns_409_on_duplicate_vote(): void
@@ -254,8 +300,11 @@ class VoteControllerTest extends TestCase
 
         $response
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Validation failed.')
-            ->assertJsonStructure(['errors']);
+            ->assertJsonValidationErrors([
+                'attribute_key',
+                'player_id',
+                'value',
+            ]);
     }
 
     public function test_store_direct_returns_409_when_vote_already_exists(): void

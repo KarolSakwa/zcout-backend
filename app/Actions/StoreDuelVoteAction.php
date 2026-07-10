@@ -2,17 +2,16 @@
 
 namespace App\Actions;
 
+use App\Data\ActionFailure;
+use App\Data\DuelVote\DuelVoteContext;
+use App\Data\DuelVote\PersistedDuelVoteResult;
+use App\Data\DuelVote\VoterIdentity;
 use App\Events\RecentVoteCreated;
 use App\Events\TopMoversMaybeChanged;
-use App\Models\Attribute;
-use App\Models\Duel;
-use App\Models\Player;
 use App\Models\PlayerAttributeRating;
 use App\Models\Vote;
-use App\Models\VoteWeightLog;
 use App\Services\Ranking\AttributeRankingService;
 use App\Support\Live\RecentVoteItem;
-use App\Support\Seed;
 use App\Support\VoteWeightResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -21,11 +20,10 @@ use Illuminate\Support\Facades\Log;
 
 final class StoreDuelVoteAction
 {
-    private const WEIGHT_VERSION = 1;
-    private const RATING_ALGORITHM_VERSION = 1;
-
     public function __construct(
-        private readonly ApplyVoteEventToRatingsAction $applyVoteEventToRatingsAction,
+        private readonly BuildDuelVoteContextAction $buildDuelVoteContextAction,
+        private readonly ResolveVoterIdentityAction $resolveVoterIdentityAction,
+        private readonly PersistDuelVoteAction $persistDuelVoteAction,
         private readonly AttributeRankingService $attributeRankingService,
         private readonly VoteWeightResolver $voteWeightResolver,
     ) {
@@ -33,64 +31,14 @@ final class StoreDuelVoteAction
 
     public function execute(array $data, Request $request): array
     {
-        $attribute = Attribute::query()
-            ->select('id', 'key')
-            ->where('key', $data['attribute_key'])
-            ->first();
+        $context = $this->buildDuelVoteContextAction->execute($data);
 
-        if (!$attribute) {
-            return $this->error(404, ['message' => 'Attribute not found.']);
+        if ($context instanceof ActionFailure) {
+            return $this->error(
+                $context->status,
+                ['message' => $context->message],
+            );
         }
-
-        $duel = Duel::query()->find((int) $data['duel_id']);
-
-        if (!$duel) {
-            return $this->error(404, ['message' => 'Duel not found.']);
-        }
-
-        $reqA = (int) $duel->player_a_id;
-        $reqB = (int) $duel->player_b_id;
-        $winnerId = (int) $data['winner_id'];
-
-        if ($winnerId !== $reqA && $winnerId !== $reqB) {
-            return $this->error(422, ['message' => 'winner_id must be one of the duel players.']);
-        }
-
-        $playerA = min($reqA, $reqB);
-        $playerB = max($reqA, $reqB);
-
-        $players = Player::query()
-            ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
-            ->with([
-                'positionRef:id,short_label',
-                'fdPositionRef:id,short_label,key,label',
-                'manualPositionRef:id,short_label,key,label',
-            ])
-            ->whereIn('id', [$playerA, $playerB])
-            ->get()
-            ->keyBy('id');
-
-        if (!isset($players[$playerA]) || !isset($players[$playerB])) {
-            return $this->error(404, ['message' => 'Player not found.']);
-        }
-
-        $posA = strtoupper((string) ($players[$playerA]->effective_position_short ?? ''));
-        $posB = strtoupper((string) ($players[$playerB]->effective_position_short ?? ''));
-
-        $beforeRows = PlayerAttributeRating::query()
-            ->where('attribute_id', $attribute->id)
-            ->whereIn('player_id', [$playerA, $playerB])
-            ->get()
-            ->keyBy('player_id');
-
-        $beforeA = (float) ($beforeRows[$playerA]->rating ?? Seed::for($posA, $attribute->key));
-        $beforeB = (float) ($beforeRows[$playerB]->rating ?? Seed::for($posB, $attribute->key));
-
-        $loserId = $winnerId === $reqA ? $reqB : $reqA;
-
-        $vote = null;
-        $afterA = $beforeA;
-        $afterB = $beforeB;
 
         $currentUserId = auth()->id();
         $isAuthed = $currentUserId !== null;
@@ -103,126 +51,37 @@ final class StoreDuelVoteAction
         $ratingWeight = $weights->ratingWeight;
         $confidenceWeight = $weights->confidenceWeight;
 
-        $anonId = trim((string) $request->header('X-Zcout-Anon'));
+        $identity = $this->resolveVoterIdentityAction->execute($request);
 
-        $lockKeys = [];
-        if ($anonId !== '') {
-            $lockKeys[] = $anonId;
-        }
-        if ($isAuthed) {
-            $lockKeys[] = 'user:' . $currentUserId;
-        }
-
-        $lockKey = $anonId !== '' ? $anonId : ($isAuthed ? ('user:' . $currentUserId) : null);
-
-        if (!$lockKey) {
-            return $this->error(400, ['message' => 'Missing voter id.']);
+        if ($identity instanceof ActionFailure) {
+            return $this->error(
+                $identity->status,
+                ['message' => $identity->message],
+            );
         }
 
-        $voterHash = hash_hmac('sha256', $lockKey, (string) config('app.key'));
         $occurredAt = now();
 
         try {
-            DB::transaction(function () use (
-                $attribute,
-                $duel,
-                $playerA,
-                $playerB,
-                $winnerId,
-                $loserId,
-                $beforeA,
-                $beforeB,
-                $voterHash,
-                &$vote,
-                &$afterA,
-                &$afterB,
-                $currentUserId,
-                $ratingWeight,
-                $confidenceWeight,
-                $occurredAt
-            ) {
-                $vote = new Vote();
-                $vote->source = 'duel';
-                $vote->attribute_id = $attribute->id;
-                $vote->duel_id = $duel->id;
-                $vote->player_a_id = $playerA;
-                $vote->player_b_id = $playerB;
-                $vote->winner_id = $winnerId;
-                $vote->user_id = $currentUserId;
-                $vote->voter_hash = $voterHash;
-                $vote->weight_applied = $ratingWeight;
-                $vote->confidence_weight_applied = $confidenceWeight;
-                $vote->weight_version = self::WEIGHT_VERSION;
-                $vote->reputation_at_vote = null;
-                $vote->risk_score_at_vote = null;
-                $vote->value = null;
-                $vote->pre_rating_a = number_format($beforeA, 3, '.', '');
-                $vote->pre_rating_b = number_format($beforeB, 3, '.', '');
-                $vote->created_at = $occurredAt;
-                $vote->save();
+            $persisted = $this->persistDuelVoteAction->execute(
+                context: $context,
+                identity: $identity,
+                ratingWeight: $ratingWeight,
+                confidenceWeight: $confidenceWeight,
+                occurredAt: $occurredAt,
+            );
 
-                VoteWeightLog::create([
-                    'vote_id' => $vote->id,
-                    'weight_version' => self::WEIGHT_VERSION,
-                    'rating_algorithm_version' => self::RATING_ALGORITHM_VERSION,
-                    'base_duel_weight' => 1.0,
-                    'rating_weight_applied' => $ratingWeight,
-                    'confidence_weight_applied' => $confidenceWeight,
-                ]);
+            $this->dispatchPostVoteEvents($persisted->vote);
 
-                $applyResult = $this->applyVoteEventToRatingsAction->executeDuel(
-                    attributeId: $attribute->id,
-                    winnerId: $winnerId,
-                    loserId: $loserId,
-                    ratingWeight: $ratingWeight,
-                    confidenceWeight: $confidenceWeight,
-                    occurredAt: $occurredAt,
-                );
-
-                if ($winnerId === $playerA) {
-                    $afterA = (float) $applyResult['winner']['post_rating'];
-                    $afterB = (float) $applyResult['loser']['post_rating'];
-                } else {
-                    $afterA = (float) $applyResult['loser']['post_rating'];
-                    $afterB = (float) $applyResult['winner']['post_rating'];
-                }
-
-                $vote->post_rating_a = number_format($afterA, 3, '.', '');
-                $vote->post_rating_b = number_format($afterB, 3, '.', '');
-                $vote->save();
-            });
-
-            $this->dispatchPostVoteEvents($vote);
-
-            DB::table('voter_duel_locks')->whereIn('voter_hash', $lockKeys)->delete();
+            DB::table('voter_duel_locks')->whereIn('voter_hash', $identity->lockKeys)->delete();
 
             return [
                 'ok' => true,
                 'status' => 200,
-                'body' => $this->buildSuccessPayload(
-                    vote: $vote,
-                    duel: $duel,
-                    attribute: $attribute,
-                    playerA: $playerA,
-                    playerB: $playerB,
-                    reqA: $reqA,
-                    reqB: $reqB,
-                    beforeA: $beforeA,
-                    beforeB: $beforeB,
-                ),
+                'body' => $this->buildSuccessPayload($context, $persisted),
             ];
         } catch (\Illuminate\Database\QueryException $e) {
-            return $this->handleDuplicateVoteException(
-                $e,
-                $lockKeys,
-                $duel,
-                $attribute,
-                $playerA,
-                $playerB,
-                $winnerId,
-                $currentUserId,
-                $voterHash,
-            );
+            return $this->handleDuplicateVoteException($e, $context, $identity);
         }
     }
 
@@ -260,35 +119,30 @@ final class StoreDuelVoteAction
     }
 
     private function buildSuccessPayload(
-        ?Vote $vote,
-        Duel $duel,
-        Attribute $attribute,
-        int $playerA,
-        int $playerB,
-        int $reqA,
-        int $reqB,
-        float $beforeA,
-        float $beforeB,
+        DuelVoteContext $context,
+        PersistedDuelVoteResult $persisted,
     ): array {
         $afterRows = PlayerAttributeRating::query()
-            ->where('attribute_id', $attribute->id)
-            ->whereIn('player_id', [$playerA, $playerB])
+            ->where('attribute_id', $context->attribute->id)
+            ->whereIn('player_id', [$context->canonicalPlayerAId, $context->canonicalPlayerBId])
             ->get()
             ->keyBy('player_id');
 
         $playersPayload = [];
-        foreach ([$playerA, $playerB] as $pid) {
-            $before = $pid === $playerA ? $beforeA : $beforeB;
-            $afterRow = $afterRows[$pid] ?? null;
+        foreach ([$context->canonicalPlayerAId, $context->canonicalPlayerBId] as $playerId) {
+            $before = $playerId === $context->canonicalPlayerAId
+                ? $context->ratingBeforeA
+                : $context->ratingBeforeB;
+            $afterRow = $afterRows[$playerId] ?? null;
             $after = (float) ($afterRow?->rating ?? $before);
 
             $badgeData = $this->attributeRankingService->getBadgeData(
-                $attribute->key,
-                (int) $pid,
+                $context->attribute->key,
+                (int) $playerId,
             );
 
             $playersPayload[] = [
-                'id' => (int) $pid,
+                'id' => (int) $playerId,
                 'rating_before' => $before,
                 'rating_after' => $after,
                 'delta' => $after - $before,
@@ -302,56 +156,50 @@ final class StoreDuelVoteAction
             ];
         }
 
-        $pop = DB::table('votes')
+        $popularity = DB::table('votes')
             ->select('winner_id', DB::raw('COUNT(*) as c'))
-            ->where('duel_id', $duel->id)
-            ->whereIn('winner_id', [$reqA, $reqB])
+            ->where('duel_id', $context->duel->id)
+            ->whereIn('winner_id', [$context->duelPlayerAId, $context->duelPlayerBId])
             ->groupBy('winner_id')
             ->pluck('c', 'winner_id');
 
-        $votesA = (int) ($pop[$reqA] ?? 0);
-        $votesB = (int) ($pop[$reqB] ?? 0);
+        $votesForDuelPlayerA = (int) ($popularity[$context->duelPlayerAId] ?? 0);
+        $votesForDuelPlayerB = (int) ($popularity[$context->duelPlayerBId] ?? 0);
 
         return [
-            'vote_id' => $vote?->id,
-            'duel_id' => $duel->id,
-            'attribute_id' => $attribute->id,
+            'vote_id' => $persisted->vote?->id,
+            'duel_id' => $context->duel->id,
+            'attribute_id' => $context->attribute->id,
             'players' => $playersPayload,
             'popularity' => [
-                'player_a_id' => $reqA,
-                'player_b_id' => $reqB,
-                'votes_a' => $votesA,
-                'votes_b' => $votesB,
-                'votes_total' => $votesA + $votesB,
+                'player_a_id' => $context->duelPlayerAId,
+                'player_b_id' => $context->duelPlayerBId,
+                'votes_a' => $votesForDuelPlayerA,
+                'votes_b' => $votesForDuelPlayerB,
+                'votes_total' => $votesForDuelPlayerA + $votesForDuelPlayerB,
             ],
         ];
     }
 
     private function handleDuplicateVoteException(
         \Illuminate\Database\QueryException $e,
-        array $lockKeys,
-        Duel $duel,
-        Attribute $attribute,
-        int $playerA,
-        int $playerB,
-        int $winnerId,
-        ?int $currentUserId,
-        string $voterHash,
+        DuelVoteContext $context,
+        VoterIdentity $identity,
     ): array {
         $msg = (string) $e->getMessage();
         $code = (string) $e->getCode();
 
         if ($code === '23505' || stripos($msg, 'votes_unique_duel_voterhash') !== false) {
-            DB::table('voter_duel_locks')->whereIn('voter_hash', $lockKeys)->delete();
+            DB::table('voter_duel_locks')->whereIn('voter_hash', $identity->lockKeys)->delete();
 
             Log::warning('vote.duel_duplicate_vote', [
-                'duel_id' => $duel->id ?? null,
-                'attribute_id' => $attribute->id ?? null,
-                'player_a_id' => $playerA ?? null,
-                'player_b_id' => $playerB ?? null,
-                'winner_id' => $winnerId ?? null,
-                'user_id' => $currentUserId,
-                'voter_hash' => $voterHash ?? null,
+                'duel_id' => $context->duel->id ?? null,
+                'attribute_id' => $context->attribute->id ?? null,
+                'player_a_id' => $context->canonicalPlayerAId ?? null,
+                'player_b_id' => $context->canonicalPlayerBId ?? null,
+                'winner_id' => $context->winnerId ?? null,
+                'user_id' => $identity->userId,
+                'voter_hash' => $identity->voterHash ?? null,
                 'error_code' => $code,
             ]);
 
