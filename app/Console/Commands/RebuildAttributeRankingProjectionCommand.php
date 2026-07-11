@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\PlayerAttributeRating;
+use App\Services\Ranking\AttributeRankingProjectionWriter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
 
@@ -12,7 +13,7 @@ class RebuildAttributeRankingProjectionCommand extends Command
 
     protected $description = 'Rebuild attribute ranking projections';
 
-    public function handle(): int
+    public function handle(AttributeRankingProjectionWriter $projectionWriter): int
     {
         $keys = Redis::keys('ranking:*');
 
@@ -29,14 +30,16 @@ class RebuildAttributeRankingProjectionCommand extends Command
                 'player_id',
                 'attribute_id',
                 'rating',
+                'confidence',
             ])
             ->with('attribute:id,key')
             ->get()
-            ->each(function (PlayerAttributeRating $row) {
-                Redis::zadd(
-                    'ranking:' . $row->attribute->key,
+            ->each(function (PlayerAttributeRating $row) use ($projectionWriter) {
+                $projectionWriter->upsert(
+                    $row->attribute->key,
+                    $row->player_id,
                     (float) $row->rating,
-                    (string) $row->player_id,
+                    (float) $row->confidence,
                 );
             });
 

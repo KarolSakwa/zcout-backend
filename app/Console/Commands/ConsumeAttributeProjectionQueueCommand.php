@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Services\RabbitMq\RabbitMqConnection;
+use App\Services\Ranking\AttributeRankingProjectionWriter;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Redis;
 use PhpAmqpLib\Message\AMQPMessage;
 
 class ConsumeAttributeProjectionQueueCommand extends Command
@@ -13,7 +13,10 @@ class ConsumeAttributeProjectionQueueCommand extends Command
 
     protected $description = 'Command description';
 
-    public function handle(RabbitMqConnection $rabbitMqConnection): int
+    public function handle(
+        RabbitMqConnection $rabbitMqConnection,
+        AttributeRankingProjectionWriter $projectionWriter,
+    ): int
     {
         $connection = $rabbitMqConnection->create();
 
@@ -34,7 +37,7 @@ class ConsumeAttributeProjectionQueueCommand extends Command
             false,
             false,
             false,
-            function (AMQPMessage $message) {
+            function (AMQPMessage $message) use ($projectionWriter) {
                 $this->info($message->getBody());
 
                 $payload = json_decode(
@@ -44,10 +47,11 @@ class ConsumeAttributeProjectionQueueCommand extends Command
                     JSON_THROW_ON_ERROR,
                 );
 
-                Redis::zadd(
-                    'ranking:' . $payload['attribute_key'],
+                $projectionWriter->upsert(
+                    $payload['attribute_key'],
+                    $payload['player_id'],
                     (float) $payload['rating'],
-                    (string) $payload['player_id'],
+                    (float) $payload['confidence'],
                 );
 
                 $message->ack();
