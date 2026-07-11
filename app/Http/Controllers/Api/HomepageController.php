@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\BuildFeaturedRankingPayloadAction;
 use App\Http\Controllers\Controller;
-use App\Support\Homepage\NeedsMoreRatingsItem;
+use App\Support\Homepage\NeedsMoreRatingsPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class HomepageController extends Controller
 {
+    public function featuredRanking(BuildFeaturedRankingPayloadAction $buildFeaturedRankingPayloadAction): JsonResponse
+    {
+        return response()->json($buildFeaturedRankingPayloadAction->execute());
+    }
+
     public function needsMoreRatings(Request $request): JsonResponse
     {
         $limit = max(1, min((int) $request->integer('limit', 5), 10));
@@ -37,7 +43,7 @@ class HomepageController extends Controller
             ]);
 
         $items = $rows
-            ->map(fn ($row) => NeedsMoreRatingsItem::fromRow($row))
+            ->map(fn ($row) => NeedsMoreRatingsPayload::fromRow($row))
             ->values();
 
         return response()->json([

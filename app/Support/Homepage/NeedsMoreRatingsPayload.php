@@ -2,7 +2,7 @@
 
 namespace App\Support\Homepage;
 
-class NeedsMoreRatingsItem
+class NeedsMoreRatingsPayload
 {
     public static function fromRow(object $row): array
     {

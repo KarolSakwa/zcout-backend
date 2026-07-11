@@ -71,6 +71,7 @@ Route::prefix('live')->group(function () {
 
 Route::prefix('homepage')->group(function () {
     Route::get('/needs-more-ratings', [HomepageController::class, 'needsMoreRatings']);
+    Route::get('/featured-ranking', [HomepageController::class, 'featuredRanking']);
 });
 
 Route::get('/search', [SearchController::class, 'index']);
