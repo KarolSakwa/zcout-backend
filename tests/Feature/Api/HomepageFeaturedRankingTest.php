@@ -79,7 +79,7 @@ class HomepageFeaturedRankingTest extends TestCase
             ->assertJsonStructure([
                 'attribute' => ['key', 'label', 'icon'],
                 'players' => [
-                    '*' => ['id', 'playerId', 'player', 'rating', 'confidence'],
+                    '*' => ['id', 'playerId', 'player', 'rating', 'confidence', 'trend_7d'],
                 ],
             ])
             ->assertJsonPath('attribute.key', 'finishing')
@@ -90,6 +90,7 @@ class HomepageFeaturedRankingTest extends TestCase
             ->assertJsonPath('players.0.player', 'Erling Haaland')
             ->assertJsonPath('players.0.rating', 94.25)
             ->assertJsonPath('players.0.confidence', 84.25)
+            ->assertJsonPath('players.0.trend_7d', null)
             ->assertJsonPath('players.1.playerId', $playerTwoId)
             ->assertJsonPath('players.1.player', 'Harry Kane')
             ->assertJsonPath('players.1.rating', 92.1)

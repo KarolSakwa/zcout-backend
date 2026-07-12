@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\Attribute;
 use App\Services\Ranking\AttributeRankingService;
+use App\Services\Ranking\AttributeRatingTrendService;
 use App\Support\Attributes\AttributeAssetPaths;
 use App\Support\Homepage\FeaturedRankingPlayerPayload;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ final class BuildFeaturedRankingPayloadAction
     public function __construct(
         private ResolveFeaturedRankingAttributeAction $resolveFeaturedRankingAttributeAction,
         private AttributeRankingService $attributeRankingService,
+        private AttributeRatingTrendService $attributeRatingTrendService,
     ) {}
 
     public function execute(): array
@@ -53,6 +55,11 @@ final class BuildFeaturedRankingPayloadAction
             ])
             ->keyBy('player_id');
 
+        $trendByPlayer = $this->attributeRatingTrendService->sumDeltasForAttribute(
+            (int) $attribute->id,
+            $playerIds,
+        );
+
         $players = [];
 
         foreach ($rankingEntries as $entry) {
@@ -62,11 +69,16 @@ final class BuildFeaturedRankingPayloadAction
                 continue;
             }
 
+            $playerId = (int) $playerRow->player_id;
+
             $players[] = FeaturedRankingPlayerPayload::fromParts(
-                playerId: (int) $playerRow->player_id,
+                playerId: $playerId,
                 playerName: (string) $playerRow->player_name,
                 rating: (float) $entry['rating'],
                 confidence: $entry['confidence'],
+                trend7d: isset($trendByPlayer[$playerId])
+                    ? (float) $trendByPlayer[$playerId]
+                    : null,
             );
         }
 
