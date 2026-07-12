@@ -51,12 +51,9 @@ class HomepageFeaturedRankingTest extends TestCase
             ->once()
             ->with('ranking:finishing', 0, 4, ['withscores' => true])
             ->andReturn([
-                (string) $playerOneId,
-                '94.25',
-                (string) $playerTwoId,
-                '92.10',
-                (string) $missingPlayerId,
-                '90.00',
+                (string) $playerOneId => '94.25',
+                (string) $playerTwoId => '92.10',
+                (string) $missingPlayerId => '90.00',
             ]);
 
         Redis::shouldReceive('hmget')

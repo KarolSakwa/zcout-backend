@@ -188,35 +188,40 @@ final class BuildPlayerProfilePayloadAction
             : 0;
         $overallTrend7d = $this->computeOverallTrendDeltaFromPayload($posCode, $payloadAttrs);
 
-        $previousPlayer = PlayerOverall::query()
-            ->where(function ($query) use ($overall, $player) {
-                $query
-                    ->where('overall', '>', $overall)
-                    ->orWhere(function ($query) use ($overall, $player) {
-                        $query
-                            ->where('overall', $overall)
-                            ->where('player_id', '>', $player->id);
-                    });
-            })
-            ->orderBy('overall')
-            ->orderBy('player_id')
-            ->with('player:id,slug')
-            ->first();
+        $previousPlayer = null;
+        $nextPlayer = null;
 
-        $nextPlayer = PlayerOverall::query()
-            ->where(function ($query) use ($overall, $player) {
-                $query
-                    ->where('overall', '<', $overall)
-                    ->orWhere(function ($query) use ($overall, $player) {
-                        $query
-                            ->where('overall', $overall)
-                            ->where('player_id', '<', $player->id);
-                    });
-            })
-            ->orderByDesc('overall')
-            ->orderByDesc('player_id')
-            ->with('player:id,slug')
-            ->first();
+        if ($overall !== null) {
+            $previousPlayer = PlayerOverall::query()
+                ->where(function ($query) use ($overall, $player) {
+                    $query
+                        ->where('overall', '>', $overall)
+                        ->orWhere(function ($query) use ($overall, $player) {
+                            $query
+                                ->where('overall', $overall)
+                                ->where('player_id', '>', $player->id);
+                        });
+                })
+                ->orderBy('overall')
+                ->orderBy('player_id')
+                ->with('player:id,slug')
+                ->first();
+
+            $nextPlayer = PlayerOverall::query()
+                ->where(function ($query) use ($overall, $player) {
+                    $query
+                        ->where('overall', '<', $overall)
+                        ->orWhere(function ($query) use ($overall, $player) {
+                            $query
+                                ->where('overall', $overall)
+                                ->where('player_id', '<', $player->id);
+                        });
+                })
+                ->orderByDesc('overall')
+                ->orderByDesc('player_id')
+                ->with('player:id,slug')
+                ->first();
+        }
 
         return [
             'id' => (int) $player->id,

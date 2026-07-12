@@ -13,7 +13,10 @@ class AttributeRankingServiceTest extends TestCase
         Redis::shouldReceive('zrevrange')
             ->once()
             ->with('ranking:finishing', 0, 2, ['withscores' => true])
-            ->andReturn(['123', '94.25', '456', '92.10']);
+            ->andReturn([
+                '123' => '94.25',
+                '456' => '92.10',
+            ]);
 
         Redis::shouldReceive('hmget')
             ->once()

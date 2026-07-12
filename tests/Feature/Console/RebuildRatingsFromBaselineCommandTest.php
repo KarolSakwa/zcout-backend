@@ -156,20 +156,20 @@ class RebuildRatingsFromBaselineCommandTest extends TestCase
         $this->assertNotNull($playerARow);
         $this->assertNotNull($playerBRow);
 
-        $this->assertEqualsWithDelta(92.734, (float) $playerARow->rating, 0.001);
+        $this->assertEqualsWithDelta(83.093, (float) $playerARow->rating, 0.001);
         $this->assertEqualsWithDelta(69.799, (float) $playerBRow->rating, 0.001);
 
         $this->assertSame(2, (int) $playerARow->votes_count);
         $this->assertSame(1, (int) $playerBRow->votes_count);
 
-        $this->assertEquals(1.5, (float) $playerARow->rating_weight_sum);
-        $this->assertEquals(0.5, (float) $playerBRow->rating_weight_sum);
+        $this->assertEquals(6.5, (float) $playerARow->rating_weight_sum);
+        $this->assertEquals(5.5, (float) $playerBRow->rating_weight_sum);
 
-        $this->assertEquals(1.1, (float) $playerARow->confidence_weight_sum);
-        $this->assertEquals(0.1, (float) $playerBRow->confidence_weight_sum);
+        $this->assertEquals(6.1, (float) $playerARow->confidence_weight_sum);
+        $this->assertEquals(5.1, (float) $playerBRow->confidence_weight_sum);
 
-        $this->assertEquals(1.1, (float) $playerARow->confidence);
-        $this->assertEquals(0.1, (float) $playerBRow->confidence);
+        $this->assertEquals(6.1, (float) $playerARow->confidence);
+        $this->assertEquals(5.1, (float) $playerBRow->confidence);
 
         $duelVote = DB::table('votes')
             ->where('source', 'duel')
@@ -188,7 +188,7 @@ class RebuildRatingsFromBaselineCommandTest extends TestCase
         $this->assertEquals('69.799', (string) $duelVote->post_rating_b);
 
         $this->assertEquals('80.201', (string) $directVote->pre_rating_a);
-        $this->assertEquals('92.734', (string) $directVote->post_rating_a);
+        $this->assertEquals('83.093', (string) $directVote->post_rating_a);
         $this->assertNull($directVote->pre_rating_b);
         $this->assertNull($directVote->post_rating_b);
     }

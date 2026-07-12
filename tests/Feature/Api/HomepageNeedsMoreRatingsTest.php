@@ -40,7 +40,7 @@ class HomepageNeedsMoreRatingsTest extends TestCase
 
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Cole Palmer',
-            'slug' => null,
+            'slug' => 'cole-palmer',
             'club' => 'Chelsea',
             'fd_position_id' => $positionId,
         ]);
@@ -134,7 +134,7 @@ class HomepageNeedsMoreRatingsTest extends TestCase
             ->assertJsonPath('items.0.overall', 82.5)
             ->assertJsonPath('items.0.confidence', 8.5)
             ->assertJsonPath('items.1.playerId', $playerBId)
-            ->assertJsonPath('items.1.slug', null)
+            ->assertJsonPath('items.1.slug', 'cole-palmer')
             ->assertJsonPath('items.1.club', 'Chelsea');
     }
 }

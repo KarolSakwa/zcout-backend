@@ -23,10 +23,12 @@ class AttributeRatingTrendServiceTest extends TestCase
 
         $playerAId = DB::table('players')->insertGetId([
             'name' => 'Erling Haaland',
+            'slug' => 'erling-haaland',
         ]);
 
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Harry Kane',
+            'slug' => 'harry-kane',
         ]);
 
         $duelId = DB::table('duels')->insertGetId([

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Events\PlayerAttributeRatingUpdated;
+use App\Events\PlayerOverallUpdated;
 use App\Listeners\PublishPlayerAttributeRatingUpdatedToRabbitMq;
 use App\Models\User;
 use App\Services\RabbitMq\RabbitMqPublisher;
@@ -54,7 +55,10 @@ class ScoutReportAttributeRankingProjectionTest extends TestCase
             'last_vote_at' => now()->subDay(),
         ]);
 
-        Event::fake([PlayerAttributeRatingUpdated::class]);
+        Event::fake([
+            PlayerAttributeRatingUpdated::class,
+            PlayerOverallUpdated::class,
+        ]);
 
         $publisher = Mockery::mock(RabbitMqPublisher::class);
         $publisher->shouldReceive('publish')->never();

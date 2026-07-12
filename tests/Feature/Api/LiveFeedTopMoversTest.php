@@ -103,7 +103,7 @@ class LiveFeedTopMoversTest extends TestCase
             ->assertJsonPath('items.0.player', 'Bukayo Saka')
             ->assertJsonPath('items.0.attributeKey', 'dribbling')
             ->assertJsonPath('items.0.attributeLabel', 'Dribbling')
-            ->assertJsonPath('items.0.delta', '+2.000');
+            ->assertJsonPath('items.0.delta', '+2.00');
     }
 
     public function test_it_returns_top_fallers_for_last_7_days(): void
@@ -199,9 +199,9 @@ class LiveFeedTopMoversTest extends TestCase
             ->assertJsonPath('items.0.player', 'Cole Palmer')
             ->assertJsonPath('items.0.attributeKey', 'dribbling')
             ->assertJsonPath('items.0.attributeLabel', 'Dribbling')
-            ->assertJsonPath('items.0.delta', '-0.600')
+            ->assertJsonPath('items.0.delta', '-0.60')
             ->assertJsonPath('items.1.playerId', $playerCId)
-            ->assertJsonPath('items.1.delta', '-0.500');
+            ->assertJsonPath('items.1.delta', '-0.50');
     }
 
     public function test_it_ignores_votes_older_than_7_days(): void

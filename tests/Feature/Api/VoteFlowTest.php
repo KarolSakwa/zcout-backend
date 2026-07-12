@@ -38,6 +38,13 @@ class VoteFlowTest extends TestCase
             'scope' => 'both',
         ]);
 
+        $duelId = DB::table('duels')->insertGetId([
+            'attribute_id' => $attributeId,
+            'player_a_id' => $playerAId,
+            'player_b_id' => $playerBId,
+            'created_at' => now(),
+        ]);
+
         $response = $this->postJson(
             '/api/votes',
             [
@@ -45,6 +52,7 @@ class VoteFlowTest extends TestCase
                 'player_a_id' => $playerAId,
                 'player_b_id' => $playerBId,
                 'winner_id' => $playerAId,
+                'duel_id' => $duelId,
             ],
             [
                 'X-Zcout-Anon' => 'anon-smoke-1',
