@@ -127,12 +127,16 @@ class DuelControllerGkAttributeSelectionTest extends TestCase
 
         $response = $this
             ->withHeaders(['X-Zcout-Anon' => 'gk-attribute-test-001'])
-            ->getJson('/api/duels/next?debug=1&attribute=gk_reflexes&intent=production&gap_profile=medium');
+            ->getJson('/api/duels/next?debug=1&attribute=gk_reflexes&intent=production&tier=A&position_profile=exact&gap_profile=medium');
 
         $response->assertOk();
 
         $response->assertJsonPath('attribute.key', 'gk_reflexes');
         $response->assertJsonPath('debug.force_gk', true);
+        $response->assertJsonPath('matchmaking.intent', 'production');
+        $response->assertJsonPath('matchmaking.tier', 'A');
+        $response->assertJsonPath('matchmaking.positional_mode', 'exact');
+        $response->assertJsonPath('matchmaking.gap_profile', 'medium');
 
         $players = data_get($response->json(), 'players', []);
         $this->assertCount(2, $players);

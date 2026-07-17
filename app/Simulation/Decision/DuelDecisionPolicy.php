@@ -4,10 +4,8 @@ namespace App\Simulation\Decision;
 
 final class DuelDecisionPolicy
 {
-    public function calculate(
-        int $runId,
-        int $currentStep,
-        string $userId,
+    public function decide(
+        string $decisionSeed,
         string $userType,
         int $playerAId,
         int $playerBId,
@@ -18,15 +16,7 @@ final class DuelDecisionPolicy
         $diff = $truthRatingA - $truthRatingB;
         $absDiff = abs($diff);
 
-        $base = implode('|', [
-            $runId,
-            $currentStep,
-            $userId,
-            $userType,
-            $playerAId,
-            $playerBId,
-            $attributeKey,
-        ]);
+        $base = $decisionSeed;
 
         $skipRoll = abs(crc32($base . '|skip')) % 1000;
         $correctnessRoll = abs(crc32($base . '|correctness')) % 1000;

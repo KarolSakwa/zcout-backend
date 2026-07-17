@@ -3,6 +3,7 @@
 namespace Tests\Unit\Simulation\Actions;
 
 use App\Simulation\Decision\DuelDecisionPolicy;
+use App\Simulation\Decision\SimulationLabDecisionSeed;
 use App\Models\SimulationRun;
 use App\Models\SimulationRunTruthRating;
 use App\Simulation\Actions\SimulateDuelDecision;
@@ -49,10 +50,16 @@ final class SimulateDuelDecisionTest extends TestCase
             $this->context($runId, currentStep: 1),
         );
 
-        $expected = (new DuelDecisionPolicy())->calculate(
-            runId: $runId,
-            currentStep: 1,
-            userId: 'u1',
+        $expected = (new DuelDecisionPolicy())->decide(
+            decisionSeed: SimulationLabDecisionSeed::build(
+                runId: $runId,
+                currentStep: 1,
+                userId: 'u1',
+                userType: 'expert',
+                playerAId: $playerAId,
+                playerBId: $playerBId,
+                attributeKey: 'passing',
+            ),
             userType: 'expert',
             playerAId: $playerAId,
             playerBId: $playerBId,
@@ -81,10 +88,16 @@ final class SimulateDuelDecisionTest extends TestCase
             $this->context($runId, currentStep: 1),
         );
 
-        $expected = (new DuelDecisionPolicy())->calculate(
-            runId: $runId,
-            currentStep: 1,
-            userId: 'u1',
+        $expected = (new DuelDecisionPolicy())->decide(
+            decisionSeed: SimulationLabDecisionSeed::build(
+                runId: $runId,
+                currentStep: 1,
+                userId: 'u1',
+                userType: 'expert',
+                playerAId: $playerAId,
+                playerBId: $playerBId,
+                attributeKey: 'passing',
+            ),
             userType: 'expert',
             playerAId: $playerAId,
             playerBId: $playerBId,

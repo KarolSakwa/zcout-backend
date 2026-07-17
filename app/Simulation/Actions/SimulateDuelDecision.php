@@ -6,6 +6,7 @@ use App\Simulation\Data\InteractionDecision;
 use App\Simulation\Data\InteractionOpportunity;
 use App\Simulation\Data\SimulatedUser;
 use App\Simulation\Decision\DuelDecisionPolicy;
+use App\Simulation\Decision\SimulationLabDecisionSeed;
 use App\Simulation\SimulationContext;
 
 final class SimulateDuelDecision
@@ -31,10 +32,18 @@ final class SimulateDuelDecision
             );
         }
 
-        $result = $this->decisionPolicy->calculate(
+        $decisionSeed = SimulationLabDecisionSeed::build(
             runId: $context->runId,
             currentStep: $context->currentStep,
             userId: $user->id,
+            userType: $user->type,
+            playerAId: $duel->playerAId,
+            playerBId: $duel->playerBId,
+            attributeKey: $duel->attributeKey,
+        );
+
+        $result = $this->decisionPolicy->decide(
+            decisionSeed: $decisionSeed,
             userType: $user->type,
             playerAId: $duel->playerAId,
             playerBId: $duel->playerBId,
