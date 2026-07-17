@@ -4,6 +4,8 @@ namespace Database\Factories;
 
 use App\Enums\InfluenceProfile;
 use App\Enums\UserRole;
+use App\Models\User;
+use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,6 +35,7 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'role' => UserRole::USER,
             'influence_profile' => InfluenceProfile::USER_DEFAULT,
+            'is_synthetic' => false,
         ];
     }
 
@@ -44,5 +47,26 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Mark the user as synthetic and create a linked profile with defaults.
+     */
+    public function synthetic(?string $decisionProfile = null): static
+    {
+        $profile = $decisionProfile ?? SyntheticUserProfileDefaults::DECISION_PROFILE;
+
+        return $this
+            ->state(fn (): array => [
+                'is_synthetic' => true,
+            ])
+            ->afterCreating(function (User $user) use ($profile): void {
+                $user->syntheticProfile()->create(array_merge(
+                    SyntheticUserProfileDefaults::attributes(),
+                    [
+                        'decision_profile' => $profile,
+                    ],
+                ));
+            });
     }
 }

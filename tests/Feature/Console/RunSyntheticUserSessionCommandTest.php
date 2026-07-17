@@ -4,9 +4,15 @@ namespace Tests\Feature\Console;
 
 use App\Actions\ResolveVoterContextAction;
 use App\Actions\ResolveVoterIdentityAction;
+use App\Events\PlayerAttributeRatingUpdated;
+use App\Events\PlayerOverallUpdated;
+use App\Events\RecentVoteCreated;
+use App\Events\TopMoversMaybeChanged;
 use App\Models\User;
 use App\Services\Ranking\AttributeRankingService;
 use App\Simulation\Synthetic\RunSyntheticUserSessionAction;
+use App\Simulation\Synthetic\SyntheticDecisionProfiles;
+use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -25,7 +31,12 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     {
         parent::setUp();
 
-        Event::fake();
+        Event::fake([
+            RecentVoteCreated::class,
+            TopMoversMaybeChanged::class,
+            PlayerAttributeRatingUpdated::class,
+            PlayerOverallUpdated::class,
+        ]);
 
         config([
             'zcout_matchmaking.intent_mix' => [
@@ -80,55 +91,102 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => 999999,
             '--actions' => 1,
-            '--profile' => 'casual',
         ]);
 
         $this->assertSame(1, $exitCode);
         $this->assertStringContainsString('was not found', Artisan::output());
     }
 
-    public function test_command_fails_for_invalid_profile(): void
+    public function test_command_fails_for_regular_user(): void
     {
         $user = User::factory()->create();
 
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 1,
-            '--profile' => 'invalid-profile',
         ]);
 
         $this->assertSame(1, $exitCode);
-        $this->assertStringContainsString(
-            'The --profile option must be one of: expert, casual, noisy.',
-            Artisan::output(),
-        );
+        $this->assertStringContainsString('is not a synthetic user', Artisan::output());
     }
 
-    public function test_command_rejects_biased_profile(): void
+    public function test_command_fails_for_synthetic_user_without_profile(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['is_synthetic' => true]);
 
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 1,
-            '--profile' => 'biased',
         ]);
 
         $this->assertSame(1, $exitCode);
-        $this->assertStringContainsString(
-            'The --profile option must be one of: expert, casual, noisy.',
-            Artisan::output(),
-        );
+        $this->assertStringContainsString('does not have a profile', Artisan::output());
+    }
+
+    public function test_command_fails_for_disabled_profile(): void
+    {
+        $user = User::factory()->synthetic()->create();
+        $user->syntheticProfile->update(['is_enabled' => false]);
+
+        $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
+            '--user-id' => $user->id,
+            '--actions' => 1,
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('profile is disabled', Artisan::output());
+    }
+
+    public function test_command_fails_for_invalid_stored_profile(): void
+    {
+        $user = User::factory()->create(['is_synthetic' => true]);
+        DB::table('synthetic_user_profiles')->insert([
+            'user_id' => $user->id,
+            'decision_profile' => 'broken',
+            'sessions_per_day_min' => 1,
+            'sessions_per_day_max' => 2,
+            'actions_per_session_min' => 3,
+            'actions_per_session_max' => 8,
+            'delay_seconds_min' => 6,
+            'delay_seconds_max' => 20,
+            'skip_probability' => 0.12,
+            'decision_accuracy' => 0.72,
+            'noise_level' => 0.15,
+            'is_enabled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
+            '--user-id' => $user->id,
+            '--actions' => 1,
+        ]);
+
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Invalid synthetic decision_profile', $output);
+        $this->assertStringContainsString('expert', $output);
+        $this->assertStringContainsString('casual', $output);
+        $this->assertStringContainsString('noisy', $output);
+    }
+
+    public function test_command_has_no_profile_option(): void
+    {
+        $definition = app(\App\Console\Commands\RunSyntheticUserSessionCommand::class)->getDefinition();
+
+        $this->assertFalse($definition->hasOption('profile'));
+        $this->assertTrue($definition->hasOption('actions'));
+        $this->assertTrue($definition->hasOption('user-id'));
     }
 
     public function test_command_fails_for_non_positive_actions(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic()->create();
 
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 0,
-            '--profile' => 'casual',
         ]);
 
         $this->assertSame(1, $exitCode);
@@ -139,7 +197,6 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     {
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--actions' => 1,
-            '--profile' => 'casual',
         ]);
 
         $this->assertSame(1, $exitCode);
@@ -149,12 +206,11 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     public function test_successful_vote_action_persists_vote_and_updates_ratings(): void
     {
         $fixture = $this->seedMatchmakingFixture(includeRatings: true);
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
 
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 1,
-            '--profile' => 'expert',
         ]);
 
         $this->assertSame(0, $exitCode);
@@ -170,18 +226,78 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
             'player_id' => $fixture['player_b_id'],
             'attribute_id' => $fixture['attribute_id'],
         ]);
-        $this->assertStringContainsString('Session completed', Artisan::output());
+        $output = Artisan::output();
+        $this->assertStringContainsString('Profile: expert', $output);
+        $this->assertStringContainsString('Session completed', $output);
+    }
+
+    public function test_command_reads_casual_profile_from_database(): void
+    {
+        $this->seedMatchmakingFixture(includeRatings: true);
+        $user = User::factory()->synthetic(SyntheticDecisionProfiles::CASUAL)->create();
+
+        $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
+            '--user-id' => $user->id,
+            '--actions' => 1,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Profile: casual', Artisan::output());
+    }
+
+    public function test_command_reads_noisy_profile_from_database(): void
+    {
+        $this->seedMatchmakingFixture(includeRatings: true);
+        $user = User::factory()->synthetic(SyntheticDecisionProfiles::NOISY)->create();
+
+        $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
+            '--user-id' => $user->id,
+            '--actions' => 1,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Profile: noisy', Artisan::output());
+    }
+
+    public function test_actions_override_still_works(): void
+    {
+        $this->seedMatchmakingFixture(includeRatings: true);
+        $user = User::factory()->synthetic()->create();
+
+        $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
+            '--user-id' => $user->id,
+            '--actions' => 2,
+        ]);
+
+        $output = Artisan::output();
+        $this->assertStringContainsString('Planned actions: 2', $output);
+        $this->assertStringContainsString('[1/2]', $output);
+        $this->assertStringContainsString('[2/2]', $output);
+        $this->assertNotSame(SyntheticUserProfileDefaults::ACTIONS_PER_SESSION_MIN, 2);
+    }
+
+    public function test_biased_cannot_be_persisted_for_synthetic_profile(): void
+    {
+        $user = User::factory()->create(['is_synthetic' => true]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Invalid synthetic decision_profile');
+
+        $user->syntheticProfile()->create(array_merge(
+            SyntheticUserProfileDefaults::attributes(),
+            ['decision_profile' => 'biased'],
+        ));
     }
 
     public function test_action_clears_voter_lock(): void
     {
-        $fixture = $this->seedMatchmakingFixture(includeRatings: true);
-        $user = User::factory()->create();
+        $this->seedMatchmakingFixture(includeRatings: true);
+        $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
         $voterHash = 'user:' . $user->id;
 
         app(RunSyntheticUserSessionAction::class)->execute(
             user: $user,
-            profile: 'expert',
+            profile: SyntheticDecisionProfiles::EXPERT,
             actions: 1,
             sessionId: '00000000-0000-4000-8000-000000000002',
             onAction: null,
@@ -202,7 +318,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         ]);
 
         $fixture = $this->seedMatchmakingFixture(includeRatings: true);
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic()->create();
 
         DB::table('player_attribute_ratings')
             ->where('player_id', $fixture['player_b_id'])
@@ -211,7 +327,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         $lines = [];
         app(RunSyntheticUserSessionAction::class)->execute(
             user: $user,
-            profile: 'casual',
+            profile: SyntheticDecisionProfiles::CASUAL,
             actions: 1,
             sessionId: '00000000-0000-4000-8000-000000000003',
             onAction: function ($result) use (&$lines): void {
@@ -230,12 +346,11 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     public function test_multiple_actions_use_same_user_history(): void
     {
         $this->seedMatchmakingFixture(includeRatings: true);
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
 
-        $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
+        Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 2,
-            '--profile' => 'expert',
         ]);
 
         $output = Artisan::output();
@@ -249,12 +364,11 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     public function test_session_does_not_create_simulation_lab_records(): void
     {
         $this->seedMatchmakingFixture(includeRatings: true);
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic()->create();
 
         Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 1,
-            '--profile' => 'casual',
         ]);
 
         $this->assertSame(0, DB::table('simulation_runs')->count());
@@ -263,7 +377,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
 
     public function test_synthetic_session_uses_same_voter_identity_as_production_flow(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic()->create();
 
         Auth::login($user);
 
@@ -295,7 +409,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     public function test_unexpected_exception_aborts_session_and_is_logged(): void
     {
         $this->seedMatchmakingFixture(includeRatings: true);
-        $user = User::factory()->create();
+        $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
 
         $this->mock(AttributeRankingService::class, function ($mock): void {
             $mock->shouldReceive('getBadgeData')
@@ -319,7 +433,6 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
             '--actions' => 3,
-            '--profile' => 'expert',
         ]);
 
         $output = Artisan::output();

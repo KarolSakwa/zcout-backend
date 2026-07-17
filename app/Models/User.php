@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use App\Enums\InfluenceProfile;
 use App\Enums\UserRole;
 use App\Support\ValidateUserAccessCombination;
+use DomainException;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
@@ -24,7 +26,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'influence_profile'
+        'influence_profile',
     ];
 
     /**
@@ -54,6 +56,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'influence_profile' => InfluenceProfile::class,
+            'is_synthetic' => 'boolean',
         ];
     }
 
@@ -64,6 +67,21 @@ class User extends Authenticatable
                 $user->role,
                 $user->influence_profile,
             );
+
+            if ($user->isDirty('is_synthetic')
+                && $user->getOriginal('is_synthetic')
+                && ! $user->is_synthetic
+                && $user->syntheticProfile()->exists()
+            ) {
+                throw new DomainException(
+                    'Cannot unset is_synthetic while the user has a synthetic profile.',
+                );
+            }
         });
+    }
+
+    public function syntheticProfile(): HasOne
+    {
+        return $this->hasOne(SyntheticUserProfile::class);
     }
 }
