@@ -6,8 +6,9 @@ use App\Actions\HandleNextDuelRequestAction;
 use App\Actions\HandleSkipDuelRequestAction;
 use App\Actions\ResolveVoterContextAction;
 use App\Actions\StoreDuelVoteAction;
+use App\Models\SyntheticUserProfile;
 use App\Models\User;
-use App\Simulation\Decision\DuelDecisionPolicy;
+use App\Simulation\Decision\SyntheticDuelDecisionPolicy;
 use App\Simulation\Decision\SyntheticSessionDecisionSeed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ class ExecuteSyntheticDuelAction
         private readonly HandleSkipDuelRequestAction $handleSkipDuelRequestAction,
         private readonly StoreDuelVoteAction $storeDuelVoteAction,
         private readonly ResolveVoterContextAction $resolveVoterContextAction,
-        private readonly DuelDecisionPolicy $decisionPolicy = new DuelDecisionPolicy(),
+        private readonly SyntheticDuelDecisionPolicy $decisionPolicy = new SyntheticDuelDecisionPolicy(),
     ) {
     }
 
@@ -28,7 +29,7 @@ class ExecuteSyntheticDuelAction
      */
     public function execute(
         User $user,
-        string $decisionProfile,
+        SyntheticUserProfile $profile,
         string $sessionSeed,
         int $actionIndex,
         int $plannedActions,
@@ -106,6 +107,8 @@ class ExecuteSyntheticDuelAction
             );
         }
 
+        $decisionProfile = (string) $profile->decision_profile;
+
         $decisionSeed = SyntheticSessionDecisionSeed::build(
             userId: (int) $user->id,
             profile: $decisionProfile,
@@ -118,12 +121,13 @@ class ExecuteSyntheticDuelAction
 
         $decision = $this->decisionPolicy->decide(
             decisionSeed: $decisionSeed,
-            userType: $decisionProfile,
             playerAId: $playerAId,
             playerBId: $playerBId,
-            attributeKey: $attributeKey,
-            truthRatingA: $ratingA,
-            truthRatingB: $ratingB,
+            ratingA: $ratingA,
+            ratingB: $ratingB,
+            skipProbability: (float) $profile->skip_probability,
+            decisionAccuracy: (float) $profile->decision_accuracy,
+            noiseLevel: (float) $profile->noise_level,
         );
 
         if ($decision->type === 'skip') {

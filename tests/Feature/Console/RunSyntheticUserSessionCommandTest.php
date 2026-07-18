@@ -207,6 +207,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     {
         $fixture = $this->seedMatchmakingFixture(includeRatings: true);
         $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
+        $this->forceDeterministicVoteProfile($user);
 
         $exitCode = Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
@@ -297,7 +298,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
 
         app(RunSyntheticUserSessionAction::class)->execute(
             user: $user,
-            profile: SyntheticDecisionProfiles::EXPERT,
+            profile: $user->syntheticProfile,
             actions: 1,
             sessionId: '00000000-0000-4000-8000-000000000002',
             onAction: null,
@@ -327,7 +328,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         $lines = [];
         app(RunSyntheticUserSessionAction::class)->execute(
             user: $user,
-            profile: SyntheticDecisionProfiles::CASUAL,
+            profile: $user->syntheticProfile,
             actions: 1,
             sessionId: '00000000-0000-4000-8000-000000000003',
             onAction: function ($result) use (&$lines): void {
@@ -347,6 +348,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     {
         $this->seedMatchmakingFixture(includeRatings: true);
         $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
+        $this->forceDeterministicVoteProfile($user);
 
         Artisan::call('zcout:synthetic-users:run-session', [
             '--user-id' => $user->id,
@@ -410,6 +412,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
     {
         $this->seedMatchmakingFixture(includeRatings: true);
         $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
+        $this->forceDeterministicVoteProfile($user);
 
         $this->mock(AttributeRankingService::class, function ($mock): void {
             $mock->shouldReceive('getBadgeData')
@@ -445,6 +448,15 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         $this->assertStringNotContainsString('[3/3]', $output);
         $this->assertStringNotContainsString('Session completed', $output);
         $this->assertLessThanOrEqual(1, DB::table('votes')->where('user_id', $user->id)->count());
+    }
+
+    private function forceDeterministicVoteProfile(User $user): void
+    {
+        $user->syntheticProfile->update([
+            'skip_probability' => 0.0,
+            'decision_accuracy' => 1.0,
+            'noise_level' => 0.0,
+        ]);
     }
 
     /**

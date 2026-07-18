@@ -112,7 +112,7 @@ final class SyntheticAuthContextTest extends TestCase
         $execute->method('execute')->willReturnCallback(
             function (
                 User $user,
-                string $decisionProfile,
+                $decisionProfile,
                 string $sessionSeed,
                 int $actionIndex,
                 int $plannedActions,
@@ -193,7 +193,7 @@ final class SyntheticAuthContextTest extends TestCase
         $execute->method('execute')->willReturnCallback(
             function (
                 User $user,
-                string $decisionProfile,
+                $decisionProfile,
                 string $sessionSeed,
                 int $actionIndex,
                 int $plannedActions,

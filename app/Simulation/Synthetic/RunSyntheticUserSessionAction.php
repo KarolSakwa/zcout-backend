@@ -2,7 +2,9 @@
 
 namespace App\Simulation\Synthetic;
 
+use App\Models\SyntheticUserProfile;
 use App\Models\User;
+use DomainException;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -19,7 +21,7 @@ final class RunSyntheticUserSessionAction
      */
     public function execute(
         User $user,
-        string $profile,
+        SyntheticUserProfile $profile,
         int $actions,
         string $sessionId,
         ?callable $onAction = null,
@@ -28,6 +30,10 @@ final class RunSyntheticUserSessionAction
         $skips = 0;
         $failures = 0;
         $actionIndex = 0;
+
+        if ((int) $profile->user_id !== (int) $user->id) {
+            throw new DomainException('Synthetic profile does not belong to the given user.');
+        }
 
         try {
             return $this->runWithAuthenticatedUser->execute($user, function () use (
@@ -44,7 +50,7 @@ final class RunSyntheticUserSessionAction
                 for ($actionIndex = 1; $actionIndex <= $actions; $actionIndex++) {
                     $result = $this->executeSyntheticDuelAction->execute(
                         user: $user,
-                        decisionProfile: $profile,
+                        profile: $profile,
                         sessionSeed: $sessionId,
                         actionIndex: $actionIndex,
                         plannedActions: $actions,

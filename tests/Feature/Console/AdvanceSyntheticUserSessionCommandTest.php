@@ -341,7 +341,7 @@ final class AdvanceSyntheticUserSessionCommandTest extends TestCase
             ->method('execute')
             ->willReturnCallback(function (
                 User $u,
-                string $profile,
+                $profile,
                 string $sessionSeed,
                 int $actionIndex,
                 int $plannedActions,
@@ -430,7 +430,7 @@ final class AdvanceSyntheticUserSessionCommandTest extends TestCase
         $execute->method('execute')->willReturnCallback(
             function (
                 User $user,
-                string $decisionProfile,
+                $profile,
                 string $sessionSeed,
                 int $actionIndex,
                 int $plannedActions,
@@ -462,6 +462,9 @@ final class AdvanceSyntheticUserSessionCommandTest extends TestCase
             'actions_per_session_max' => $plannedActions,
             'delay_seconds_min' => $delayMin,
             'delay_seconds_max' => $delayMax,
+            'skip_probability' => 0.0,
+            'decision_accuracy' => 1.0,
+            'noise_level' => 0.0,
         ]);
 
         $random = $this->createMock(RandomIntRange::class);

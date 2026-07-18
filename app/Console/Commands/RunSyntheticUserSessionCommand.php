@@ -109,7 +109,7 @@ final class RunSyntheticUserSessionCommand extends Command
         try {
             $summary = $runSyntheticUserSessionAction->execute(
                 user: $user,
-                profile: $decisionProfile,
+                profile: $profile,
                 actions: $actions,
                 sessionId: $sessionId,
                 onAction: function ($result): void {

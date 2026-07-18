@@ -389,7 +389,7 @@ final class TickSyntheticWorldActionTest extends TestCase
         $execute->method('execute')->willReturnCallback(
             function (
                 User $user,
-                string $decisionProfile,
+                $decisionProfile,
                 string $sessionSeed,
                 int $actionIndex,
                 int $plannedActions,
@@ -573,7 +573,7 @@ final class TickSyntheticWorldActionTest extends TestCase
         $execute->method('execute')->willReturnCallback(
             function (
                 User $user,
-                string $decisionProfile,
+                $decisionProfile,
                 string $sessionSeed,
                 int $actionIndex,
                 int $plannedActions,

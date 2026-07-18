@@ -92,11 +92,9 @@ final class AdvanceSyntheticUserSessionAction
 
             $actionIndex = (int) $locked->completed_actions + 1;
             $sessionSeed = (string) $locked->session_seed;
-            $decisionProfile = (string) $profile->decision_profile;
 
             $this->runWithAuthenticatedUser->execute($user, function () use (
                 $user,
-                $decisionProfile,
                 $sessionSeed,
                 $actionIndex,
                 $locked,
@@ -107,7 +105,7 @@ final class AdvanceSyntheticUserSessionAction
                 try {
                     $actionResult = $this->executeSyntheticDuelAction->execute(
                         user: $user,
-                        decisionProfile: $decisionProfile,
+                        profile: $profile,
                         sessionSeed: $sessionSeed,
                         actionIndex: $actionIndex,
                         plannedActions: (int) $locked->planned_actions,
