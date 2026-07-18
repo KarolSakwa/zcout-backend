@@ -12,6 +12,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Long-lived scheduler for Laravel sub-minute tasks.
+  # Set SYNTHETIC_WORLD_ENABLED=true in .env to automate world ticks.
+  # Restart this service on deploy so schedule:work loads new code.
+  scheduler:
+    image: zcout-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      - pgsql
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   pgsql:
     image: postgres:18-alpine
     restart: unless-stopped

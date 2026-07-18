@@ -93,15 +93,12 @@ final class TickSyntheticWorldCommandTest extends TestCase
         $this->assertStringContainsString('db down', $output);
     }
 
-    public function test_command_does_not_register_scheduler_entry(): void
+    public function test_command_does_not_register_scheduler_entry_when_disabled(): void
     {
-        $schedulePath = base_path('routes/console.php');
-        $contents = is_file($schedulePath) ? (string) file_get_contents($schedulePath) : '';
+        config(['synthetic_world.enabled' => false]);
+        $this->app->forgetInstance(\Illuminate\Console\Scheduling\Schedule::class);
 
-        $this->assertStringNotContainsString('synthetic-world:tick', $contents);
-
-        $kernel = app(\Illuminate\Console\Scheduling\Schedule::class);
-        $events = collect($kernel->events())->map(
+        $events = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())->map(
             static fn ($event): string => (string) ($event->command ?? $event->description ?? ''),
         );
 

@@ -88,6 +88,30 @@ services:
       networks:
         - sail
 
+    # Long-lived scheduler for Laravel sub-minute tasks (e.g. Synthetic World tick).
+    # Enable automation with SYNTHETIC_WORLD_ENABLED=true in .env.
+    scheduler:
+        build:
+            context: './vendor/laravel/sail/runtimes/8.5'
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: 'sail-8.5/app'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
+            - redis
+        restart: unless-stopped
+        command: php artisan schedule:work
+
 networks:
     sail:
         driver: bridge

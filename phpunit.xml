@@ -28,5 +28,6 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="BROADCAST_DRIVER" value="null"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="SYNTHETIC_WORLD_ENABLED" value="false"/>
     </php>
 </phpunit>

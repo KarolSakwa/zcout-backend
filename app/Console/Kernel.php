@@ -4,6 +4,7 @@ namespace App\Console;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use InvalidArgumentException;
 
 class Kernel extends ConsoleKernel
 {
@@ -12,8 +13,32 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
         $schedule->command('zcout:sync-football-data-player-metadata')->weeklyOn(1, '03:00');
+
+        $this->scheduleSyntheticWorldTick($schedule);
+    }
+
+    /**
+     * Register the Synthetic World tick when automation is enabled.
+     */
+    protected function scheduleSyntheticWorldTick(Schedule $schedule): void
+    {
+        if (! config('synthetic_world.enabled')) {
+            return;
+        }
+
+        $overlapMinutes = (int) config('synthetic_world.without_overlapping_minutes');
+        if ($overlapMinutes < 1) {
+            throw new InvalidArgumentException(
+                'synthetic_world.without_overlapping_minutes must be an integer greater than or equal to 1.',
+            );
+        }
+
+        $schedule->command('zcout:synthetic-world:tick')
+            ->everyTenSeconds()
+            ->withoutOverlapping($overlapMinutes)
+            ->name('synthetic-world-tick')
+            ->description('Synthetic world tick');
     }
 
     /**
