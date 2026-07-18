@@ -22,6 +22,9 @@ class SyntheticUserSession extends Model
         'session_seed',
         'last_action_status',
         'last_action_reason',
+        'activity_date',
+        'daily_session_index',
+        'scheduled_start_at',
     ];
 
     protected function casts(): array
@@ -32,6 +35,9 @@ class SyntheticUserSession extends Model
             'next_action_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'activity_date' => 'date',
+            'daily_session_index' => 'integer',
+            'scheduled_start_at' => 'datetime',
         ];
     }
 

@@ -28,6 +28,9 @@ class SyntheticUserSessionFactory extends Factory
             'session_seed' => (string) Str::uuid(),
             'last_action_status' => null,
             'last_action_reason' => null,
+            'activity_date' => null,
+            'daily_session_index' => null,
+            'scheduled_start_at' => null,
         ];
     }
 
@@ -77,6 +80,15 @@ class SyntheticUserSessionFactory extends Factory
             'status' => SyntheticSessionStatuses::ACTIVE,
             'next_action_at' => now()->addHour(),
             'completed_at' => null,
+        ]);
+    }
+
+    public function world(string $activityDate, int $dailySessionIndex): static
+    {
+        return $this->state(fn (): array => [
+            'activity_date' => $activityDate,
+            'daily_session_index' => $dailySessionIndex,
+            'scheduled_start_at' => now(),
         ]);
     }
 }

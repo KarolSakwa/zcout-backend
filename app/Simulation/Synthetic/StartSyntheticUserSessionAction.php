@@ -4,10 +4,11 @@ namespace App\Simulation\Synthetic;
 
 use App\Models\SyntheticUserSession;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Str;
 
-final class StartSyntheticUserSessionAction
+class StartSyntheticUserSessionAction
 {
     public function __construct(
         private readonly ValidateSyntheticUserProfile $validateSyntheticUserProfile,
@@ -15,7 +16,15 @@ final class StartSyntheticUserSessionAction
     ) {
     }
 
-    public function execute(User $user): SyntheticUserSession
+    /**
+     * @param  array{
+     *     activity_date: CarbonInterface|string,
+     *     daily_session_index: int,
+     *     scheduled_start_at: CarbonInterface,
+     *     session_seed: string
+     * }|null  $worldMetadata
+     */
+    public function execute(User $user, ?array $worldMetadata = null): SyntheticUserSession
     {
         if (! $user->is_synthetic) {
             throw new DomainException(sprintf('User [%d] is not a synthetic user.', $user->id));
@@ -60,6 +69,18 @@ final class StartSyntheticUserSessionAction
         }
 
         $now = now();
+        $activityDate = null;
+        $dailySessionIndex = null;
+        $scheduledStartAt = null;
+        $sessionSeed = (string) Str::uuid();
+
+        if ($worldMetadata !== null) {
+            $this->assertWorldMetadata($worldMetadata);
+            $activityDate = $worldMetadata['activity_date'];
+            $dailySessionIndex = (int) $worldMetadata['daily_session_index'];
+            $scheduledStartAt = $worldMetadata['scheduled_start_at'];
+            $sessionSeed = (string) $worldMetadata['session_seed'];
+        }
 
         return SyntheticUserSession::query()->create([
             'user_id' => $user->id,
@@ -69,9 +90,28 @@ final class StartSyntheticUserSessionAction
             'next_action_at' => $now,
             'started_at' => $now,
             'completed_at' => null,
-            'session_seed' => (string) Str::uuid(),
+            'session_seed' => $sessionSeed,
             'last_action_status' => null,
             'last_action_reason' => null,
+            'activity_date' => $activityDate,
+            'daily_session_index' => $dailySessionIndex,
+            'scheduled_start_at' => $scheduledStartAt,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $worldMetadata
+     */
+    private function assertWorldMetadata(array $worldMetadata): void
+    {
+        foreach (['activity_date', 'daily_session_index', 'scheduled_start_at', 'session_seed'] as $key) {
+            if (! array_key_exists($key, $worldMetadata) || $worldMetadata[$key] === null || $worldMetadata[$key] === '') {
+                throw new DomainException('World session metadata is incomplete: missing '.$key.'.');
+            }
+        }
+
+        if ((int) $worldMetadata['daily_session_index'] < 1) {
+            throw new DomainException('daily_session_index must be greater than or equal to 1.');
+        }
     }
 }
