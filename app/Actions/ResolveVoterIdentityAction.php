@@ -19,10 +19,12 @@ final class ResolveVoterIdentityAction
             $lockKeys[] = $anonId;
         }
         if ($isAuthenticated) {
-            $lockKeys[] = 'user:' . $userId;
+            $lockKeys[] = AuthenticatedVoterLockKey::forUserId((int) $userId);
         }
 
-        $lockKey = $anonId !== '' ? $anonId : ($isAuthenticated ? ('user:' . $userId) : null);
+        $lockKey = $anonId !== ''
+            ? $anonId
+            : ($isAuthenticated ? AuthenticatedVoterLockKey::forUserId((int) $userId) : null);
 
         if (!$lockKey) {
             return new ActionFailure(400, 'Missing voter id.');
