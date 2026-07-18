@@ -58,6 +58,7 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'influence_profile' => InfluenceProfile::class,
             'is_synthetic' => 'boolean',
+            'synthetic_pool_index' => 'integer',
         ];
     }
 
@@ -78,7 +79,37 @@ class User extends Authenticatable
                     'Cannot unset is_synthetic while the user has a synthetic profile.',
                 );
             }
+
+            $user->assertSyntheticPoolMembershipConsistency();
         });
+    }
+
+    private function assertSyntheticPoolMembershipConsistency(): void
+    {
+        $key = $this->synthetic_pool_key;
+        $index = $this->synthetic_pool_index;
+        $keySet = is_string($key) && $key !== '';
+        $indexSet = $index !== null;
+
+        if ($keySet !== $indexSet) {
+            throw new DomainException(
+                'synthetic_pool_key and synthetic_pool_index must both be set or both be null.',
+            );
+        }
+
+        if (! $keySet) {
+            return;
+        }
+
+        if ((int) $index < 1) {
+            throw new DomainException('synthetic_pool_index must be greater than or equal to 1.');
+        }
+
+        if (! $this->is_synthetic) {
+            throw new DomainException(
+                'Managed synthetic pool members must have is_synthetic=true.',
+            );
+        }
     }
 
     public function syntheticProfile(): HasOne

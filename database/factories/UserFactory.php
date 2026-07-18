@@ -5,6 +5,8 @@ namespace Database\Factories;
 use App\Enums\InfluenceProfile;
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Simulation\Synthetic\SyntheticDecisionProfiles;
+use App\Simulation\Synthetic\SyntheticPoolIdentity;
 use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -36,6 +38,8 @@ class UserFactory extends Factory
             'role' => UserRole::USER,
             'influence_profile' => InfluenceProfile::USER_DEFAULT,
             'is_synthetic' => false,
+            'synthetic_pool_key' => null,
+            'synthetic_pool_index' => null,
         ];
     }
 
@@ -65,6 +69,38 @@ class UserFactory extends Factory
                     SyntheticUserProfileDefaults::attributes(),
                     [
                         'decision_profile' => $profile,
+                    ],
+                ));
+            });
+    }
+
+    /**
+     * Create a managed synthetic pool member with deterministic identity.
+     */
+    public function syntheticPoolMember(
+        string $pool = 'default',
+        int $index = 1,
+        ?string $profile = null,
+    ): static {
+        $decisionProfile = $profile ?? SyntheticDecisionProfiles::CASUAL;
+        $identity = app(SyntheticPoolIdentity::class);
+
+        return $this
+            ->state(fn (): array => [
+                'name' => $identity->displayName($pool, $index),
+                'email' => $identity->email($pool, $index),
+                'is_synthetic' => true,
+                'synthetic_pool_key' => $pool,
+                'synthetic_pool_index' => $index,
+                'role' => UserRole::USER,
+                'influence_profile' => InfluenceProfile::USER_DEFAULT,
+            ])
+            ->afterCreating(function (User $user) use ($decisionProfile): void {
+                $user->syntheticProfile()->create(array_merge(
+                    SyntheticUserProfileDefaults::attributes(),
+                    [
+                        'decision_profile' => $decisionProfile,
+                        'is_enabled' => true,
                     ],
                 ));
             });
