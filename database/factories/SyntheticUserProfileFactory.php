@@ -5,7 +5,7 @@ namespace Database\Factories;
 use App\Models\SyntheticUserProfile;
 use App\Models\User;
 use App\Simulation\Synthetic\SyntheticDecisionProfiles;
-use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
+use App\Simulation\Synthetic\SyntheticProfilePresets;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,7 +18,7 @@ class SyntheticUserProfileFactory extends Factory
     public function definition(): array
     {
         return array_merge(
-            SyntheticUserProfileDefaults::attributes(),
+            SyntheticProfilePresets::for(SyntheticDecisionProfiles::CASUAL),
             [
                 'user_id' => User::factory()->state([
                     'is_synthetic' => true,
@@ -29,23 +29,23 @@ class SyntheticUserProfileFactory extends Factory
 
     public function expert(): static
     {
-        return $this->state(fn (): array => [
-            'decision_profile' => SyntheticDecisionProfiles::EXPERT,
-        ]);
+        return $this->state(
+            fn (): array => SyntheticProfilePresets::for(SyntheticDecisionProfiles::EXPERT),
+        );
     }
 
     public function casual(): static
     {
-        return $this->state(fn (): array => [
-            'decision_profile' => SyntheticDecisionProfiles::CASUAL,
-        ]);
+        return $this->state(
+            fn (): array => SyntheticProfilePresets::for(SyntheticDecisionProfiles::CASUAL),
+        );
     }
 
     public function noisy(): static
     {
-        return $this->state(fn (): array => [
-            'decision_profile' => SyntheticDecisionProfiles::NOISY,
-        ]);
+        return $this->state(
+            fn (): array => SyntheticProfilePresets::for(SyntheticDecisionProfiles::NOISY),
+        );
     }
 
     public function disabled(): static

@@ -9,6 +9,7 @@ use App\Simulation\Synthetic\SeedSyntheticUserPoolAction;
 use App\Simulation\Synthetic\SyntheticDecisionProfiles;
 use App\Simulation\Synthetic\SyntheticPoolIdentity;
 use App\Simulation\Synthetic\SyntheticPoolProfileAllocator;
+use App\Simulation\Synthetic\SyntheticProfilePresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -111,7 +112,7 @@ final class SeedSyntheticUserPoolCommandTest extends TestCase
         $this->assertSame($identity->displayName('alpha', 1), $user->name);
     }
 
-    public function test_profiles_match_allocator(): void
+    public function test_profiles_match_allocator_and_full_presets(): void
     {
         Artisan::call('zcout:synthetic-users:seed-pool', [
             '--count' => 10,
@@ -128,14 +129,95 @@ final class SeedSyntheticUserPoolCommandTest extends TestCase
             ->get();
 
         foreach ($users as $user) {
-            $expected = $allocator->allocate(
+            $expectedProfile = $allocator->allocate(
                 'default',
                 (int) $user->synthetic_pool_index,
                 20,
                 50,
                 30,
             );
-            $this->assertSame($expected, $user->syntheticProfile->decision_profile);
+            $this->assertSame($expectedProfile, $user->syntheticProfile->decision_profile);
+            $this->assertContains($expectedProfile, SyntheticDecisionProfiles::ALLOWED);
+            $this->assertNotSame('biased', $user->syntheticProfile->decision_profile);
+            $this->assertProfileMatchesPreset($user->syntheticProfile, $expectedProfile);
+        }
+    }
+
+    public function test_rerun_does_not_modify_manually_changed_existing_profile(): void
+    {
+        Artisan::call('zcout:synthetic-users:seed-pool', [
+            '--count' => 1,
+            '--expert-percent' => 100,
+            '--casual-percent' => 0,
+            '--noisy-percent' => 0,
+        ]);
+
+        $user = User::query()
+            ->where('synthetic_pool_key', 'default')
+            ->where('synthetic_pool_index', 1)
+            ->with('syntheticProfile')
+            ->firstOrFail();
+
+        $this->assertProfileMatchesPreset($user->syntheticProfile, SyntheticDecisionProfiles::EXPERT);
+
+        $user->syntheticProfile->update([
+            'skip_probability' => 0.33,
+            'decision_accuracy' => 0.41,
+            'noise_level' => 0.22,
+            'actions_per_session_max' => 11,
+        ]);
+
+        Artisan::call('zcout:synthetic-users:seed-pool', [
+            '--count' => 1,
+            '--expert-percent' => 100,
+            '--casual-percent' => 0,
+            '--noisy-percent' => 0,
+        ]);
+
+        $user->syntheticProfile->refresh();
+        $this->assertEqualsWithDelta(0.33, $user->syntheticProfile->skip_probability, 1e-9);
+        $this->assertEqualsWithDelta(0.41, $user->syntheticProfile->decision_accuracy, 1e-9);
+        $this->assertEqualsWithDelta(0.22, $user->syntheticProfile->noise_level, 1e-9);
+        $this->assertSame(11, $user->syntheticProfile->actions_per_session_max);
+        $this->assertSame(SyntheticDecisionProfiles::EXPERT, $user->syntheticProfile->decision_profile);
+    }
+
+    public function test_growing_pool_applies_presets_only_to_new_members(): void
+    {
+        Artisan::call('zcout:synthetic-users:seed-pool', [
+            '--count' => 1,
+            '--expert-percent' => 0,
+            '--casual-percent' => 100,
+            '--noisy-percent' => 0,
+        ]);
+
+        $existing = User::query()
+            ->where('synthetic_pool_key', 'default')
+            ->where('synthetic_pool_index', 1)
+            ->with('syntheticProfile')
+            ->firstOrFail();
+        $existing->syntheticProfile->update(['skip_probability' => 0.01]);
+
+        Artisan::call('zcout:synthetic-users:seed-pool', [
+            '--count' => 3,
+            '--expert-percent' => 0,
+            '--casual-percent' => 0,
+            '--noisy-percent' => 100,
+        ]);
+
+        $existing->syntheticProfile->refresh();
+        $this->assertEqualsWithDelta(0.01, $existing->syntheticProfile->skip_probability, 1e-9);
+        $this->assertSame(SyntheticDecisionProfiles::CASUAL, $existing->syntheticProfile->decision_profile);
+
+        $newMembers = User::query()
+            ->where('synthetic_pool_key', 'default')
+            ->whereIn('synthetic_pool_index', [2, 3])
+            ->with('syntheticProfile')
+            ->get();
+
+        $this->assertCount(2, $newMembers);
+        foreach ($newMembers as $member) {
+            $this->assertProfileMatchesPreset($member->syntheticProfile, SyntheticDecisionProfiles::NOISY);
         }
     }
 
@@ -283,5 +365,42 @@ final class SeedSyntheticUserPoolCommandTest extends TestCase
         $this->assertNotSame('', (string) $user->password);
         $this->assertTrue(strlen((string) $user->getRawOriginal('password')) > 20);
         $this->assertStringNotContainsString((string) $user->getRawOriginal('password'), $output);
+    }
+
+    public function test_dry_run_reports_profiles_without_writing_presets(): void
+    {
+        $exitCode = Artisan::call('zcout:synthetic-users:seed-pool', [
+            '--count' => 3,
+            '--expert-percent' => 100,
+            '--casual-percent' => 0,
+            '--noisy-percent' => 0,
+            '--dry-run' => true,
+        ]);
+        $output = Artisan::output();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, User::query()->where('synthetic_pool_key', 'default')->count());
+        $this->assertSame(0, DB::table('synthetic_user_profiles')->count());
+        $this->assertStringContainsString('Would create: 3', $output);
+        $this->assertStringContainsString('Expert: 3', $output);
+        $this->assertStringContainsString('Casual: 0', $output);
+        $this->assertStringContainsString('Noisy: 0', $output);
+    }
+
+    private function assertProfileMatchesPreset($profile, string $archetype): void
+    {
+        $expected = SyntheticProfilePresets::for($archetype);
+
+        $this->assertSame($expected['decision_profile'], $profile->decision_profile);
+        $this->assertSame($expected['sessions_per_day_min'], $profile->sessions_per_day_min);
+        $this->assertSame($expected['sessions_per_day_max'], $profile->sessions_per_day_max);
+        $this->assertSame($expected['actions_per_session_min'], $profile->actions_per_session_min);
+        $this->assertSame($expected['actions_per_session_max'], $profile->actions_per_session_max);
+        $this->assertSame($expected['delay_seconds_min'], $profile->delay_seconds_min);
+        $this->assertSame($expected['delay_seconds_max'], $profile->delay_seconds_max);
+        $this->assertEqualsWithDelta($expected['skip_probability'], $profile->skip_probability, 1e-9);
+        $this->assertEqualsWithDelta($expected['decision_accuracy'], $profile->decision_accuracy, 1e-9);
+        $this->assertEqualsWithDelta($expected['noise_level'], $profile->noise_level, 1e-9);
+        $this->assertSame($expected['is_enabled'], $profile->is_enabled);
     }
 }

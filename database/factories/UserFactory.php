@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Simulation\Synthetic\SyntheticDecisionProfiles;
 use App\Simulation\Synthetic\SyntheticPoolIdentity;
+use App\Simulation\Synthetic\SyntheticProfilePresets;
 use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -58,19 +59,16 @@ class UserFactory extends Factory
      */
     public function synthetic(?string $decisionProfile = null): static
     {
-        $profile = $decisionProfile ?? SyntheticUserProfileDefaults::DECISION_PROFILE;
+        $attributes = SyntheticProfilePresets::for(
+            $decisionProfile ?? SyntheticUserProfileDefaults::DECISION_PROFILE,
+        );
 
         return $this
             ->state(fn (): array => [
                 'is_synthetic' => true,
             ])
-            ->afterCreating(function (User $user) use ($profile): void {
-                $user->syntheticProfile()->create(array_merge(
-                    SyntheticUserProfileDefaults::attributes(),
-                    [
-                        'decision_profile' => $profile,
-                    ],
-                ));
+            ->afterCreating(function (User $user) use ($attributes): void {
+                $user->syntheticProfile()->create($attributes);
             });
     }
 
@@ -96,13 +94,9 @@ class UserFactory extends Factory
                 'influence_profile' => InfluenceProfile::USER_DEFAULT,
             ])
             ->afterCreating(function (User $user) use ($decisionProfile): void {
-                $user->syntheticProfile()->create(array_merge(
-                    SyntheticUserProfileDefaults::attributes(),
-                    [
-                        'decision_profile' => $decisionProfile,
-                        'is_enabled' => true,
-                    ],
-                ));
+                $user->syntheticProfile()->create(
+                    SyntheticProfilePresets::for($decisionProfile),
+                );
             });
     }
 }

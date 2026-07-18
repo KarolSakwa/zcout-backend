@@ -192,13 +192,9 @@ final class SeedSyntheticUserPoolAction
             ]);
             $user->save();
 
-            $user->syntheticProfile()->create(array_merge(
-                SyntheticUserProfileDefaults::attributes(),
-                [
-                    'decision_profile' => $decisionProfile,
-                    'is_enabled' => true,
-                ],
-            ));
+            $user->syntheticProfile()->create(
+                SyntheticProfilePresets::for($decisionProfile),
+            );
 
             return $user->fresh(['syntheticProfile']) ?? $user;
         });

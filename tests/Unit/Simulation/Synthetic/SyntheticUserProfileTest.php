@@ -5,6 +5,7 @@ namespace Tests\Unit\Simulation\Synthetic;
 use App\Models\SyntheticUserProfile;
 use App\Models\User;
 use App\Simulation\Synthetic\SyntheticDecisionProfiles;
+use App\Simulation\Synthetic\SyntheticProfilePresets;
 use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
 use App\Simulation\Synthetic\ValidateSyntheticUserProfile;
 use DomainException;
@@ -32,16 +33,17 @@ final class SyntheticUserProfileTest extends TestCase
         $this->assertSame(1, $user->syntheticProfile()->count());
 
         $profile = $user->syntheticProfile;
-        $this->assertSame(SyntheticUserProfileDefaults::DECISION_PROFILE, $profile->decision_profile);
-        $this->assertSame(SyntheticUserProfileDefaults::SESSIONS_PER_DAY_MIN, $profile->sessions_per_day_min);
-        $this->assertSame(SyntheticUserProfileDefaults::SESSIONS_PER_DAY_MAX, $profile->sessions_per_day_max);
-        $this->assertSame(SyntheticUserProfileDefaults::ACTIONS_PER_SESSION_MIN, $profile->actions_per_session_min);
-        $this->assertSame(SyntheticUserProfileDefaults::ACTIONS_PER_SESSION_MAX, $profile->actions_per_session_max);
-        $this->assertSame(SyntheticUserProfileDefaults::DELAY_SECONDS_MIN, $profile->delay_seconds_min);
-        $this->assertSame(SyntheticUserProfileDefaults::DELAY_SECONDS_MAX, $profile->delay_seconds_max);
-        $this->assertEqualsWithDelta(SyntheticUserProfileDefaults::SKIP_PROBABILITY, $profile->skip_probability, 0.0001);
-        $this->assertEqualsWithDelta(SyntheticUserProfileDefaults::DECISION_ACCURACY, $profile->decision_accuracy, 0.0001);
-        $this->assertEqualsWithDelta(SyntheticUserProfileDefaults::NOISE_LEVEL, $profile->noise_level, 0.0001);
+        $expected = SyntheticProfilePresets::for(SyntheticDecisionProfiles::CASUAL);
+        $this->assertSame($expected['decision_profile'], $profile->decision_profile);
+        $this->assertSame($expected['sessions_per_day_min'], $profile->sessions_per_day_min);
+        $this->assertSame($expected['sessions_per_day_max'], $profile->sessions_per_day_max);
+        $this->assertSame($expected['actions_per_session_min'], $profile->actions_per_session_min);
+        $this->assertSame($expected['actions_per_session_max'], $profile->actions_per_session_max);
+        $this->assertSame($expected['delay_seconds_min'], $profile->delay_seconds_min);
+        $this->assertSame($expected['delay_seconds_max'], $profile->delay_seconds_max);
+        $this->assertEqualsWithDelta($expected['skip_probability'], $profile->skip_probability, 0.0001);
+        $this->assertEqualsWithDelta($expected['decision_accuracy'], $profile->decision_accuracy, 0.0001);
+        $this->assertEqualsWithDelta($expected['noise_level'], $profile->noise_level, 0.0001);
         $this->assertTrue($profile->is_enabled);
         $this->assertIsBool($profile->is_enabled);
         $this->assertIsInt($profile->sessions_per_day_min);
@@ -51,8 +53,12 @@ final class SyntheticUserProfileTest extends TestCase
     public function test_synthetic_factory_can_override_decision_profile(): void
     {
         $user = User::factory()->synthetic(SyntheticDecisionProfiles::EXPERT)->create();
+        $expected = SyntheticProfilePresets::for(SyntheticDecisionProfiles::EXPERT);
 
-        $this->assertSame(SyntheticDecisionProfiles::EXPERT, $user->syntheticProfile->decision_profile);
+        $this->assertSame($expected['decision_profile'], $user->syntheticProfile->decision_profile);
+        $this->assertEqualsWithDelta($expected['skip_probability'], $user->syntheticProfile->skip_probability, 1e-9);
+        $this->assertEqualsWithDelta($expected['decision_accuracy'], $user->syntheticProfile->decision_accuracy, 1e-9);
+        $this->assertEqualsWithDelta($expected['noise_level'], $user->syntheticProfile->noise_level, 1e-9);
     }
 
     public function test_profile_is_deleted_when_user_is_deleted(): void
@@ -150,8 +156,12 @@ final class SyntheticUserProfileTest extends TestCase
     public function test_profile_factory_expert_state(): void
     {
         $profile = SyntheticUserProfile::factory()->expert()->create();
+        $expected = SyntheticProfilePresets::for(SyntheticDecisionProfiles::EXPERT);
 
-        $this->assertSame(SyntheticDecisionProfiles::EXPERT, $profile->decision_profile);
+        $this->assertSame($expected['decision_profile'], $profile->decision_profile);
+        $this->assertEqualsWithDelta($expected['skip_probability'], $profile->skip_probability, 1e-9);
+        $this->assertEqualsWithDelta($expected['decision_accuracy'], $profile->decision_accuracy, 1e-9);
+        $this->assertEqualsWithDelta($expected['noise_level'], $profile->noise_level, 1e-9);
         $this->assertTrue($profile->user->is_synthetic);
     }
 

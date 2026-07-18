@@ -274,7 +274,10 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
         $this->assertStringContainsString('Planned actions: 2', $output);
         $this->assertStringContainsString('[1/2]', $output);
         $this->assertStringContainsString('[2/2]', $output);
-        $this->assertNotSame(SyntheticUserProfileDefaults::ACTIONS_PER_SESSION_MIN, 2);
+        $this->assertNotSame(
+            SyntheticUserProfileDefaults::attributes()['actions_per_session_min'],
+            2,
+        );
     }
 
     public function test_biased_cannot_be_persisted_for_synthetic_profile(): void
