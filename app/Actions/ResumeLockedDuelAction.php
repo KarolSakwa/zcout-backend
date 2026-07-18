@@ -118,6 +118,20 @@ final class ResumeLockedDuelAction
             ];
         }
 
+        $bothInCurrentPremierLeague = Player::query()
+            ->whereKey([(int) $pA->id, (int) $pB->id])
+            ->inCurrentPremierLeague()
+            ->count() === 2;
+
+        if (! $bothInCurrentPremierLeague) {
+            DB::table('voter_duel_locks')->where('voter_hash', $voterHash)->delete();
+
+            return [
+                'status' => 'expired',
+                'payload' => null,
+            ];
+        }
+
         $payload = $this->buildNextDuelPayloadAction->handle([
             'attribute' => $lockedAttr,
             'duel' => $lockedDuel,

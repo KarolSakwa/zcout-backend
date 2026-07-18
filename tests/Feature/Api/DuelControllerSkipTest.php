@@ -44,6 +44,7 @@ class DuelControllerSkipTest extends TestCase
             'color_primary' => '#660033',
             'color_secondary' => '#94BEE5',
             'color_tertiary' => '#FFFFFF',
+            'is_current_premier_league' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -54,6 +55,7 @@ class DuelControllerSkipTest extends TestCase
             'color_primary' => '#6CABDD',
             'color_secondary' => '#1C2C5B',
             'color_tertiary' => '#FFFFFF',
+            'is_current_premier_league' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

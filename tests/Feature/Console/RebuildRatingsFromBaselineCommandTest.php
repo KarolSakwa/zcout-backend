@@ -207,11 +207,20 @@ class RebuildRatingsFromBaselineCommandTest extends TestCase
 
     private function createPlayer(array $data): int
     {
+        $clubId = DB::table('clubs')->insertGetId([
+            'name' => 'Club '.$data['slug'],
+            'slug' => 'club-'.$data['slug'],
+            'is_current_premier_league' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         return (int) DB::table('players')->insertGetId([
             'name' => $data['name'],
             'slug' => $data['slug'],
             'position_id' => $data['position_id'],
-            'club_id' => null,
+            'club_id' => $clubId,
+            'club' => 'Club '.$data['slug'],
             'country_id' => null,
             'number' => null,
             'date_of_birth' => null,

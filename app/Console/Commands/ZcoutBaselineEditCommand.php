@@ -114,16 +114,20 @@ class ZcoutBaselineEditCommand extends Command
     protected function loadPlayers()
     {
         return DB::table('players as p')
+            ->join('clubs as c', 'c.id', '=', 'p.club_id')
             ->leftJoin('player_reputation_stats as prs', 'prs.player_id', '=', 'p.id')
             ->leftJoin('positions as pos', 'pos.id', '=', 'p.position_id')
+            ->whereNotNull('p.club_id')
+            ->where('c.is_current_premier_league', true)
             ->select([
                 'p.id',
                 'p.name',
-                'p.club',
+                'c.name as club_name',
                 'pos.short_label as position',
                 'prs.player_rep',
             ])
-            ->orderByRaw('prs.player_rep DESC NULLS LAST')
+            ->orderByRaw('CASE WHEN prs.player_rep IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('prs.player_rep')
             ->orderBy('p.name')
             ->orderBy('p.id')
             ->get()
@@ -132,7 +136,7 @@ class ZcoutBaselineEditCommand extends Command
                     'id' => (int) $row->id,
                     'name' => $this->pickString($row, ['name', 'player_name'], 'Unknown Player'),
                     'position' => strtoupper($this->pickString($row, ['position'], '-')),
-                    'club' => $this->pickString($row, ['club', 'club_name', 'current_club', 'current_club_name'], '-'),
+                    'club' => $this->pickString($row, ['club_name', 'club', 'current_club', 'current_club_name'], '-'),
                 ];
             })
             ->values();
@@ -388,7 +392,11 @@ class ZcoutBaselineEditCommand extends Command
         }
 
         return [
-            'version' => 1,
+            'version' => (int) ($baseline['version'] ?? 1),
+            'format_version' => (int) ($baseline['format_version'] ?? 2),
+            'competition' => (string) ($baseline['competition'] ?? config('zcout_premier_league.competition', 'Premier League')),
+            'season' => (string) ($baseline['season'] ?? config('zcout_premier_league.season', '2026/27')),
+            'generated_at' => (string) ($baseline['generated_at'] ?? ($baseline['updated_at'] ?? CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s\Z'))),
             'updated_at' => (string) ($baseline['updated_at'] ?? CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s\Z')),
             'players' => $players,
         ];
@@ -396,9 +404,15 @@ class ZcoutBaselineEditCommand extends Command
 
     protected function emptyBaseline(): array
     {
+        $now = CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s\Z');
+
         return [
             'version' => 1,
-            'updated_at' => CarbonImmutable::now('UTC')->format('Y-m-d\TH:i:s\Z'),
+            'format_version' => 2,
+            'competition' => (string) config('zcout_premier_league.competition', 'Premier League'),
+            'season' => (string) config('zcout_premier_league.season', '2026/27'),
+            'generated_at' => $now,
+            'updated_at' => $now,
             'players' => [],
         ];
     }

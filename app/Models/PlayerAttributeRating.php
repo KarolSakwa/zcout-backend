@@ -24,6 +24,11 @@ class PlayerAttributeRating extends Model
         return $this->belongsTo(Attribute::class);
     }
 
+    public function player()
+    {
+        return $this->belongsTo(Player::class);
+    }
+
     protected function casts(): array
     {
         return [

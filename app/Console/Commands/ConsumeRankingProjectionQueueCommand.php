@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Player;
 use App\Services\RabbitMq\RabbitMqConnection;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
@@ -44,11 +45,21 @@ class ConsumeRankingProjectionQueueCommand extends Command
                     JSON_THROW_ON_ERROR,
                 );
 
-                Redis::zadd(
-                    'ranking:overall',
-                    (float) $payload['overall'],
-                    (string) $payload['player_id'],
-                );
+                $playerId = (int) $payload['player_id'];
+                $inCurrentPremierLeague = Player::query()
+                    ->whereKey($playerId)
+                    ->inCurrentPremierLeague()
+                    ->exists();
+
+                if ($inCurrentPremierLeague) {
+                    Redis::zadd(
+                        'ranking:overall',
+                        (float) $payload['overall'],
+                        (string) $playerId,
+                    );
+                } else {
+                    Redis::zrem('ranking:overall', (string) $playerId);
+                }
 
                 $message->ack();
 

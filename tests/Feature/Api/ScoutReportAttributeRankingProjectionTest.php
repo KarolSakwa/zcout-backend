@@ -96,6 +96,20 @@ class ScoutReportAttributeRankingProjectionTest extends TestCase
 
     public function test_registered_listener_writes_redis_and_publishes_after_event_dispatch(): void
     {
+        $clubId = (int) DB::table('clubs')->insertGetId([
+            'name' => 'Scout Club',
+            'slug' => 'scout-club-'.uniqid(),
+            'is_current_premier_league' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $playerId = (int) DB::table('players')->insertGetId([
+            'name' => 'Scout Player',
+            'slug' => 'scout-player-'.uniqid(),
+            'club_id' => $clubId,
+        ]);
+
         $publisher = Mockery::mock(RabbitMqPublisher::class);
         $publisher->shouldReceive('publish')
             ->once()
@@ -103,7 +117,7 @@ class ScoutReportAttributeRankingProjectionTest extends TestCase
                 'zcout.events',
                 'player.attribute.updated',
                 [
-                    'player_id' => 7,
+                    'player_id' => $playerId,
                     'attribute_key' => 'leadership',
                     'rating' => 91.0,
                     'confidence' => 2.0,
@@ -114,16 +128,16 @@ class ScoutReportAttributeRankingProjectionTest extends TestCase
 
         Redis::shouldReceive('zadd')
             ->once()
-            ->with('ranking:leadership', 91.0, '7')
+            ->with('ranking:leadership', 91.0, (string) $playerId)
             ->andReturn(1);
 
         Redis::shouldReceive('hset')
             ->once()
-            ->with('ranking:leadership:meta', '7', '{"confidence":2}')
+            ->with('ranking:leadership:meta', (string) $playerId, '{"confidence":2}')
             ->andReturn(1);
 
         event(new PlayerAttributeRatingUpdated(
-            playerId: 7,
+            playerId: $playerId,
             attributeKey: 'leadership',
             rating: 91.0,
             confidence: 2.0,

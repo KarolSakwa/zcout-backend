@@ -14,18 +14,21 @@ class DatabaseController extends Controller
         if ($limit < 1) $limit = 1;
         if ($limit > 200) $limit = 200;
 
-        $clubs = DB::table('players as p')
-            ->selectRaw('p.club as club, c.color_primary as primary, c.color_secondary as secondary, c.color_tertiary as tertiary')
-            ->leftJoin('clubs as c', 'c.name', '=', 'p.club')
-            ->whereNotNull('p.club')
-            ->where('p.club', '!=', '')
-            ->groupBy('p.club', 'c.color_primary', 'c.color_secondary', 'c.color_tertiary')
-            ->orderBy('p.club')
+        $clubs = DB::table('clubs as c')
+            ->where('c.is_current_premier_league', true)
+            ->orderBy('c.name')
             ->limit($limit)
-            ->get()
+            ->get([
+                'c.name as club',
+                'c.slug',
+                'c.color_primary as primary',
+                'c.color_secondary as secondary',
+                'c.color_tertiary as tertiary',
+            ])
             ->map(function ($r) {
                 return [
                     'club' => (string) $r->club,
+                    'slug' => (string) $r->slug,
                     'colors' => [
                         'primary' => $r->primary ? (string) $r->primary : null,
                         'secondary' => $r->secondary ? (string) $r->secondary : null,
@@ -43,6 +46,7 @@ class DatabaseController extends Controller
             'filters' => [
                 'limit' => $limit,
                 'league' => 'Premier League',
+                'season' => (string) config('zcout_premier_league.season'),
             ],
             'items' => $clubs,
         ]);
@@ -55,7 +59,7 @@ class DatabaseController extends Controller
         if ($limit > 500) $limit = 500;
 
         $club = DB::table('clubs')
-            ->select('name', 'slug', 'color_primary', 'color_secondary', 'color_tertiary')
+            ->select('id', 'name', 'slug', 'color_primary', 'color_secondary', 'color_tertiary', 'is_current_premier_league')
             ->where('slug', $slug)
             ->first();
 
@@ -92,7 +96,7 @@ class DatabaseController extends Controller
             ->select('id', 'name', 'position_id', 'fd_position_id', 'manual_position_id')
             ->with(['positionRef:id,short_label', 'fdPositionRef:id,short_label,key,label',
                 'manualPositionRef:id,short_label,key,label'])
-            ->where('club', (string) $club->name)
+            ->where('club_id', (int) $club->id)
             ->orderBy('name')
             ->limit($limit)
             ->get();

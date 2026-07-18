@@ -5,10 +5,12 @@ namespace Tests\Feature\Api;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use Tests\Support\CreatesCurrentPremierLeagueClub;
 use Tests\TestCase;
 
 class HomepageFeaturedRankingTest extends TestCase
 {
+    use CreatesCurrentPremierLeagueClub;
     use RefreshDatabase;
 
     public function test_it_returns_null_attribute_and_empty_players_when_no_attributes_exist(): void
@@ -25,6 +27,8 @@ class HomepageFeaturedRankingTest extends TestCase
 
     public function test_it_returns_featured_ranking_contract_with_redis_data(): void
     {
+        $clubId = $this->createCurrentPremierLeagueClub('Featured Ranking Club', 'featured-ranking-club');
+
         $attributeId = DB::table('attributes')->insertGetId([
             'key' => 'finishing',
             'label' => 'Finishing',
@@ -38,18 +42,20 @@ class HomepageFeaturedRankingTest extends TestCase
         $playerOneId = DB::table('players')->insertGetId([
             'name' => 'Erling Haaland',
             'slug' => 'erling-haaland',
+            'club_id' => $clubId,
         ]);
 
         $playerTwoId = DB::table('players')->insertGetId([
             'name' => 'Harry Kane',
             'slug' => 'harry-kane',
+            'club_id' => $clubId,
         ]);
 
         $missingPlayerId = 999_999;
 
         Redis::shouldReceive('zrevrange')
             ->once()
-            ->with('ranking:finishing', 0, 4, ['withscores' => true])
+            ->with('ranking:finishing', 0, 49, ['withscores' => true])
             ->andReturn([
                 (string) $playerOneId => '94.25',
                 (string) $playerTwoId => '92.10',
@@ -92,6 +98,8 @@ class HomepageFeaturedRankingTest extends TestCase
             ->assertJsonPath('players.1.player', 'Harry Kane')
             ->assertJsonPath('players.1.rating', 92.1)
             ->assertJsonPath('players.1.confidence', null);
+
+        $this->assertLessThanOrEqual(5, count($response->json('players')));
     }
 
     public function test_it_returns_attribute_with_empty_players_when_ranking_is_empty(): void
@@ -106,7 +114,7 @@ class HomepageFeaturedRankingTest extends TestCase
 
         Redis::shouldReceive('zrevrange')
             ->once()
-            ->with('ranking:pace', 0, 4, ['withscores' => true])
+            ->with('ranking:pace', 0, 49, ['withscores' => true])
             ->andReturn([]);
 
         $response = $this->getJson('/api/homepage/featured-ranking');
@@ -115,5 +123,49 @@ class HomepageFeaturedRankingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('attribute.key', 'pace')
             ->assertJsonPath('players', []);
+    }
+
+    public function test_it_returns_at_most_five_players_despite_overfetch(): void
+    {
+        $clubId = $this->createCurrentPremierLeagueClub('Overfetch Club', 'overfetch-club');
+
+        DB::table('attributes')->insert([
+            'key' => 'pace',
+            'label' => 'Pace',
+            'group' => 'PACE',
+            'order' => 1,
+            'scope' => 'both',
+        ]);
+
+        $redisPayload = [];
+        $metaFields = [];
+        $metaValues = [];
+
+        for ($i = 1; $i <= 8; $i++) {
+            $playerId = (int) DB::table('players')->insertGetId([
+                'name' => "Player {$i}",
+                'slug' => "player-{$i}",
+                'club_id' => $clubId,
+            ]);
+            $redisPayload[(string) $playerId] = (string) (100 - $i);
+            $metaFields[] = (string) $playerId;
+            $metaValues[] = '{"confidence":50}';
+        }
+
+        Redis::shouldReceive('zrevrange')
+            ->once()
+            ->with('ranking:pace', 0, 49, ['withscores' => true])
+            ->andReturn($redisPayload);
+
+        Redis::shouldReceive('hmget')
+            ->once()
+            ->with('ranking:pace:meta', $metaFields)
+            ->andReturn($metaValues);
+
+        $response = $this->getJson('/api/homepage/featured-ranking');
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(5, 'players');
     }
 }

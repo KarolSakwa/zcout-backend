@@ -36,6 +36,7 @@ class SearchController extends Controller
         $contains = '%' . $needle . '%';
 
         $playerRows = Player::query()
+            ->inCurrentPremierLeague()
             ->select(
                 'players.id',
                 'players.name',
@@ -180,6 +181,7 @@ class SearchController extends Controller
             });
 
         $clubs = Club::query()
+            ->currentPremierLeague()
             ->select('id', 'name', 'slug')
             ->where(function ($query) use ($contains) {
                 $query

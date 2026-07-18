@@ -193,6 +193,7 @@ final class BuildPlayerProfilePayloadAction
 
         if ($overall !== null) {
             $previousPlayer = PlayerOverall::query()
+                ->whereHas('player', fn ($q) => $q->inCurrentPremierLeague())
                 ->where(function ($query) use ($overall, $player) {
                     $query
                         ->where('overall', '>', $overall)
@@ -208,6 +209,7 @@ final class BuildPlayerProfilePayloadAction
                 ->first();
 
             $nextPlayer = PlayerOverall::query()
+                ->whereHas('player', fn ($q) => $q->inCurrentPremierLeague())
                 ->where(function ($query) use ($overall, $player) {
                     $query
                         ->where('overall', '<', $overall)

@@ -17,6 +17,7 @@ class HomepageNeedsMoreRatingsTest extends TestCase
             'slug' => 'arsenal',
             'color_primary' => '#111111',
             'color_secondary' => '#222222',
+            'is_current_premier_league' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -38,10 +39,19 @@ class HomepageNeedsMoreRatingsTest extends TestCase
             'fd_position_id' => $positionId,
         ]);
 
+        $chelseaId = DB::table('clubs')->insertGetId([
+            'name' => 'Chelsea',
+            'slug' => 'chelsea',
+            'is_current_premier_league' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Cole Palmer',
             'slug' => 'cole-palmer',
             'club' => 'Chelsea',
+            'club_id' => $chelseaId,
             'fd_position_id' => $positionId,
         ]);
 
