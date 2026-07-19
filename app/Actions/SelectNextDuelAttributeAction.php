@@ -18,44 +18,15 @@ final class SelectNextDuelAttributeAction
         }
 
         $scopeMix = $cfg['attribute_scope_mix'] ?? [
-                'both' => 0.90,
-                'gk' => 0.10,
-            ];
+            'both' => 0.90,
+            'gk' => 0.10,
+        ];
 
-        $gkShare = (float) ($scopeMix['gk'] ?? 0.10);
-        if ($gkShare < 0.0) {
-            $gkShare = 0.0;
-        }
-        if ($gkShare > 1.0) {
-            $gkShare = 1.0;
-        }
-
+        $gkShare = max(0.0, min(1.0, (float) ($scopeMix['gk'] ?? 0.10)));
         $scope = (mt_rand() / mt_getrandmax()) < $gkShare ? 'gk' : 'both';
 
-        $allowedKeys = $cfg['attribute_selection']['organic_allowed_keys'] ?? null;
-
-        $query = Attribute::query()
-            ->where('scope', $scope);
-
-        if (is_array($allowedKeys) && $allowedKeys !== []) {
-            $query->whereIn('key', $allowedKeys);
-        }
-
-        $attribute = $query
-            ->inRandomOrder()
-            ->first();
-
-        if ($attribute) {
-            return $attribute;
-        }
-
-        $fallbackQuery = Attribute::query();
-
-        if (is_array($allowedKeys) && $allowedKeys !== []) {
-            $fallbackQuery->whereIn('key', $allowedKeys);
-        }
-
-        return $fallbackQuery
+        return Attribute::query()
+            ->where('scope', $scope)
             ->inRandomOrder()
             ->first();
     }

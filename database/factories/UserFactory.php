@@ -4,6 +4,11 @@ namespace Database\Factories;
 
 use App\Enums\InfluenceProfile;
 use App\Enums\UserRole;
+use App\Models\User;
+use App\Simulation\Synthetic\SyntheticDecisionProfiles;
+use App\Simulation\Synthetic\SyntheticPoolIdentity;
+use App\Simulation\Synthetic\SyntheticProfilePresets;
+use App\Simulation\Synthetic\SyntheticUserProfileDefaults;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,6 +38,9 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'role' => UserRole::USER,
             'influence_profile' => InfluenceProfile::USER_DEFAULT,
+            'is_synthetic' => false,
+            'synthetic_pool_key' => null,
+            'synthetic_pool_index' => null,
         ];
     }
 
@@ -44,5 +52,51 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Mark the user as synthetic and create a linked profile with defaults.
+     */
+    public function synthetic(?string $decisionProfile = null): static
+    {
+        $attributes = SyntheticProfilePresets::for(
+            $decisionProfile ?? SyntheticUserProfileDefaults::DECISION_PROFILE,
+        );
+
+        return $this
+            ->state(fn (): array => [
+                'is_synthetic' => true,
+            ])
+            ->afterCreating(function (User $user) use ($attributes): void {
+                $user->syntheticProfile()->create($attributes);
+            });
+    }
+
+    /**
+     * Create a managed synthetic pool member with deterministic identity.
+     */
+    public function syntheticPoolMember(
+        string $pool = 'default',
+        int $index = 1,
+        ?string $profile = null,
+    ): static {
+        $decisionProfile = $profile ?? SyntheticDecisionProfiles::CASUAL;
+        $identity = app(SyntheticPoolIdentity::class);
+
+        return $this
+            ->state(fn (): array => [
+                'name' => $identity->displayName($pool, $index),
+                'email' => $identity->email($pool, $index),
+                'is_synthetic' => true,
+                'synthetic_pool_key' => $pool,
+                'synthetic_pool_index' => $index,
+                'role' => UserRole::USER,
+                'influence_profile' => InfluenceProfile::USER_DEFAULT,
+            ])
+            ->afterCreating(function (User $user) use ($decisionProfile): void {
+                $user->syntheticProfile()->create(
+                    SyntheticProfilePresets::for($decisionProfile),
+                );
+            });
     }
 }

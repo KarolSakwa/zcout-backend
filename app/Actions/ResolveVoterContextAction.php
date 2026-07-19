@@ -10,7 +10,7 @@ final class ResolveVoterContextAction
         $isAuthed = auth()->check();
         $userId = $isAuthed ? auth()->id() : null;
 
-        $voterHash = $anon ?: ($isAuthed ? ('user:' . $userId) : null);
+        $voterHash = $anon ?: ($isAuthed ? AuthenticatedVoterLockKey::forUserId((int) $userId) : null);
 
         if (!$voterHash) {
             return [

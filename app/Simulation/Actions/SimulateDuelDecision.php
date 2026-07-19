@@ -5,12 +5,15 @@ namespace App\Simulation\Actions;
 use App\Simulation\Data\InteractionDecision;
 use App\Simulation\Data\InteractionOpportunity;
 use App\Simulation\Data\SimulatedUser;
+use App\Simulation\Decision\DuelDecisionPolicy;
+use App\Simulation\Decision\SimulationLabDecisionSeed;
 use App\Simulation\SimulationContext;
 
 final class SimulateDuelDecision
 {
     public function __construct(
         private readonly BuildTruthAwareDuel $truthAwareDuelBuilder = new BuildTruthAwareDuel(),
+        private readonly DuelDecisionPolicy $decisionPolicy = new DuelDecisionPolicy(),
     ) {
     }
 
@@ -29,32 +32,27 @@ final class SimulateDuelDecision
             );
         }
 
-        $diff = $duel->truthRatingA - $duel->truthRatingB;
-        $absDiff = abs($diff);
+        $decisionSeed = SimulationLabDecisionSeed::build(
+            runId: $context->runId,
+            currentStep: $context->currentStep,
+            userId: $user->id,
+            userType: $user->type,
+            playerAId: $duel->playerAId,
+            playerBId: $duel->playerBId,
+            attributeKey: $duel->attributeKey,
+        );
 
-        $base = implode('|', [
-            $context->runId,
-            $context->currentStep,
-            $user->id,
-            $user->type,
-            $duel->playerAId,
-            $duel->playerBId,
-            $duel->attributeKey,
-        ]);
+        $result = $this->decisionPolicy->decide(
+            decisionSeed: $decisionSeed,
+            userType: $user->type,
+            playerAId: $duel->playerAId,
+            playerBId: $duel->playerBId,
+            attributeKey: $duel->attributeKey,
+            truthRatingA: $duel->truthRatingA,
+            truthRatingB: $duel->truthRatingB,
+        );
 
-        $skipRoll = abs(crc32($base . '|skip')) % 1000;
-        $correctnessRoll = abs(crc32($base . '|correctness')) % 1000;
-        $biasRoll = abs(crc32($base . '|bias')) % 1000;
-
-        $skipThreshold = match ($user->type) {
-            'expert' => $absDiff < 3 ? 300 : ($absDiff < 8 ? 80 : 10),
-            'casual' => $absDiff < 3 ? 220 : ($absDiff < 8 ? 95 : 30),
-            'noisy' => $absDiff < 3 ? 180 : ($absDiff < 8 ? 90 : 35),
-            'biased' => $absDiff < 3 ? 120 : ($absDiff < 8 ? 55 : 20),
-            default => $absDiff < 3 ? 180 : ($absDiff < 8 ? 80 : 35),
-        };
-
-        if ($skipRoll < $skipThreshold) {
+        if ($result->type === 'skip') {
             return new InteractionDecision(
                 source: 'duel',
                 type: 'skip',
@@ -62,35 +60,12 @@ final class SimulateDuelDecision
             );
         }
 
-        $correctnessThreshold = match ($user->type) {
-            'expert' => $absDiff < 3 ? 860 : ($absDiff < 8 ? 945 : 985),
-            'casual' => $absDiff < 3 ? 610 : ($absDiff < 8 ? 740 : 820),
-            'noisy' => $absDiff < 3 ? 420 : ($absDiff < 8 ? 560 : 680),
-            'biased' => $absDiff < 3 ? 560 : ($absDiff < 8 ? 700 : 820),
-            default => $absDiff < 3 ? 500 : ($absDiff < 8 ? 650 : 780),
-        };
-
-        $preferredWinnerId = $diff >= 0 ? $duel->playerAId : $duel->playerBId;
-        $oppositeWinnerId = $preferredWinnerId === $duel->playerAId ? $duel->playerBId : $duel->playerAId;
-
-        $winnerPlayerId = $correctnessRoll < $correctnessThreshold
-            ? $preferredWinnerId
-            : $oppositeWinnerId;
-
-        if ($user->type === 'biased' && $absDiff < 8) {
-            $biasedPreferredWinnerId = $biasRoll < 500 ? $duel->playerAId : $duel->playerBId;
-
-            if ($biasRoll < 350) {
-                $winnerPlayerId = $biasedPreferredWinnerId;
-            }
-        }
-
         return new InteractionDecision(
             source: 'duel',
             type: 'vote',
             payload: [
-                'winner_player_id' => $winnerPlayerId,
-                'truth_diff' => round($diff, 2),
+                'winner_player_id' => $result->winnerPlayerId,
+                'truth_diff' => $result->truthDiff,
             ],
         );
     }
