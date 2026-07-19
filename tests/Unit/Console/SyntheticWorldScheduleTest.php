@@ -74,7 +74,7 @@ final class SyntheticWorldScheduleTest extends TestCase
         $this->app->make(Schedule::class);
     }
 
-    public function test_manual_tick_command_still_runs_when_automation_disabled(): void
+    public function test_manual_tick_command_still_invokes_action_when_environment_disabled(): void
     {
         config(['synthetic_world.enabled' => false]);
 

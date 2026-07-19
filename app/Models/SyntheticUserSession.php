@@ -60,4 +60,9 @@ class SyntheticUserSession extends Model
     {
         return $this->status === SyntheticSessionStatuses::FAILED;
     }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === SyntheticSessionStatuses::CANCELLED;
+    }
 }

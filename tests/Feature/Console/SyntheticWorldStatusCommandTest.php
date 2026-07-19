@@ -40,7 +40,9 @@ final class SyntheticWorldStatusCommandTest extends TestCase
             'Synthetic World Status',
             'Date:',
             'Timezone:',
-            'Automation:',
+            'Environment automation:',
+            'Runtime automation:',
+            'Effective automation:',
             'Health:',
             'Users',
             'Profiles',
@@ -124,9 +126,11 @@ final class SyntheticWorldStatusCommandTest extends TestCase
         $this->app->instance(TickSyntheticWorldAction::class, $tick);
 
         $exitCode = Artisan::call('zcout:synthetic-world:status');
+        $output = Artisan::output();
 
         $this->assertSame(0, $exitCode);
-        $this->assertStringContainsString('Automation: disabled', Artisan::output());
+        $this->assertStringContainsString('Environment automation: disabled', $output);
+        $this->assertStringContainsString('Effective automation: disabled', $output);
     }
 
     public function test_verbose_includes_capped_details_section(): void

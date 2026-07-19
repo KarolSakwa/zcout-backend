@@ -14,8 +14,13 @@ class GetSyntheticWorldStatusAction
 {
     private const DETAILS_LIMIT = 20;
 
+    private const NO_PROGRESS_SECONDS = 180;
+
     public function __construct(
         private readonly ValidateSyntheticUserProfile $validateSyntheticUserProfile,
+        private readonly SyntheticWorldRuntime $runtime,
+        private readonly SyntheticWorldScheduleMutex $mutex,
+        private readonly SyntheticDailyActivityPlanner $planner,
     ) {
     }
 
@@ -49,9 +54,22 @@ class GetSyntheticWorldStatusAction
             ->whereIn('status', [SyntheticSessionStatuses::ACTIVE, SyntheticSessionStatuses::COMPLETED])
             ->max('updated_at');
 
-        $automationEnabled = (bool) config('synthetic_world.enabled', false);
+        $environmentEnabled = $this->runtime->environmentEnabled();
+        $runtimeSettings = $this->runtime->current();
+        $dailyPlan = $this->collectDailyPlan($dateString);
+        $archetypeRanges = $this->collectArchetypeRanges();
+        try {
+            $mutexPresent = $this->mutex->exists();
+            $mutexStale = $this->mutex->isStale();
+            $mutexAge = $this->mutex->ageSeconds();
+        } catch (\Throwable) {
+            $mutexPresent = false;
+            $mutexStale = false;
+            $mutexAge = null;
+        }
+
         $health = $this->resolveHealth(
-            automationEnabled: $automationEnabled,
+            automationEnabled: $environmentEnabled && $this->runtime->effectiveEnabled(),
             enabledProfiles: $users['enabled_profiles'],
             overdue5: $execution['overdue_5_min'],
             overdue15: $execution['overdue_15_min'],
@@ -61,7 +79,7 @@ class GetSyntheticWorldStatusAction
         );
 
         $warnings = $this->buildWarnings(
-            automationEnabled: $automationEnabled,
+            automationEnabled: $environmentEnabled,
             users: $users,
             invalidProfiles: $invalid['count'],
             failedToday: $failures['failed_sessions_today'],
@@ -71,13 +89,19 @@ class GetSyntheticWorldStatusAction
             syntheticVotes: $activity['synthetic_votes'],
             worldSessionsTotal: $worldSessions['total'],
             latestVoteAt: $activity['latest_synthetic_vote_at'],
+            effectiveEnabled: $this->runtime->effectiveEnabled(),
+            dueNow: $execution['due_now'],
+            dailyPlanExhausted: $dailyPlan['daily_plan_exhausted'],
+            lastProgressAt: $runtimeSettings->last_progress_at?->toIso8601String(),
+            mutexStale: $mutexStale,
+            now: $now,
         );
 
         return new SyntheticWorldStatus(
             date: $dateString,
             time: $now->toIso8601String(),
             timezone: $timezone,
-            automation_enabled: $automationEnabled,
+            automation_enabled: $environmentEnabled,
             health: $health,
             synthetic_users_total: $users['synthetic_users_total'],
             managed_pool_users: $users['managed_pool_users'],
@@ -101,6 +125,23 @@ class GetSyntheticWorldStatusAction
             failedSessionDetails: $includeDetails ? $failures['details'] : [],
             overdueSessionDetails: $includeDetails ? $execution['details'] : [],
             staleLockDetails: $includeDetails ? $locks['details'] : [],
+            environment_automation: $environmentEnabled ? 'enabled' : 'disabled',
+            runtime_automation: $this->runtime->runtimeLabel(),
+            effective_automation: $this->runtime->effectiveLabel(),
+            pause_mode: $runtimeSettings->pause_mode,
+            archetype_ranges: $archetypeRanges,
+            daily_plan: $dailyPlan,
+            heartbeat: [
+                'tick_started_at' => $this->toIsoOrNull($runtimeSettings->tick_started_at),
+                'tick_finished_at' => $this->toIsoOrNull($runtimeSettings->tick_finished_at),
+                'tick_failed_at' => $this->toIsoOrNull($runtimeSettings->tick_failed_at),
+                'last_error' => $runtimeSettings->last_error,
+                'last_progress_at' => $this->toIsoOrNull($runtimeSettings->last_progress_at),
+                'last_tick_duration_ms' => $runtimeSettings->last_tick_duration_ms,
+            ],
+            mutex_present: $mutexPresent,
+            mutex_age_seconds: $mutexAge,
+            mutex_stale: $mutexStale,
         );
     }
 
@@ -648,6 +689,12 @@ class GetSyntheticWorldStatusAction
         int $syntheticVotes,
         int $worldSessionsTotal,
         ?string $latestVoteAt,
+        bool $effectiveEnabled = false,
+        int $dueNow = 0,
+        bool $dailyPlanExhausted = false,
+        ?string $lastProgressAt = null,
+        bool $mutexStale = false,
+        ?CarbonImmutable $now = null,
     ): array {
         $warnings = [];
 
@@ -707,7 +754,135 @@ class GetSyntheticWorldStatusAction
             ];
         }
 
+        if ($dailyPlanExhausted && $reportDateIsToday && $users['enabled_profiles'] > 0) {
+            $warnings[] = [
+                'code' => 'daily_plan_exhausted',
+                'message' => 'All planned world sessions for today appear started; idle ticks are expected until tomorrow or higher sessions_* limits.',
+            ];
+        }
+
+        if ($mutexStale) {
+            $warnings[] = [
+                'code' => 'stale_mutex',
+                'message' => 'Schedule mutex looks stale (old tick_started_at without finish). Consider start --clear-stale-mutex after inspection.',
+            ];
+        }
+
+        if (
+            $effectiveEnabled
+            && $reportDateIsToday
+            && $dueNow > 0
+            && ! $dailyPlanExhausted
+            && $now !== null
+        ) {
+            $progressAt = $lastProgressAt !== null ? CarbonImmutable::parse($lastProgressAt) : null;
+            $staleProgress = $progressAt === null || $progressAt->diffInSeconds($now) >= self::NO_PROGRESS_SECONDS;
+            if ($staleProgress) {
+                $warnings[] = [
+                    'code' => 'no_progress',
+                    'message' => 'Effective automation is enabled with due sessions, but no recent progress heartbeat was recorded.',
+                ];
+            }
+        }
+
         return $warnings;
+    }
+
+    /**
+     * @return array{planned_sessions_today: int, started_sessions_today: int, remaining_sessions_today: int, daily_plan_exhausted: bool}
+     */
+    private function collectDailyPlan(string $dateString): array
+    {
+        $planned = 0;
+        $remaining = 0;
+
+        User::query()
+            ->where('is_synthetic', true)
+            ->whereHas('syntheticProfile', static fn ($q) => $q->where('is_enabled', true))
+            ->with('syntheticProfile')
+            ->orderBy('id')
+            ->chunkById(100, function ($users) use ($dateString, &$planned, &$remaining): void {
+                foreach ($users as $user) {
+                    $profile = $user->syntheticProfile;
+                    if ($profile === null) {
+                        continue;
+                    }
+
+                    $target = $this->planner->targetSessionsToday(
+                        userId: (int) $user->id,
+                        activityDate: $dateString,
+                        sessionsPerDayMin: (int) $profile->sessions_per_day_min,
+                        sessionsPerDayMax: (int) $profile->sessions_per_day_max,
+                    );
+                    $planned += $target;
+
+                    $started = (int) SyntheticUserSession::query()
+                        ->where('user_id', $user->id)
+                        ->whereDate('activity_date', $dateString)
+                        ->whereNotNull('daily_session_index')
+                        ->count();
+
+                    $remaining += max(0, $target - $started);
+                }
+            });
+
+        $startedTotal = (int) SyntheticUserSession::query()
+            ->whereDate('activity_date', $dateString)
+            ->count();
+
+        return [
+            'planned_sessions_today' => $planned,
+            'started_sessions_today' => $startedTotal,
+            'remaining_sessions_today' => $remaining,
+            'daily_plan_exhausted' => $planned > 0 && $remaining === 0,
+        ];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function collectArchetypeRanges(): array
+    {
+        $ranges = [];
+        foreach (SyntheticDecisionProfiles::ALLOWED as $archetype) {
+            $query = SyntheticUserProfile::query()
+                ->where('is_enabled', true)
+                ->where('decision_profile', $archetype);
+
+            if (! $query->exists()) {
+                continue;
+            }
+
+            $ranges[$archetype] = [
+                'count' => (int) $query->count(),
+                'sessions_per_day' => [
+                    'min' => (int) $query->min('sessions_per_day_min'),
+                    'max' => (int) $query->max('sessions_per_day_max'),
+                ],
+                'actions_per_session' => [
+                    'min' => (int) $query->min('actions_per_session_min'),
+                    'max' => (int) $query->max('actions_per_session_max'),
+                ],
+                'delay_seconds' => [
+                    'min' => (int) $query->min('delay_seconds_min'),
+                    'max' => (int) $query->max('delay_seconds_max'),
+                ],
+                'skip_probability' => [
+                    'min' => (float) $query->min('skip_probability'),
+                    'max' => (float) $query->max('skip_probability'),
+                ],
+                'decision_accuracy' => [
+                    'min' => (float) $query->min('decision_accuracy'),
+                    'max' => (float) $query->max('decision_accuracy'),
+                ],
+                'noise_level' => [
+                    'min' => (float) $query->min('noise_level'),
+                    'max' => (float) $query->max('noise_level'),
+                ],
+            ];
+        }
+
+        return $ranges;
     }
 
     private function resolveHealth(

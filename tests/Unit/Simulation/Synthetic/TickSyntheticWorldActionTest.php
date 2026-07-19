@@ -24,6 +24,12 @@ final class TickSyntheticWorldActionTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['synthetic_world.enabled' => true]);
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();

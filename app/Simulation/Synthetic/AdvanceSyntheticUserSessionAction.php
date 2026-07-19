@@ -53,6 +53,13 @@ final class AdvanceSyntheticUserSessionAction
                 ));
             }
 
+            if ($locked->isCancelled()) {
+                throw new DomainException(sprintf(
+                    'Cannot advance cancelled synthetic session [%d].',
+                    $locked->id,
+                ));
+            }
+
             if (! $locked->isActive()) {
                 throw new DomainException(sprintf(
                     'Synthetic session [%d] is not active.',

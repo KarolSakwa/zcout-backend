@@ -61,9 +61,53 @@ final class SyntheticWorldStatusCommand extends Command
         $this->line('Date: '.$status->date);
         $this->line('Time: '.$status->time);
         $this->line('Timezone: '.$status->timezone);
-        $this->line('Automation: '.($status->automation_enabled ? 'enabled' : 'disabled'));
+        $this->line('Environment automation: '.$status->environment_automation);
+        $this->line('Runtime automation: '.$status->runtime_automation);
+        $this->line('Effective automation: '.$status->effective_automation);
+        $this->line('Pause mode: '.($status->pause_mode ?? 'none'));
         $this->line('Health: '.$status->health);
         $this->newLine();
+
+        $this->line('Daily plan');
+        $this->line('  Planned sessions today: '.$status->daily_plan['planned_sessions_today']);
+        $this->line('  Started sessions today: '.$status->daily_plan['started_sessions_today']);
+        $this->line('  Remaining sessions today: '.$status->daily_plan['remaining_sessions_today']);
+        $this->line('  Exhausted: '.($status->daily_plan['daily_plan_exhausted'] ? 'yes' : 'no'));
+        $this->newLine();
+
+        $this->line('Heartbeat');
+        $this->line('  Last tick started: '.($status->heartbeat['tick_started_at'] ?? 'none'));
+        $this->line('  Last tick finished: '.($status->heartbeat['tick_finished_at'] ?? 'none'));
+        $this->line('  Last tick failed: '.($status->heartbeat['tick_failed_at'] ?? 'none'));
+        $this->line('  Last progress: '.($status->heartbeat['last_progress_at'] ?? 'none'));
+        $this->line('  Last tick duration ms: '.($status->heartbeat['last_tick_duration_ms'] ?? 'n/a'));
+        $this->line('  Mutex present: '.($status->mutex_present ? 'yes' : 'no'));
+        $this->line('  Mutex stale: '.($status->mutex_stale ? 'yes' : 'no'));
+        $this->newLine();
+
+        if ($status->archetype_ranges !== []) {
+            $this->line('Archetype ranges (enabled)');
+            foreach ($status->archetype_ranges as $archetype => $range) {
+                $this->line(sprintf(
+                    '  %s (n=%d): sessions %d-%d, actions %d-%d, delay %d-%d, skip %.2f-%.2f, acc %.2f-%.2f, noise %.2f-%.2f',
+                    $archetype,
+                    $range['count'],
+                    $range['sessions_per_day']['min'],
+                    $range['sessions_per_day']['max'],
+                    $range['actions_per_session']['min'],
+                    $range['actions_per_session']['max'],
+                    $range['delay_seconds']['min'],
+                    $range['delay_seconds']['max'],
+                    $range['skip_probability']['min'],
+                    $range['skip_probability']['max'],
+                    $range['decision_accuracy']['min'],
+                    $range['decision_accuracy']['max'],
+                    $range['noise_level']['min'],
+                    $range['noise_level']['max'],
+                ));
+            }
+            $this->newLine();
+        }
 
         $this->line('Users');
         $this->line('  Synthetic total: '.$status->synthetic_users_total);

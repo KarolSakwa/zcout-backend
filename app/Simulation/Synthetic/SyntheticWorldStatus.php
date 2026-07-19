@@ -47,6 +47,31 @@ final class SyntheticWorldStatus
         public readonly array $failedSessionDetails = [],
         public readonly array $overdueSessionDetails = [],
         public readonly array $staleLockDetails = [],
+        public readonly string $environment_automation = 'disabled',
+        public readonly string $runtime_automation = 'paused',
+        public readonly string $effective_automation = 'disabled',
+        public readonly ?string $pause_mode = null,
+        /** @var array<string, array<string, mixed>> */
+        public readonly array $archetype_ranges = [],
+        /** @var array{planned_sessions_today: int, started_sessions_today: int, remaining_sessions_today: int, daily_plan_exhausted: bool} */
+        public readonly array $daily_plan = [
+            'planned_sessions_today' => 0,
+            'started_sessions_today' => 0,
+            'remaining_sessions_today' => 0,
+            'daily_plan_exhausted' => false,
+        ],
+        /** @var array{tick_started_at: ?string, tick_finished_at: ?string, tick_failed_at: ?string, last_error: ?string, last_progress_at: ?string, last_tick_duration_ms: ?int} */
+        public readonly array $heartbeat = [
+            'tick_started_at' => null,
+            'tick_finished_at' => null,
+            'tick_failed_at' => null,
+            'last_error' => null,
+            'last_progress_at' => null,
+            'last_tick_duration_ms' => null,
+        ],
+        public readonly bool $mutex_present = false,
+        public readonly ?int $mutex_age_seconds = null,
+        public readonly bool $mutex_stale = false,
     ) {
     }
 
@@ -69,6 +94,18 @@ final class SyntheticWorldStatus
             'time' => $this->time,
             'timezone' => $this->timezone,
             'automation_enabled' => $this->automation_enabled,
+            'environment_automation' => $this->environment_automation,
+            'runtime_automation' => $this->runtime_automation,
+            'effective_automation' => $this->effective_automation,
+            'pause_mode' => $this->pause_mode,
+            'archetype_ranges' => $this->archetype_ranges,
+            'daily_plan' => $this->daily_plan,
+            'heartbeat' => $this->heartbeat,
+            'mutex' => [
+                'present' => $this->mutex_present,
+                'age_seconds' => $this->mutex_age_seconds,
+                'stale' => $this->mutex_stale,
+            ],
             'health' => $this->health,
             'users' => [
                 'synthetic_users_total' => $this->synthetic_users_total,

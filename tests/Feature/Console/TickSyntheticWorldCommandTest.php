@@ -109,7 +109,7 @@ final class TickSyntheticWorldCommandTest extends TestCase
 
     public function test_command_runs_real_tick_for_enabled_synthetic_user(): void
     {
-        config(['app.timezone' => 'UTC']);
+        config(['app.timezone' => 'UTC', 'synthetic_world.enabled' => true]);
         Carbon::setTestNow('2026-07-18 23:50:00');
 
         $user = User::factory()->synthetic()->create();
