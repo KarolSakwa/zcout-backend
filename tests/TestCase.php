@@ -15,6 +15,10 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         config(['broadcasting.default' => 'null']);
+        config([
+            'zcout_premier_league.api.minimum_request_interval_seconds' => 0,
+            'zcout_premier_league.api.max_requests_per_minute' => 1000,
+        ]);
 
         $publisher = Mockery::mock(RabbitMqPublisher::class);
         $publisher->shouldReceive('publish')->byDefault();
