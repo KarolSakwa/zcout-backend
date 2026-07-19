@@ -18,6 +18,7 @@ final class ResolveFeaturedPlayerAction
     public function execute(): array
     {
         $player = Player::query()
+            ->inCurrentPremierLeague()
             ->join('player_reputation_stats as prs', 'prs.player_id', '=', 'players.id')
             ->where('prs.tier', 'A')
             ->inRandomOrder()

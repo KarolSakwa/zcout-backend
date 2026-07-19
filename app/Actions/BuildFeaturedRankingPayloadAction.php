@@ -32,7 +32,7 @@ final class BuildFeaturedRankingPayloadAction
 
         $rankingEntries = $this->attributeRankingService->getTopPlayers(
             $attribute->key,
-            self::TOP_LIMIT,
+            max(self::TOP_LIMIT * 10, 50),
         );
 
         if ($rankingEntries === []) {
@@ -48,6 +48,8 @@ final class BuildFeaturedRankingPayloadAction
         );
 
         $playerRows = DB::table('players as p')
+            ->join('clubs as c', 'c.id', '=', 'p.club_id')
+            ->where('c.is_current_premier_league', true)
             ->whereIn('p.id', $playerIds)
             ->get([
                 'p.id as player_id',
@@ -63,6 +65,10 @@ final class BuildFeaturedRankingPayloadAction
         $players = [];
 
         foreach ($rankingEntries as $entry) {
+            if (count($players) >= self::TOP_LIMIT) {
+                break;
+            }
+
             $playerRow = $playerRows->get($entry['player_id']);
 
             if (!$playerRow) {

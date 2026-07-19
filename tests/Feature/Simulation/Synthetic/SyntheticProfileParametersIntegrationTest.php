@@ -345,6 +345,7 @@ final class SyntheticProfileParametersIntegrationTest extends TestCase
             'color_primary' => '#111111',
             'color_secondary' => '#222222',
             'color_tertiary' => '#FFFFFF',
+            'is_current_premier_league' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -355,6 +356,7 @@ final class SyntheticProfileParametersIntegrationTest extends TestCase
             'color_primary' => '#333333',
             'color_secondary' => '#444444',
             'color_tertiary' => '#FFFFFF',
+            'is_current_premier_league' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,6 +40,18 @@ class Player extends Model
     public function clubRel(): BelongsTo
     {
         return $this->belongsTo(Club::class, 'club_id', 'id');
+    }
+
+    /**
+     * Active Premier League pool: current club membership, not legacy players.club text.
+     */
+    public function scopeInCurrentPremierLeague(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull($query->getModel()->getTable().'.club_id')
+            ->whereHas('clubRel', function (Builder $clubQuery) {
+                $clubQuery->currentPremierLeague();
+            });
     }
 
     public function countryRef(): BelongsTo

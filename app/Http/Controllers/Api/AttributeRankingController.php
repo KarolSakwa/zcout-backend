@@ -22,6 +22,7 @@ class AttributeRankingController extends Controller
             ->with('player:id,name,slug,country,club,position')
             ->where('attribute_id', $attribute->id)
             ->where('votes_count', '>=', $minVotes)
+            ->whereHas('player', fn ($p) => $p->inCurrentPremierLeague())
             ->when($position, function ($q) use ($position) {
                 $q->whereHas('player', fn ($p) => $p->where('position', $position));
             })

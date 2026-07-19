@@ -21,7 +21,11 @@ class LiveFeedController extends Controller
             ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
             ->join('players as player_a', 'player_a.id', '=', 'v.player_a_id')
             ->join('players as player_b', 'player_b.id', '=', 'v.player_b_id')
+            ->join('clubs as club_a', 'club_a.id', '=', 'player_a.club_id')
+            ->join('clubs as club_b', 'club_b.id', '=', 'player_b.club_id')
             ->where('v.source', 'duel')
+            ->where('club_a.is_current_premier_league', true)
+            ->where('club_b.is_current_premier_league', true)
             ->orderByDesc('v.created_at')
             ->orderByDesc('v.id')
             ->limit($limit)
@@ -131,6 +135,19 @@ class LiveFeedController extends Controller
             return $a['deltaValue'] <=> $b['deltaValue'];
         });
 
+        $activePlayerIds = DB::table('players as p')
+            ->join('clubs as c', 'c.id', '=', 'p.club_id')
+            ->where('c.is_current_premier_league', true)
+            ->whereIn('p.id', array_column($aggregated, 'playerId'))
+            ->pluck('p.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $activePlayerIdSet = array_fill_keys($activePlayerIds, true);
+
+        $aggregated = array_values(array_filter(
+            $aggregated,
+            fn (array $item) => isset($activePlayerIdSet[$item['playerId']])
+        ));
         $aggregated = array_slice($aggregated, 0, $limit);
 
         $playerNamesById = DB::table('players')
@@ -208,10 +225,30 @@ class LiveFeedController extends Controller
                 array_column($fallersRaw, 'playerId'),
             )));
 
-            $playerNamesById = empty($playerIds)
+            $activePlayerIds = empty($playerIds)
+                ? []
+                : DB::table('players as p')
+                    ->join('clubs as c', 'c.id', '=', 'p.club_id')
+                    ->where('c.is_current_premier_league', true)
+                    ->whereIn('p.id', $playerIds)
+                    ->pluck('p.id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+            $activePlayerIdSet = array_fill_keys($activePlayerIds, true);
+
+            $risersRaw = array_values(array_filter(
+                $risersRaw,
+                fn (array $item) => isset($activePlayerIdSet[(int) $item['playerId']])
+            ));
+            $fallersRaw = array_values(array_filter(
+                $fallersRaw,
+                fn (array $item) => isset($activePlayerIdSet[(int) $item['playerId']])
+            ));
+
+            $playerNamesById = empty($activePlayerIds)
                 ? collect()
                 : DB::table('players')
-                    ->whereIn('id', $playerIds)
+                    ->whereIn('id', $activePlayerIds)
                     ->selectRaw('id, COALESCE(manual_display_name, fd_name, name) as effective_name')
                     ->pluck('effective_name', 'id');
 

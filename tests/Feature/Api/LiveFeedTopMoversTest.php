@@ -4,27 +4,33 @@ namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesCurrentPremierLeagueClub;
 use Tests\TestCase;
 
 class LiveFeedTopMoversTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesCurrentPremierLeagueClub;
 
     public function test_it_returns_top_risers_for_last_7_days(): void
     {
-        $playerAId = DB::table('players')->insertGetId([
+        $clubId = $this->createCurrentPremierLeagueClub('Club '.uniqid('pl', true), 'club-'.uniqid('pl', true));
+$playerAId = DB::table('players')->insertGetId([
             'name' => 'Bukayo Saka',
             'slug' => 'bukayo-saka',
+        'club_id' => $clubId,
         ]);
 
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Cole Palmer',
             'slug' => 'cole-palmer',
+        'club_id' => $clubId,
         ]);
 
         $playerCId = DB::table('players')->insertGetId([
             'name' => 'Martin Odegaard',
             'slug' => 'martin-odegaard',
+        'club_id' => $clubId,
         ]);
 
         $attributeId = DB::table('attributes')->insertGetId([
@@ -108,19 +114,23 @@ class LiveFeedTopMoversTest extends TestCase
 
     public function test_it_returns_top_fallers_for_last_7_days(): void
     {
-        $playerAId = DB::table('players')->insertGetId([
+        $clubId = $this->createCurrentPremierLeagueClub('Club '.uniqid('pl', true), 'club-'.uniqid('pl', true));
+$playerAId = DB::table('players')->insertGetId([
             'name' => 'Bukayo Saka',
             'slug' => 'bukayo-saka',
+        'club_id' => $clubId,
         ]);
 
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Cole Palmer',
             'slug' => 'cole-palmer',
+        'club_id' => $clubId,
         ]);
 
         $playerCId = DB::table('players')->insertGetId([
             'name' => 'Martin Odegaard',
             'slug' => 'martin-odegaard',
+        'club_id' => $clubId,
         ]);
 
         $attributeId = DB::table('attributes')->insertGetId([
@@ -206,14 +216,17 @@ class LiveFeedTopMoversTest extends TestCase
 
     public function test_it_ignores_votes_older_than_7_days(): void
     {
-        $playerAId = DB::table('players')->insertGetId([
+        $clubId = $this->createCurrentPremierLeagueClub('Club '.uniqid('pl', true), 'club-'.uniqid('pl', true));
+$playerAId = DB::table('players')->insertGetId([
             'name' => 'Bukayo Saka',
             'slug' => 'bukayo-saka',
+        'club_id' => $clubId,
         ]);
 
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Cole Palmer',
             'slug' => 'cole-palmer',
+        'club_id' => $clubId,
         ]);
 
         $attributeId = DB::table('attributes')->insertGetId([

@@ -146,6 +146,7 @@ final class BuildRankingAttributeAction
         }
 
         $playersQuery = Player::query()
+            ->inCurrentPremierLeague()
             ->select(
                 'id',
                 'name',

@@ -13,6 +13,14 @@ class RebuildAttributeRankingProjectionCommandTest extends TestCase
 
     public function test_it_rebuilds_zset_and_meta_hash_from_player_attribute_ratings(): void
     {
+        $clubId = (int) DB::table('clubs')->insertGetId([
+            'name' => 'Rebuild Club',
+            'slug' => 'rebuild-club',
+            'is_current_premier_league' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $positionId = $this->createPosition([
             'short_label' => 'ST',
             'key' => 'st',
@@ -24,6 +32,7 @@ class RebuildAttributeRankingProjectionCommandTest extends TestCase
             'name' => 'Test Striker',
             'slug' => 'test-striker',
             'position_id' => $positionId,
+            'club_id' => $clubId,
         ]);
 
         $attributeId = $this->createAttribute([
@@ -50,6 +59,7 @@ class RebuildAttributeRankingProjectionCommandTest extends TestCase
             ->andReturn([
                 'laravel_database_ranking:pace',
                 'laravel_database_ranking:pace:meta',
+                'laravel_database_ranking:overall',
             ]);
 
         Redis::shouldReceive('del')
@@ -90,7 +100,7 @@ class RebuildAttributeRankingProjectionCommandTest extends TestCase
             'name' => $data['name'],
             'slug' => $data['slug'],
             'position_id' => $data['position_id'],
-            'club_id' => null,
+            'club_id' => $data['club_id'],
             'country_id' => null,
             'number' => null,
             'date_of_birth' => null,

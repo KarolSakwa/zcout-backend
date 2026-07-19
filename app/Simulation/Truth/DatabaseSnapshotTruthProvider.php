@@ -20,6 +20,7 @@ final class DatabaseSnapshotTruthProvider implements TruthProvider
             ->get();
 
         $players = Player::query()
+            ->inCurrentPremierLeague()
             ->select('id', 'position_id', 'fd_position_id', 'manual_position_id')
             ->with([
                 'positionRef:id,short_label,key,label,group',

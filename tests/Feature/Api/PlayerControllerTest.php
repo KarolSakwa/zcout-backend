@@ -4,10 +4,12 @@ namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesCurrentPremierLeagueClub;
 use Tests\TestCase;
 
 class PlayerControllerTest extends TestCase
 {
+    use CreatesCurrentPremierLeagueClub;
     use RefreshDatabase;
 
     public function test_show_returns_player_profile_contract(): void
@@ -63,6 +65,8 @@ class PlayerControllerTest extends TestCase
 
     public function test_featured_returns_player_profile_contract(): void
     {
+        $clubId = $this->createCurrentPremierLeagueClub('Featured Club', 'featured-club');
+
         $positionId = DB::table('positions')->insertGetId([
             'short_label' => 'AM',
             'key' => 'am',
@@ -73,6 +77,7 @@ class PlayerControllerTest extends TestCase
             'name' => 'Martin Odegaard',
             'slug' => 'martin-odegaard',
             'fd_position_id' => $positionId,
+            'club_id' => $clubId,
         ]);
 
         DB::table('player_overalls')->insert([
@@ -122,5 +127,45 @@ class PlayerControllerTest extends TestCase
                 'rank',
             ])
             ->assertJsonPath('id', $playerId);
+    }
+
+    public function test_featured_does_not_return_player_from_inactive_club(): void
+    {
+        $inactiveClubId = (int) DB::table('clubs')->insertGetId([
+            'name' => 'Relegated Club',
+            'slug' => 'relegated-club',
+            'is_current_premier_league' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $positionId = DB::table('positions')->insertGetId([
+            'short_label' => 'ST',
+            'key' => 'st',
+            'label' => 'Striker',
+        ]);
+
+        $playerId = (int) DB::table('players')->insertGetId([
+            'name' => 'Inactive Club Star',
+            'slug' => 'inactive-club-star',
+            'fd_position_id' => $positionId,
+            'club_id' => $inactiveClubId,
+        ]);
+
+        DB::table('player_reputation_stats')->insert([
+            'player_id' => $playerId,
+            'player_rep' => 0.9500,
+            'tier' => 'A',
+            'minutes_90d' => 100,
+            'minutes_long_term' => 1000,
+            'is_long_tail' => false,
+            'computed_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+            'fpl_now_cost' => 50,
+            'fpl_selected_by_percent' => 0,
+        ]);
+
+        $this->getJson('/api/players/featured')->assertNotFound();
     }
 }

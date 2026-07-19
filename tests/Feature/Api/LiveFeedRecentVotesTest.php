@@ -4,22 +4,28 @@ namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesCurrentPremierLeagueClub;
 use Tests\TestCase;
 
 class LiveFeedRecentVotesTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesCurrentPremierLeagueClub;
 
     public function test_it_returns_recent_duel_votes_in_expected_shape(): void
     {
+        $clubId = $this->createCurrentPremierLeagueClub('Arsenal', 'arsenal');
+
         $winnerId = DB::table('players')->insertGetId([
             'name' => 'Bukayo Saka',
             'slug' => 'bukayo-saka',
+            'club_id' => $clubId,
         ]);
 
         $loserId = DB::table('players')->insertGetId([
             'name' => 'Cole Palmer',
             'slug' => 'cole-palmer',
+            'club_id' => $clubId,
         ]);
 
         $attributeId = DB::table('attributes')->insertGetId([
@@ -79,19 +85,24 @@ class LiveFeedRecentVotesTest extends TestCase
 
     public function test_it_returns_recent_votes_in_desc_order_and_respects_limit(): void
     {
+        $clubId = $this->createCurrentPremierLeagueClub('Arsenal', 'arsenal');
+
         $playerAId = DB::table('players')->insertGetId([
             'name' => 'Player A',
             'slug' => 'player-a',
+            'club_id' => $clubId,
         ]);
 
         $playerBId = DB::table('players')->insertGetId([
             'name' => 'Player B',
             'slug' => 'player-b',
+            'club_id' => $clubId,
         ]);
 
         $playerCId = DB::table('players')->insertGetId([
             'name' => 'Player C',
             'slug' => 'player-c',
+            'club_id' => $clubId,
         ]);
 
         $attributeId = DB::table('attributes')->insertGetId([
