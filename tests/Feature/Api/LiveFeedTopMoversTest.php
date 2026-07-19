@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesCurrentPremierLeagueClub;
 use Tests\TestCase;
@@ -266,5 +267,131 @@ $playerAId = DB::table('players')->insertGetId([
             ->assertJson([
                 'items' => [],
             ]);
+    }
+
+    public function test_top_movers_summary_applies_premier_league_filter_before_limit(): void
+    {
+        Cache::flush();
+
+        $attributeId = DB::table('attributes')->insertGetId([
+            'key' => 'dribbling',
+            'label' => 'Dribbling',
+            'group' => 'TECHNIQUE',
+        ]);
+
+        $inactiveClubId = $this->createInactiveClub();
+        $activeClubId = $this->createCurrentPremierLeagueClub(
+            'Club '.uniqid('pl', true),
+            'club-'.uniqid('pl', true)
+        );
+
+        $dummyActivePlayerId = $this->createPlayer($activeClubId, 'Dummy Active');
+        $dummyInactivePlayerId = $this->createPlayer($inactiveClubId, 'Dummy Inactive');
+
+        $inactiveRiserIds = [];
+        foreach ([10.0, 9.0, 8.0] as $index => $delta) {
+            $playerId = $this->createPlayer($inactiveClubId, 'Inactive Riser '.$index);
+            $inactiveRiserIds[] = $playerId;
+            $this->insertMoverVote($attributeId, $playerId, $dummyInactivePlayerId, $delta);
+        }
+
+        $activeRiserIds = [];
+        foreach ([7.0, 6.0, 5.0, 4.0, 3.0, 2.0] as $index => $delta) {
+            $playerId = $this->createPlayer($activeClubId, 'Active Riser '.$index);
+            $activeRiserIds[] = $playerId;
+            $this->insertMoverVote($attributeId, $playerId, $dummyActivePlayerId, $delta);
+        }
+
+        $inactiveFallerIds = [];
+        foreach ([-10.0, -9.0, -8.0] as $index => $delta) {
+            $playerId = $this->createPlayer($inactiveClubId, 'Inactive Faller '.$index);
+            $inactiveFallerIds[] = $playerId;
+            $this->insertMoverVote($attributeId, $playerId, $dummyInactivePlayerId, $delta);
+        }
+
+        $activeFallerIds = [];
+        foreach ([-7.0, -6.0, -5.0, -4.0, -3.0, -2.0] as $index => $delta) {
+            $playerId = $this->createPlayer($activeClubId, 'Active Faller '.$index);
+            $activeFallerIds[] = $playerId;
+            $this->insertMoverVote($attributeId, $playerId, $dummyActivePlayerId, $delta);
+        }
+
+        $response = $this->getJson('/api/live/top-movers-summary?period=7d&limit=5');
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(5, 'risers')
+            ->assertJsonCount(5, 'fallers');
+
+        $riserPlayerIds = collect($response->json('risers'))->pluck('playerId')->all();
+        $fallerPlayerIds = collect($response->json('fallers'))->pluck('playerId')->all();
+
+        $this->assertSame(
+            array_slice($activeRiserIds, 0, 5),
+            $riserPlayerIds,
+            'Risers should come from active Premier League clubs, ordered by delta.'
+        );
+        $this->assertSame(
+            array_slice($activeFallerIds, 0, 5),
+            $fallerPlayerIds,
+            'Fallers should come from active Premier League clubs, ordered by delta.'
+        );
+
+        foreach ($inactiveRiserIds as $inactiveRiserId) {
+            $this->assertNotContains($inactiveRiserId, $riserPlayerIds);
+        }
+
+        foreach ($inactiveFallerIds as $inactiveFallerId) {
+            $this->assertNotContains($inactiveFallerId, $fallerPlayerIds);
+        }
+    }
+
+    private function createInactiveClub(): int
+    {
+        return (int) DB::table('clubs')->insertGetId([
+            'name' => 'Relegated '.uniqid('club', true),
+            'slug' => 'relegated-'.uniqid('club', true),
+            'is_current_premier_league' => false,
+            'color_primary' => '#111111',
+            'color_secondary' => '#222222',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createPlayer(int $clubId, string $name): int
+    {
+        return (int) DB::table('players')->insertGetId([
+            'name' => $name,
+            'slug' => str($name)->slug()->toString().'-'.uniqid(),
+            'club_id' => $clubId,
+        ]);
+    }
+
+    private function insertMoverVote(int $attributeId, int $playerAId, int $playerBId, float $deltaA): void
+    {
+        $duelId = DB::table('duels')->insertGetId([
+            'attribute_id' => $attributeId,
+            'player_a_id' => $playerAId,
+            'player_b_id' => $playerBId,
+            'status' => 'completed',
+            'winner_id' => $playerAId,
+            'created_at' => now()->subDay(),
+            'completed_at' => now()->subDay(),
+        ]);
+
+        DB::table('votes')->insert([
+            'source' => 'duel',
+            'duel_id' => $duelId,
+            'player_a_id' => $playerAId,
+            'player_b_id' => $playerBId,
+            'winner_id' => $playerAId,
+            'attribute_id' => $attributeId,
+            'pre_rating_a' => 80,
+            'post_rating_a' => 80 + $deltaA,
+            'pre_rating_b' => 50,
+            'post_rating_b' => 50,
+            'created_at' => now()->subDay(),
+        ]);
     }
 }

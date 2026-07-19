@@ -148,6 +148,14 @@ class SyncPremierLeagueCommand extends Command
             $parts[] = 'club_id '.$line['club_id'];
         }
 
+        if (isset($line['external_id']) && is_array($line['external_id'])) {
+            $from = $line['external_id']['from'] ?? 'null';
+            $to = $line['external_id']['to'] ?? 'null';
+            $parts[] = "external_id {$from} → {$to}";
+        } elseif (isset($line['external_id'])) {
+            $parts[] = 'external_id '.$line['external_id'];
+        }
+
         if (! empty($line['internal_players.id_preserved'])) {
             $parts[] = 'internal players.id preserved='.$this->stringify($line['internal_players.id_preserved']);
         }

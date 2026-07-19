@@ -2,14 +2,39 @@
 
 namespace App\PremierLeague;
 
+use App\PremierLeague\Support\FootballDataRateLimitWaitParser;
+use App\PremierLeague\Support\FootballDataRequestThrottler;
+use App\PremierLeague\Support\PremierLeagueApiClock;
+use App\PremierLeague\Support\PremierLeagueApiSleeper;
+use App\PremierLeague\Support\SleepPremierLeagueApiSleeper;
+use App\PremierLeague\Support\SystemPremierLeagueApiClock;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 final class PremierLeagueApiClient
 {
+    private readonly PremierLeagueApiClock $clock;
+
+    private readonly PremierLeagueApiSleeper $sleeper;
+
+    private readonly FootballDataRequestThrottler $throttler;
+
     public function __construct(
         private readonly ?string $token = null,
+        ?PremierLeagueApiClock $clock = null,
+        ?PremierLeagueApiSleeper $sleeper = null,
+        ?FootballDataRequestThrottler $throttler = null,
     ) {
+        $this->clock = $clock ?? new SystemPremierLeagueApiClock();
+        $this->sleeper = $sleeper ?? new SleepPremierLeagueApiSleeper();
+        $this->throttler = $throttler ?? new FootballDataRequestThrottler(
+            $this->clock,
+            $this->sleeper,
+            (int) config('zcout_premier_league.api.minimum_request_interval_seconds', 7),
+            (int) config('zcout_premier_league.api.max_requests_per_minute', 9),
+            (int) config('zcout_premier_league.api.rate_limit_window_seconds', 60),
+        );
     }
 
     /**
@@ -17,8 +42,7 @@ final class PremierLeagueApiClient
      */
     public function fetchCompetitionTeams(): array
     {
-        $response = $this->http()
-            ->get($this->baseUrl().'/competitions/PL/teams');
+        $response = $this->get('/competitions/PL/teams');
 
         if (! $response->successful()) {
             throw new RuntimeException('Failed to fetch PL teams: HTTP '.$response->status());
@@ -49,8 +73,7 @@ final class PremierLeagueApiClient
      */
     public function fetchTeamSquad(int $teamExternalId): array
     {
-        $response = $this->http()
-            ->get($this->baseUrl().'/teams/'.$teamExternalId);
+        $response = $this->get('/teams/'.$teamExternalId);
 
         if (! $response->successful()) {
             throw new RuntimeException(
@@ -82,6 +105,59 @@ final class PremierLeagueApiClient
         return $normalized;
     }
 
+    public function throttler(): FootballDataRequestThrottler
+    {
+        return $this->throttler;
+    }
+
+    public function sleeper(): PremierLeagueApiSleeper
+    {
+        return $this->sleeper;
+    }
+
+    private function get(string $path): Response
+    {
+        $url = $this->baseUrl().$path;
+        $maxRetries = (int) config('zcout_premier_league.api.max_rate_limit_retries', 3);
+        $marginSeconds = (int) config('zcout_premier_league.api.rate_limit_retry_margin_seconds', 2);
+        $fallbackWaitSeconds = (int) config('zcout_premier_league.api.rate_limit_fallback_wait_seconds', 60);
+        $rateLimitAttempts = 0;
+
+        while (true) {
+            $this->throttler->waitBeforeNextRequest();
+
+            $response = Http::withHeaders($this->authHeaders())->get($url);
+            $this->throttler->recordRequest();
+
+            if ($response->status() !== 429) {
+                return $response;
+            }
+
+            if ($rateLimitAttempts >= $maxRetries) {
+                throw new RuntimeException(
+                    'Football-data.org rate limit exceeded after '.$maxRetries.' retries: '.$response->body()
+                );
+            }
+
+            $waitSeconds = FootballDataRateLimitWaitParser::parseSeconds($response, $fallbackWaitSeconds) + $marginSeconds;
+            $this->sleeper->sleep($waitSeconds);
+            $rateLimitAttempts++;
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function authHeaders(): array
+    {
+        $token = $this->token ?? env('FOOTBALL_DATA_TOKEN');
+        if (! is_string($token) || $token === '') {
+            throw new RuntimeException('Missing FOOTBALL_DATA_TOKEN in .env');
+        }
+
+        return ['X-Auth-Token' => $token];
+    }
+
     private function parseShirtNumber(mixed $value): ?int
     {
         if (is_int($value)) {
@@ -95,20 +171,6 @@ final class PremierLeagueApiClient
         }
 
         return null;
-    }
-
-    private function http()
-    {
-        $token = $this->token ?? env('FOOTBALL_DATA_TOKEN');
-        if (! is_string($token) || $token === '') {
-            throw new RuntimeException('Missing FOOTBALL_DATA_TOKEN in .env');
-        }
-
-        return Http::withHeaders(['X-Auth-Token' => $token])
-            ->retry(
-                (int) config('zcout_premier_league.api_retry_times', 3),
-                (int) config('zcout_premier_league.api_retry_sleep_ms', 800),
-            );
     }
 
     private function baseUrl(): string

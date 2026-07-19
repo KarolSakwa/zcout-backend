@@ -395,6 +395,11 @@ class PremierLeagueSeasonSynchronizer
 
         $countryIdByCode = DB::table('countries')->pluck('id', 'code')->map(fn ($id) => (int) $id)->all();
 
+        $remapResolution = $this->resolvePlayerExternalIdRemaps();
+        $errors = array_merge($errors, $remapResolution['errors']);
+        $remapOldToNew = $remapResolution['oldToNew'];
+        $remapNewToOld = $remapResolution['newToOld'];
+
         $existingPlayers = DB::table('players')->get();
         $playersByExternalId = [];
         foreach ($existingPlayers as $player) {
@@ -413,6 +418,7 @@ class PremierLeagueSeasonSynchronizer
         }
 
         $apiPlayerExtSet = [];
+        $remappedPlayerIds = [];
         foreach ($apiPlayersByExt as $playerExt => $apiPlayer) {
             $apiPlayerExtSet[$playerExt] = true;
             $clubExt = (int) $apiPlayer['club_external_id'];
@@ -429,6 +435,39 @@ class PremierLeagueSeasonSynchronizer
             }
 
             $existing = $playersByExternalId[$playerExt] ?? null;
+            $isExternalIdRemap = false;
+            $fromExternalId = null;
+
+            if ($existing === null && isset($remapNewToOld[$playerExt])) {
+                $fromExternalId = $remapNewToOld[$playerExt];
+                $existing = $playersByExternalId[$fromExternalId] ?? null;
+
+                if ($existing === null) {
+                    $errors[] = "player_external_id_remaps: API external_id={$playerExt} maps from {$fromExternalId} but no DB player has that old external_id.";
+                    continue;
+                }
+
+                foreach ($existingPlayers as $candidate) {
+                    if ($candidate->external_id !== null
+                        && (int) $candidate->external_id === $playerExt
+                        && (int) $candidate->id !== (int) $existing->id) {
+                        $errors[] = "Remap conflict: external_id {$playerExt} already belongs to player #{$candidate->id} while remap targets player #{$existing->id} (old external_id {$fromExternalId}).";
+                        $existing = null;
+                        break;
+                    }
+                }
+
+                if ($existing !== null) {
+                    $isExternalIdRemap = true;
+                    $remappedPlayerIds[(int) $existing->id] = true;
+                }
+            } elseif ($existing !== null && isset($remapNewToOld[$playerExt])) {
+                $fromExternalId = $remapNewToOld[$playerExt];
+                $oldPlayer = $playersByExternalId[$fromExternalId] ?? null;
+                if ($oldPlayer !== null && (int) $oldPlayer->id !== (int) $existing->id) {
+                    $errors[] = "Remap conflict: both external_id {$fromExternalId} (player #{$oldPlayer->id}) and {$playerExt} (player #{$existing->id}) exist while remap maps {$fromExternalId} → {$playerExt}.";
+                }
+            }
 
             $positionId = null;
             if (! empty($apiPlayer['position'])) {
@@ -467,9 +506,10 @@ class PremierLeagueSeasonSynchronizer
                     : null;
 
                 $playerOps[] = [
-                    'action' => 'update',
+                    'action' => $isExternalIdRemap ? 'external_id_remap' : 'update',
                     'player_id' => (int) $existing->id,
                     'external_id' => $playerExt,
+                    'previous_external_id' => $fromExternalId,
                     'fd_name' => $fdName,
                     'fd_position_id' => $fdPositionId,
                     'fd_number' => $fdNumber,
@@ -483,12 +523,18 @@ class PremierLeagueSeasonSynchronizer
                     'from_club_id' => $fromClubId,
                 ];
 
-                $playerLines[] = [
-                    'action' => ($fromClubId !== $resolvedTargetClubId && $resolvedTargetClubId !== null) || ($fromClubId !== null && $targetClubId === null && ! isset($clubsByExternalId[$clubExt]))
+                $lineAction = $isExternalIdRemap
+                    ? 'external_id_remap'
+                    : (($fromClubId !== $resolvedTargetClubId && $resolvedTargetClubId !== null) || ($fromClubId !== null && $targetClubId === null && ! isset($clubsByExternalId[$clubExt]))
                         ? 'transfer_or_update'
-                        : 'update',
+                        : 'update');
+
+                $playerLines[] = [
+                    'action' => $lineAction,
                     'player_id' => (int) $existing->id,
-                    'external_id' => $playerExt,
+                    'external_id' => $isExternalIdRemap
+                        ? ['from' => $fromExternalId, 'to' => $playerExt]
+                        : $playerExt,
                     'name' => $fdName ?? (string) $existing->name,
                     'fd_name' => $fdName,
                     'club_id' => ['from' => $fromClubId, 'to' => $resolvedTargetClubId ?? "new_club:ext:{$clubExt}"],
@@ -562,6 +608,14 @@ class PremierLeagueSeasonSynchronizer
 
             $ext = (int) $player->external_id;
             if (isset($apiPlayerExtSet[$ext])) {
+                continue;
+            }
+
+            if (isset($remapOldToNew[$ext]) && isset($apiPlayerExtSet[$remapOldToNew[$ext]])) {
+                continue;
+            }
+
+            if (isset($remappedPlayerIds[(int) $player->id])) {
                 continue;
             }
 
@@ -698,6 +752,7 @@ class PremierLeagueSeasonSynchronizer
             'clubs_deactivate' => count(array_filter($clubOps, fn ($o) => $o['action'] === 'deactivate')),
             'players_create' => count(array_filter($playerOps, fn ($o) => $o['action'] === 'create')),
             'players_update' => count(array_filter($playerOps, fn ($o) => $o['action'] === 'update')),
+            'players_external_id_remap' => count(array_filter($playerOps, fn ($o) => $o['action'] === 'external_id_remap')),
             'players_detach' => count(array_filter($playerOps, fn ($o) => $o['action'] === 'detach')),
             'invalid_locks' => count($invalidLockIds),
         ];
@@ -843,7 +898,7 @@ class PremierLeagueSeasonSynchronizer
                 continue;
             }
 
-            if ($op['action'] === 'update') {
+            if ($op['action'] === 'update' || $op['action'] === 'external_id_remap') {
                 // Provider/raw fields + membership only. Never name/slug/position_id/number/manual_*.
                 $update = [
                     'fd_name' => $op['fd_name'],
@@ -855,6 +910,10 @@ class PremierLeagueSeasonSynchronizer
                     'country_id' => $op['country_id'],
                 ];
 
+                if ($op['action'] === 'external_id_remap') {
+                    $update['external_id'] = $op['external_id'];
+                }
+
                 if (($op['update_fd_number'] ?? false) === true && $op['fd_number'] !== null) {
                     $update['fd_number'] = $op['fd_number'];
                 }
@@ -862,6 +921,53 @@ class PremierLeagueSeasonSynchronizer
                 DB::table('players')->where('id', $op['player_id'])->update($update);
             }
         }
+    }
+
+    /**
+     * @return array{oldToNew: array<int, int>, newToOld: array<int, int>, errors: list<string>}
+     */
+    private function resolvePlayerExternalIdRemaps(): array
+    {
+        $configured = config('zcout_premier_league.player_external_id_remaps', []);
+        $errors = [];
+        $oldToNew = [];
+        $newToOld = [];
+
+        if (! is_array($configured)) {
+            return [
+                'oldToNew' => [],
+                'newToOld' => [],
+                'errors' => ['player_external_id_remaps must be an array.'],
+            ];
+        }
+
+        foreach ($configured as $oldExternalId => $newExternalId) {
+            $oldId = (int) $oldExternalId;
+            $newId = (int) $newExternalId;
+
+            if ($oldId <= 0 || $newId <= 0) {
+                $errors[] = "Invalid player_external_id_remaps entry: {$oldExternalId} => {$newExternalId}.";
+                continue;
+            }
+
+            if ($oldId === $newId) {
+                $errors[] = "Invalid player_external_id_remaps: external_id {$oldId} maps to itself.";
+                continue;
+            }
+
+            if (isset($newToOld[$newId]) && $newToOld[$newId] !== $oldId) {
+                $errors[] = "Invalid player_external_id_remaps: new external_id {$newId} is mapped from both {$newToOld[$newId]} and {$oldId}.";
+            }
+
+            $oldToNew[$oldId] = $newId;
+            $newToOld[$newId] = $oldId;
+        }
+
+        return [
+            'oldToNew' => $oldToNew,
+            'newToOld' => $newToOld,
+            'errors' => $errors,
+        ];
     }
 
     /**

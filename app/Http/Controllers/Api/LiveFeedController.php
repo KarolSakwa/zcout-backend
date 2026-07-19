@@ -181,28 +181,31 @@ class LiveFeedController extends Controller
             };
 
             $baseRows = DB::query()
-            ->fromSub(function ($query) use ($since) {
-                $query->from('votes as v')
-                    ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
-                    ->where('v.created_at', '>=', $since)
-                    ->whereNotNull('v.pre_rating_a')
-                    ->whereNotNull('v.post_rating_a')
-                    ->whereNotNull('v.pre_rating_b')
-                    ->whereNotNull('v.post_rating_b')
-                    ->selectRaw('v.player_a_id as player_id, v.attribute_id, a.key as attribute_key, a.label as attribute_label, (v.post_rating_a::numeric - v.pre_rating_a::numeric) as delta_value')
-                    ->unionAll(
-                        DB::table('votes as v')
-                            ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
-                            ->where('v.created_at', '>=', $since)
-                            ->whereNotNull('v.pre_rating_a')
-                            ->whereNotNull('v.post_rating_a')
-                            ->whereNotNull('v.pre_rating_b')
-                            ->whereNotNull('v.post_rating_b')
-                            ->selectRaw('v.player_b_id as player_id, v.attribute_id, a.key as attribute_key, a.label as attribute_label, (v.post_rating_b::numeric - v.pre_rating_b::numeric) as delta_value')
-                    );
-            }, 'movers')
-            ->selectRaw('player_id as "playerId", attribute_id as "attributeId", attribute_key as "attributeKey", attribute_label as "attributeLabel", SUM(delta_value) as "deltaValue"')
-            ->groupBy('player_id', 'attribute_id', 'attribute_key', 'attribute_label');
+                ->fromSub(function ($query) use ($since) {
+                    $query->from('votes as v')
+                        ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
+                        ->where('v.created_at', '>=', $since)
+                        ->whereNotNull('v.pre_rating_a')
+                        ->whereNotNull('v.post_rating_a')
+                        ->whereNotNull('v.pre_rating_b')
+                        ->whereNotNull('v.post_rating_b')
+                        ->selectRaw('v.player_a_id as player_id, v.attribute_id, a.key as attribute_key, a.label as attribute_label, (v.post_rating_a::numeric - v.pre_rating_a::numeric) as delta_value')
+                        ->unionAll(
+                            DB::table('votes as v')
+                                ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
+                                ->where('v.created_at', '>=', $since)
+                                ->whereNotNull('v.pre_rating_a')
+                                ->whereNotNull('v.post_rating_a')
+                                ->whereNotNull('v.pre_rating_b')
+                                ->whereNotNull('v.post_rating_b')
+                                ->selectRaw('v.player_b_id as player_id, v.attribute_id, a.key as attribute_key, a.label as attribute_label, (v.post_rating_b::numeric - v.pre_rating_b::numeric) as delta_value')
+                        );
+                }, 'movers')
+                ->join('players as p', 'p.id', '=', 'movers.player_id')
+                ->join('clubs as c', 'c.id', '=', 'p.club_id')
+                ->where('c.is_current_premier_league', true)
+                ->selectRaw('movers.player_id as "playerId", movers.attribute_id as "attributeId", movers.attribute_key as "attributeKey", movers.attribute_label as "attributeLabel", SUM(movers.delta_value) as "deltaValue"')
+                ->groupBy('movers.player_id', 'movers.attribute_id', 'movers.attribute_key', 'movers.attribute_label');
 
             $risersRaw = (clone $baseRows)
                 ->havingRaw('SUM(delta_value) > 0')
@@ -225,30 +228,10 @@ class LiveFeedController extends Controller
                 array_column($fallersRaw, 'playerId'),
             )));
 
-            $activePlayerIds = empty($playerIds)
-                ? []
-                : DB::table('players as p')
-                    ->join('clubs as c', 'c.id', '=', 'p.club_id')
-                    ->where('c.is_current_premier_league', true)
-                    ->whereIn('p.id', $playerIds)
-                    ->pluck('p.id')
-                    ->map(fn ($id) => (int) $id)
-                    ->all();
-            $activePlayerIdSet = array_fill_keys($activePlayerIds, true);
-
-            $risersRaw = array_values(array_filter(
-                $risersRaw,
-                fn (array $item) => isset($activePlayerIdSet[(int) $item['playerId']])
-            ));
-            $fallersRaw = array_values(array_filter(
-                $fallersRaw,
-                fn (array $item) => isset($activePlayerIdSet[(int) $item['playerId']])
-            ));
-
-            $playerNamesById = empty($activePlayerIds)
+            $playerNamesById = empty($playerIds)
                 ? collect()
                 : DB::table('players')
-                    ->whereIn('id', $activePlayerIds)
+                    ->whereIn('id', $playerIds)
                     ->selectRaw('id, COALESCE(manual_display_name, fd_name, name) as effective_name')
                     ->pluck('effective_name', 'id');
 
