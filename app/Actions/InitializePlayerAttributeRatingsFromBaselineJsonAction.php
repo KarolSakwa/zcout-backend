@@ -113,26 +113,17 @@ final class InitializePlayerAttributeRatingsFromBaselineJsonAction
                 ];
 
                 if (count($payload) >= 1000) {
-                    DB::table('player_attribute_ratings')->upsert(
-                        $payload,
-                        ['player_id', 'attribute_id'],
-                        ['rating', 'votes_count', 'rating_weight_sum', 'confidence_weight_sum', 'confidence', 'last_vote_at']
-                    );
+                    $rowsInserted += DB::table('player_attribute_ratings')
+                        ->insertOrIgnore($payload);
 
-                    $rowsInserted += count($payload);
                     $payload = [];
                 }
             }
         }
 
         if ($payload !== []) {
-            DB::table('player_attribute_ratings')->upsert(
-                $payload,
-                ['player_id', 'attribute_id'],
-                ['rating', 'votes_count', 'rating_weight_sum', 'confidence_weight_sum', 'confidence', 'last_vote_at']
-            );
-
-            $rowsInserted += count($payload);
+            $rowsInserted += DB::table('player_attribute_ratings')
+                ->insertOrIgnore($payload);
         }
 
         return [

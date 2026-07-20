@@ -611,4 +611,87 @@ class SyncPremierLeagueSeasonTest extends TestCase
             return Http::response(['message' => 'unexpected '.$request->url()], 404);
         });
     }
+
+    public function test_initializing_attribute_ratings_only_inserts_missing_rows(): void
+{
+    $clubId = DB::table('clubs')->insertGetId([
+        'name' => 'Active',
+        'slug' => 'active',
+        'is_current_premier_league' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $positionId = $this->createPosition();
+
+    $existingPlayerId = DB::table('players')->insertGetId([
+        'name' => 'Existing Player',
+        'slug' => 'existing-player',
+        'club_id' => $clubId,
+        'position_id' => $positionId,
+    ]);
+
+    $newPlayerId = DB::table('players')->insertGetId([
+        'name' => 'New Player',
+        'slug' => 'new-player',
+        'club_id' => $clubId,
+        'position_id' => $positionId,
+    ]);
+
+    $attributeId = DB::table('attributes')->insertGetId([
+        'key' => 'pace',
+        'label' => 'Pace',
+        'group' => 'PACE',
+        'order' => 1,
+        'scope' => 'both',
+    ]);
+
+    DB::table('player_attribute_ratings')->insert([
+        'player_id' => $existingPlayerId,
+        'attribute_id' => $attributeId,
+        'rating' => 82.5,
+        'votes_count' => 17,
+        'rating_weight_sum' => 14.5,
+        'confidence_weight_sum' => 12.5,
+        'confidence' => 0.73,
+        'last_vote_at' => now()->subDay(),
+    ]);
+
+    $path = storage_path('framework/testing/baseline_insert_missing_test.json');
+
+    if (! is_dir(dirname($path))) {
+        mkdir(dirname($path), 0777, true);
+    }
+
+    file_put_contents($path, json_encode([
+        'format_version' => 2,
+        'competition' => 'Premier League',
+        'season' => '2026/27',
+        'players' => [],
+    ]));
+
+    $result = app(
+        \App\Actions\InitializePlayerAttributeRatingsFromBaselineJsonAction::class
+    )->execute($path);
+
+    $existingRating = DB::table('player_attribute_ratings')
+        ->where('player_id', $existingPlayerId)
+        ->where('attribute_id', $attributeId)
+        ->first();
+
+    $this->assertSame('82.500', (string) $existingRating->rating);
+    $this->assertSame(17, (int) $existingRating->votes_count);
+    $this->assertSame('14.500', (string) $existingRating->rating_weight_sum);
+    $this->assertSame('12.5000', (string) $existingRating->confidence_weight_sum);
+    $this->assertSame('0.73', (string) $existingRating->confidence);
+    $this->assertNotNull($existingRating->last_vote_at);
+
+    $this->assertDatabaseHas('player_attribute_ratings', [
+        'player_id' => $newPlayerId,
+        'attribute_id' => $attributeId,
+        'votes_count' => 0,
+    ]);
+
+    $this->assertSame(1, $result['rows_initialized']);
+}
 }
