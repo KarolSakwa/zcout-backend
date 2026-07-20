@@ -59,9 +59,9 @@ class RecalculatePlayerOverallAction
         PlayerOverall::updateOrCreate(
             [
                 'player_id' => $player->id,
-                'position' => $pos,
             ],
             [
+                'position' => $pos,
                 'overall' => round((float) ($overall ?? 0), 2),
                 'confidence' => round((float) $confidence, 2),
             ]

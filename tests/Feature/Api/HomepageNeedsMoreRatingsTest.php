@@ -146,5 +146,8 @@ class HomepageNeedsMoreRatingsTest extends TestCase
             ->assertJsonPath('items.1.playerId', $playerBId)
             ->assertJsonPath('items.1.slug', 'cole-palmer')
             ->assertJsonPath('items.1.club', 'Chelsea');
+
+        $playerIds = collect($response->json('items'))->pluck('playerId');
+        $this->assertSame($playerIds->count(), $playerIds->unique()->count());
     }
 }
