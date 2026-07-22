@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\BuildFeaturedRankingPayloadAction;
+use App\Actions\Rankings\BuildFeaturedRankingPayloadAction;
 use App\Http\Controllers\Controller;
 use App\Support\Homepage\NeedsMoreRatingsPayload;
 use Illuminate\Http\JsonResponse;

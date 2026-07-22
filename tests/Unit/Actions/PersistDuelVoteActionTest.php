@@ -2,8 +2,8 @@
 
 namespace Tests\Unit\Actions;
 
-use App\Actions\PersistDuelVoteAction;
-use App\Actions\StoreDuelVoteAction;
+use App\Actions\Duels\PersistDuelVoteAction;
+use App\Actions\Duels\StoreDuelVoteAction;
 use App\Data\DuelVote\DuelVoteContext;
 use App\Data\DuelVote\VoterIdentity;
 use App\Models\Attribute;

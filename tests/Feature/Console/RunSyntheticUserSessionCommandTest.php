@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Console;
 
-use App\Actions\ResolveVoterContextAction;
-use App\Actions\ResolveVoterIdentityAction;
+use App\Actions\Duels\ResolveVoterContextAction;
+use App\Actions\Duels\ResolveVoterIdentityAction;
 use App\Events\PlayerAttributeRatingUpdated;
 use App\Events\PlayerOverallUpdated;
 use App\Events\RecentVoteCreated;
@@ -173,7 +173,7 @@ final class RunSyntheticUserSessionCommandTest extends TestCase
 
     public function test_command_has_no_profile_option(): void
     {
-        $definition = app(\App\Console\Commands\RunSyntheticUserSessionCommand::class)->getDefinition();
+        $definition = app(\App\Console\Commands\Simulation\SyntheticUsers\RunSyntheticUserSessionCommand::class)->getDefinition();
 
         $this->assertFalse($definition->hasOption('profile'));
         $this->assertTrue($definition->hasOption('actions'));

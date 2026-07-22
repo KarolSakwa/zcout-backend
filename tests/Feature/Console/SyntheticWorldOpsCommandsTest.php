@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Console;
 
-use App\Actions\AuthenticatedVoterLockKey;
+use App\Actions\Duels\AuthenticatedVoterLockKey;
 use App\Models\SyntheticUserSession;
 use App\Models\SyntheticWorldRuntimeSettings;
 use App\Models\User;

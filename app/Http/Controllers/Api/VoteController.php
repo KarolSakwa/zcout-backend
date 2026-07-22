@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\GetScoutReportAttributesAction;
-use App\Actions\StoreDirectVoteAction;
-use App\Actions\StoreDuelVoteAction;
-use App\Actions\SubmitScoutReportAction;
+use App\Actions\ScoutReports\GetScoutReportAttributesAction;
+use App\Actions\Ratings\StoreDirectVoteAction;
+use App\Actions\Duels\StoreDuelVoteAction;
+use App\Actions\ScoutReports\SubmitScoutReportAction;
 use App\Http\Controllers\Controller;
 use App\Requests\StoreDirectVoteRequest;
 use App\Requests\StoreDuelVoteRequest;

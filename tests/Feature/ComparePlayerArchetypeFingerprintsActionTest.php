@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Actions\ComparePlayerArchetypeFingerprintsAction;
+use App\Actions\Players\ComparePlayerArchetypeFingerprintsAction;
 use Tests\TestCase;
 
 class ComparePlayerArchetypeFingerprintsActionTest extends TestCase

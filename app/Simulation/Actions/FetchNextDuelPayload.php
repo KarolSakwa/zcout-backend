@@ -2,7 +2,7 @@
 
 namespace App\Simulation\Actions;
 
-use App\Actions\HandleNextDuelRequestAction;
+use App\Actions\Duels\HandleNextDuelRequestAction;
 
 final class FetchNextDuelPayload
 {

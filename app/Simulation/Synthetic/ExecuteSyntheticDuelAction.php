@@ -2,10 +2,10 @@
 
 namespace App\Simulation\Synthetic;
 
-use App\Actions\HandleNextDuelRequestAction;
-use App\Actions\HandleSkipDuelRequestAction;
-use App\Actions\ResolveVoterContextAction;
-use App\Actions\StoreDuelVoteAction;
+use App\Actions\Duels\HandleNextDuelRequestAction;
+use App\Actions\Duels\HandleSkipDuelRequestAction;
+use App\Actions\Duels\ResolveVoterContextAction;
+use App\Actions\Duels\StoreDuelVoteAction;
 use App\Models\SyntheticUserProfile;
 use App\Models\User;
 use App\Simulation\Decision\SyntheticDuelDecisionPolicy;

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\PremierLeague;
 
-use App\Actions\BuildRankingAttributeAction;
+use App\Actions\Rankings\BuildRankingAttributeAction;
 use App\Matchmaking\MatchmakingCandidateRowFetcher;
 use App\Models\Club;
 use App\Models\Player;

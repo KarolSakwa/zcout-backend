@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Actions;
 
-use App\Actions\ResolveVoterIdentityAction;
+use App\Actions\Duels\ResolveVoterIdentityAction;
 use App\Data\ActionFailure;
 use App\Enums\InfluenceProfile;
 use App\Enums\UserRole;

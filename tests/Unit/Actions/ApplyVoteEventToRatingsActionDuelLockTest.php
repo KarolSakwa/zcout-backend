@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Actions;
 
-use App\Actions\ApplyVoteEventToRatingsAction;
+use App\Actions\Ratings\ApplyVoteEventToRatingsAction;
 use App\Services\RatingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

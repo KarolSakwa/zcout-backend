@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Simulation\Synthetic;
 
-use App\Actions\AuthenticatedVoterLockKey;
+use App\Actions\Duels\AuthenticatedVoterLockKey;
 use App\Models\SyntheticUserSession;
 use App\Models\User;
 use App\Simulation\Synthetic\GetSyntheticWorldStatusAction;

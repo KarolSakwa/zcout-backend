@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Actions\ValidatePlayerArchetypeLabelAction;
+use App\Actions\Players\ValidatePlayerArchetypeLabelAction;
 use App\Models\Player;
 use Tests\TestCase;
 use InvalidArgumentException;

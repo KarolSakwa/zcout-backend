@@ -437,7 +437,7 @@ class SyncPremierLeagueSeasonTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $resume = app(\App\Actions\ResumeLockedDuelAction::class)->handle([
+        $resume = app(\App\Actions\Duels\ResumeLockedDuelAction::class)->handle([
             'voter_hash' => str_repeat('a', 64),
             'vote_voter_hash' => str_repeat('a', 64),
         ]);
@@ -495,14 +495,14 @@ class SyncPremierLeagueSeasonTest extends TestCase
             'players' => [],
         ]));
 
-        $result = app(\App\Actions\InitializePlayerAttributeRatingsFromBaselineJsonAction::class)->execute($path);
+        $result = app(\App\Actions\Ratings\InitializePlayerAttributeRatingsFromBaselineJsonAction::class)->execute($path);
 
         $this->assertGreaterThan(0, $result['rows_initialized']);
         $this->assertSame(1, $result['players_count']);
         $this->assertDatabaseHas('player_attribute_ratings', ['player_id' => $activePlayer]);
         $this->assertDatabaseMissing('player_attribute_ratings', ['player_id' => $inactivePlayer]);
 
-        $command = app(\App\Console\Commands\ZcoutBaselineEditCommand::class);
+        $command = app(\App\Console\Commands\Players\ZcoutBaselineEditCommand::class);
         $method = new \ReflectionMethod($command, 'loadPlayers');
         $method->setAccessible(true);
         $players = $method->invoke($command);
@@ -671,7 +671,7 @@ class SyncPremierLeagueSeasonTest extends TestCase
     ]));
 
     $result = app(
-        \App\Actions\InitializePlayerAttributeRatingsFromBaselineJsonAction::class
+        \App\Actions\Ratings\InitializePlayerAttributeRatingsFromBaselineJsonAction::class
     )->execute($path);
 
     $existingRating = DB::table('player_attribute_ratings')

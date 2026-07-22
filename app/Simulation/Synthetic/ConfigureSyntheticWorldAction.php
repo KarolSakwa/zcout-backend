@@ -2,7 +2,7 @@
 
 namespace App\Simulation\Synthetic;
 
-use App\Actions\AuthenticatedVoterLockKey;
+use App\Actions\Duels\AuthenticatedVoterLockKey;
 use App\Models\SyntheticUserProfile;
 use App\Models\SyntheticUserSession;
 use App\Models\User;

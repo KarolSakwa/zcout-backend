@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Actions;
 
-use App\Actions\BuildDuelVoteContextAction;
+use App\Actions\Duels\BuildDuelVoteContextAction;
 use App\Data\ActionFailure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

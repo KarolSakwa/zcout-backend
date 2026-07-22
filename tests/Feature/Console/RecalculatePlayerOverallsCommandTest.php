@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Console;
 
-use App\Actions\RecalculatePlayerOverallAction;
+use App\Actions\Ratings\RecalculatePlayerOverallAction;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;

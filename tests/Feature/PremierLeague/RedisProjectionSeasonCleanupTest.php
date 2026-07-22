@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\PremierLeague;
 
-use App\Actions\BuildFeaturedRankingPayloadAction;
+use App\Actions\Rankings\BuildFeaturedRankingPayloadAction;
 use App\PremierLeague\PremierLeagueApiClient;
 use App\PremierLeague\PremierLeagueSeasonSynchronizer;
 use App\PremierLeague\PremierLeagueSyncReport;

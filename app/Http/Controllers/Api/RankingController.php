@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\BuildRankingAttributeAction;
-use App\Actions\BuildRankingMetaAction;
+use App\Actions\Rankings\BuildRankingAttributeAction;
+use App\Actions\Rankings\BuildRankingMetaAction;
 use App\Http\Controllers\Controller;
 use App\Services\Ranking\RankingResultBuilder;
 use Illuminate\Http\Request;

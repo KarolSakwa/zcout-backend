@@ -2,7 +2,7 @@
 
 namespace App\Simulation\Actions;
 
-use App\Actions\ApplyVoteEventToRatingsAction;
+use App\Actions\Ratings\ApplyVoteEventToRatingsAction;
 use App\Http\Controllers\Api\VoteController;
 use App\Simulation\Data\SimulatedDuelVote;
 use Illuminate\Http\Request;

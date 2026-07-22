@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Actions\ResolveVoterContextAction;
-use App\Actions\HandleNextDuelRequestAction;
-use App\Actions\HandleSkipDuelRequestAction;
+use App\Actions\Duels\ResolveVoterContextAction;
+use App\Actions\Duels\HandleNextDuelRequestAction;
+use App\Actions\Duels\HandleSkipDuelRequestAction;
 
 class DuelController extends Controller
 {

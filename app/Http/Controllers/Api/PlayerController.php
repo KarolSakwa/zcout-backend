@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\BuildPlayerProfilePayloadAction;
-use App\Actions\ResolveFeaturedPlayerAction;
+use App\Actions\Players\BuildPlayerProfilePayloadAction;
+use App\Actions\Rankings\ResolveFeaturedPlayerAction;
 use App\Http\Controllers\Controller;
 use App\Models\Player;
 use Illuminate\Http\Request;

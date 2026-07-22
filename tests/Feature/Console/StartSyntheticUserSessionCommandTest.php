@@ -97,7 +97,7 @@ final class StartSyntheticUserSessionCommandTest extends TestCase
 
     public function test_command_has_no_actions_or_profile_options(): void
     {
-        $definition = app(\App\Console\Commands\StartSyntheticUserSessionCommand::class)->getDefinition();
+        $definition = app(\App\Console\Commands\Simulation\SyntheticUsers\StartSyntheticUserSessionCommand::class)->getDefinition();
 
         $this->assertTrue($definition->hasOption('user-id'));
         $this->assertFalse($definition->hasOption('actions'));

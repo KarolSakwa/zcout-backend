@@ -418,7 +418,7 @@ final class AdvanceSyntheticUserSessionCommandTest extends TestCase
 
     public function test_command_has_no_user_id_option(): void
     {
-        $definition = app(\App\Console\Commands\AdvanceSyntheticUserSessionCommand::class)->getDefinition();
+        $definition = app(\App\Console\Commands\Simulation\SyntheticUsers\AdvanceSyntheticUserSessionCommand::class)->getDefinition();
 
         $this->assertTrue($definition->hasOption('session-id'));
         $this->assertFalse($definition->hasOption('user-id'));

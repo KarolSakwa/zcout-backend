@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Actions;
 
-use App\Actions\ResolveFeaturedRankingAttributeAction;
+use App\Actions\Rankings\ResolveFeaturedRankingAttributeAction;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
