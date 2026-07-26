@@ -57,16 +57,42 @@ final class SyntheticDailyActivityPlanner
         }
 
         $timezone = (string) config('app.timezone', 'UTC');
-        $dayStart = $this->dayStart($activityDate, $timezone);
-        $dayEnd = $dayStart->addDay();
-        $totalSeconds = $dayStart->diffInSeconds($dayEnd);
+        $startHour = (int) config('synthetic_world.activity_start_hour', 7);
+        $endHour = (int) config('synthetic_world.activity_end_hour', 18);
 
-        if ($totalSeconds <= 0) {
-            throw new InvalidArgumentException('Activity day duration must be positive.');
+        if ($startHour < 0 || $startHour > 23) {
+            throw new InvalidArgumentException('synthetic_world.activity_start_hour must be between 0 and 23.');
         }
 
-        $slotStartOffset = intdiv(($dailySessionIndex - 1) * $totalSeconds, $targetSessionsToday);
-        $slotEndOffset = intdiv($dailySessionIndex * $totalSeconds, $targetSessionsToday);
+        if ($endHour < 1 || $endHour > 24) {
+            throw new InvalidArgumentException('synthetic_world.activity_end_hour must be between 1 and 24.');
+        }
+
+        if ($endHour <= $startHour) {
+            throw new InvalidArgumentException(
+                'synthetic_world.activity_end_hour must be greater than activity_start_hour.',
+            );
+        }
+
+        $dayStart = $this->dayStart($activityDate, $timezone);
+        $windowStart = $dayStart->addHours($startHour);
+        $windowEnd = $dayStart->addHours($endHour);
+        $totalSeconds = $windowStart->diffInSeconds($windowEnd);
+
+        if ($totalSeconds <= 0) {
+            throw new InvalidArgumentException('Synthetic activity window duration must be positive.');
+        }
+
+        $slotStartOffset = intdiv(
+            ($dailySessionIndex - 1) * $totalSeconds,
+            $targetSessionsToday,
+        );
+
+        $slotEndOffset = intdiv(
+            $dailySessionIndex * $totalSeconds,
+            $targetSessionsToday,
+        );
+
         $slotLength = max(1, $slotEndOffset - $slotStartOffset);
 
         $dateKey = $this->normalizeDateKey($activityDate);
@@ -74,9 +100,10 @@ final class SyntheticDailyActivityPlanner
             'sha256',
             'synthetic-daily-slot|'.$userId.'|'.$dateKey.'|'.$dailySessionIndex,
         );
+
         $offsetInSlot = hexdec(substr($digest, 0, 8)) % $slotLength;
 
-        return $dayStart->addSeconds($slotStartOffset + $offsetInSlot);
+        return $windowStart->addSeconds($slotStartOffset + $offsetInSlot);
     }
 
     /**

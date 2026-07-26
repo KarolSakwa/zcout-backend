@@ -35,8 +35,22 @@ class Kernel extends ConsoleKernel
             );
         }
 
-        $schedule->command('zcout:synthetic-world:tick')
+        $actionsPerTick = (int) config('synthetic_world.actions_per_tick', 1);
+        $startHour = (int) config('synthetic_world.activity_start_hour', 7);
+        $endHour = (int) config('synthetic_world.activity_end_hour', 18);
+
+        if ($actionsPerTick < 1) {
+            throw new InvalidArgumentException(
+                'synthetic_world.actions_per_tick must be an integer greater than or equal to 1.',
+            );
+        }
+
+        $schedule->command("zcout:synthetic-world:tick --session-limit={$actionsPerTick}")
             ->everyTenSeconds()
+            ->between(
+                sprintf('%02d:00', $startHour),
+                sprintf('%02d:59', $endHour - 1),
+            )
             ->withoutOverlapping($overlapMinutes)
             ->name('synthetic-world-tick')
             ->description('Synthetic world tick');

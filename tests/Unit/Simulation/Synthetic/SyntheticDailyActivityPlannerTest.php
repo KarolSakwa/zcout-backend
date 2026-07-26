@@ -67,30 +67,52 @@ final class SyntheticDailyActivityPlannerTest extends TestCase
         $this->assertGreaterThan(1, count(array_unique($targets)));
     }
 
-    public function test_scheduled_times_are_ordered_within_day_slots(): void
+    public function test_scheduled_times_are_ordered_within_configured_activity_window_slots(): void
     {
-        config(['app.timezone' => 'UTC']);
+        config([
+            'app.timezone' => 'UTC',
+            'synthetic_world.activity_start_hour' => 7,
+            'synthetic_world.activity_end_hour' => 18,
+        ]);
+
         $userId = 15;
         $date = '2026-07-18';
         $target = 4;
 
         $times = [];
+
         for ($index = 1; $index <= $target; $index++) {
-            $times[$index] = $this->planner->scheduledStartAt($userId, $date, $index, $target);
+            $times[$index] = $this->planner->scheduledStartAt(
+                $userId,
+                $date,
+                $index,
+                $target,
+            );
         }
 
         $dayStart = CarbonImmutable::parse($date, 'UTC')->startOfDay();
-        $dayEnd = $dayStart->addDay();
-        $totalSeconds = $dayStart->diffInSeconds($dayEnd);
+        $windowStart = $dayStart->addHours(7);
+        $windowEnd = $dayStart->addHours(18);
+        $totalSeconds = $windowStart->diffInSeconds($windowEnd);
 
         for ($index = 1; $index <= $target; $index++) {
             $time = $times[$index];
-            $this->assertTrue($time->gte($dayStart));
-            $this->assertTrue($time->lt($dayEnd));
 
-            $slotStart = intdiv(($index - 1) * $totalSeconds, $target);
-            $slotEnd = intdiv($index * $totalSeconds, $target);
-            $offset = $dayStart->diffInSeconds($time);
+            $this->assertTrue($time->gte($windowStart));
+            $this->assertTrue($time->lt($windowEnd));
+
+            $slotStart = intdiv(
+                ($index - 1) * $totalSeconds,
+                $target,
+            );
+
+            $slotEnd = intdiv(
+                $index * $totalSeconds,
+                $target,
+            );
+
+            $offset = $windowStart->diffInSeconds($time);
+
             $this->assertGreaterThanOrEqual($slotStart, $offset);
             $this->assertLessThan($slotEnd, $offset);
 
