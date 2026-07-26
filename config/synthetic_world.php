@@ -42,5 +42,7 @@ return [
     'activity_end_hour' => (int) env('SYNTHETIC_WORLD_ACTIVITY_END_HOUR', 18),
 
     'actions_per_tick' => (int) env('SYNTHETIC_WORLD_ACTIONS_PER_TICK', 1),
-    
+
+    'timezone' => env('SYNTHETIC_WORLD_TIMEZONE', 'Europe/Warsaw'),
+
 ];
