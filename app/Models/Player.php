@@ -95,28 +95,38 @@ class Player extends Model
 
     protected function effectivePositionId(): Attribute
     {
-        return Attribute::get(fn () => $this->manual_position_id ?? $this->fd_position_id ?? $this->position_id);
+        return Attribute::get(
+            fn () => $this->manual_position_id
+                ?? $this->position_id
+                ?? $this->fd_position_id
+        );
     }
 
     protected function effectivePositionShort(): Attribute
     {
-        return Attribute::get(fn () => $this->manualPositionRef?->short_label
-            ?? $this->fdPositionRef?->short_label
-            ?? $this->positionRef?->short_label);
+        return Attribute::get(
+            fn () => $this->manualPositionRef?->short_label
+                ?? $this->positionRef?->short_label
+                ?? $this->fdPositionRef?->short_label
+        );
     }
 
     protected function effectivePositionKey(): Attribute
     {
-        return Attribute::get(fn () => $this->manualPositionRef?->key
-            ?? $this->fdPositionRef?->key
-            ?? $this->positionRef?->key);
+        return Attribute::get(
+            fn () => $this->manualPositionRef?->key
+                ?? $this->positionRef?->key
+                ?? $this->fdPositionRef?->key
+        );
     }
 
     protected function effectivePositionLabel(): Attribute
     {
-        return Attribute::get(fn () => $this->manualPositionRef?->label
-            ?? $this->fdPositionRef?->label
-            ?? $this->positionRef?->label);
+        return Attribute::get(
+            fn () => $this->manualPositionRef?->label
+                ?? $this->positionRef?->label
+                ?? $this->fdPositionRef?->label
+        );
     }
 
     public function archetype()
