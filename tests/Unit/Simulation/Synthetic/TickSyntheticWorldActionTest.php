@@ -27,7 +27,15 @@ final class TickSyntheticWorldActionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['synthetic_world.enabled' => true]);
+
+        config([
+            'app.timezone' => 'UTC',
+            'synthetic_world.enabled' => true,
+            'synthetic_world.timezone' => 'UTC',
+            'synthetic_world.activity_start_hour' => 7,
+            'synthetic_world.activity_end_hour' => 18,
+            'synthetic_world.actions_per_tick' => 1,
+        ]);
     }
 
     protected function tearDown(): void

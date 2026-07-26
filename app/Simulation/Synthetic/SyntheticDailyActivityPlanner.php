@@ -20,11 +20,15 @@ final class SyntheticDailyActivityPlanner
         int $sessionsPerDayMax,
     ): int {
         if ($sessionsPerDayMin < 0 || $sessionsPerDayMax < 0) {
-            throw new InvalidArgumentException('sessions_per_day bounds must be greater than or equal to 0.');
+            throw new InvalidArgumentException(
+                'sessions_per_day bounds must be greater than or equal to 0.',
+            );
         }
 
         if ($sessionsPerDayMax < $sessionsPerDayMin) {
-            throw new InvalidArgumentException('sessions_per_day_max must be greater than or equal to sessions_per_day_min.');
+            throw new InvalidArgumentException(
+                'sessions_per_day_max must be greater than or equal to sessions_per_day_min.',
+            );
         }
 
         if ($sessionsPerDayMin === $sessionsPerDayMax) {
@@ -40,7 +44,7 @@ final class SyntheticDailyActivityPlanner
     }
 
     /**
-     * Deterministic scheduled start within the local-day slot for daily_session_index (1-based).
+     * Deterministic scheduled start within the configured local activity window.
      */
     public function scheduledStartAt(
         int $userId,
@@ -49,23 +53,31 @@ final class SyntheticDailyActivityPlanner
         int $targetSessionsToday,
     ): CarbonImmutable {
         if ($targetSessionsToday <= 0) {
-            throw new InvalidArgumentException('targetSessionsToday must be greater than 0.');
+            throw new InvalidArgumentException(
+                'targetSessionsToday must be greater than 0.',
+            );
         }
 
         if ($dailySessionIndex < 1 || $dailySessionIndex > $targetSessionsToday) {
-            throw new InvalidArgumentException('dailySessionIndex must be between 1 and targetSessionsToday.');
+            throw new InvalidArgumentException(
+                'dailySessionIndex must be between 1 and targetSessionsToday.',
+            );
         }
 
-        $timezone = (string) config('app.timezone', 'UTC');
+        $timezone = $this->timezone();
         $startHour = (int) config('synthetic_world.activity_start_hour', 7);
         $endHour = (int) config('synthetic_world.activity_end_hour', 18);
 
         if ($startHour < 0 || $startHour > 23) {
-            throw new InvalidArgumentException('synthetic_world.activity_start_hour must be between 0 and 23.');
+            throw new InvalidArgumentException(
+                'synthetic_world.activity_start_hour must be between 0 and 23.',
+            );
         }
 
         if ($endHour < 1 || $endHour > 24) {
-            throw new InvalidArgumentException('synthetic_world.activity_end_hour must be between 1 and 24.');
+            throw new InvalidArgumentException(
+                'synthetic_world.activity_end_hour must be between 1 and 24.',
+            );
         }
 
         if ($endHour <= $startHour) {
@@ -80,7 +92,9 @@ final class SyntheticDailyActivityPlanner
         $totalSeconds = $windowStart->diffInSeconds($windowEnd);
 
         if ($totalSeconds <= 0) {
-            throw new InvalidArgumentException('Synthetic activity window duration must be positive.');
+            throw new InvalidArgumentException(
+                'Synthetic activity window duration must be positive.',
+            );
         }
 
         $slotStartOffset = intdiv(
@@ -103,7 +117,9 @@ final class SyntheticDailyActivityPlanner
 
         $offsetInSlot = hexdec(substr($digest, 0, 8)) % $slotLength;
 
-        return $windowStart->addSeconds($slotStartOffset + $offsetInSlot);
+        return $windowStart->addSeconds(
+            $slotStartOffset + $offsetInSlot,
+        );
     }
 
     /**
@@ -120,26 +136,42 @@ final class SyntheticDailyActivityPlanner
         return Uuid::uuid5(Uuid::NAMESPACE_URL, $name)->toString();
     }
 
-    public function normalizeDateKey(DateTimeInterface|string $activityDate): string
-    {
+    public function normalizeDateKey(
+        DateTimeInterface|string $activityDate,
+    ): string {
+        $timezone = $this->timezone();
+
         if (is_string($activityDate)) {
-            return CarbonImmutable::parse($activityDate, (string) config('app.timezone', 'UTC'))
+            return CarbonImmutable::parse($activityDate, $timezone)
                 ->toDateString();
         }
 
         if ($activityDate instanceof CarbonInterface) {
-            return $activityDate->copy()->timezone((string) config('app.timezone', 'UTC'))->toDateString();
+            return $activityDate
+                ->copy()
+                ->timezone($timezone)
+                ->toDateString();
         }
 
         return CarbonImmutable::instance($activityDate)
-            ->timezone((string) config('app.timezone', 'UTC'))
+            ->timezone($timezone)
             ->toDateString();
     }
 
-    private function dayStart(DateTimeInterface|string $activityDate, string $timezone): CarbonImmutable
-    {
+    private function dayStart(
+        DateTimeInterface|string $activityDate,
+        string $timezone,
+    ): CarbonImmutable {
         $dateKey = $this->normalizeDateKey($activityDate);
 
         return CarbonImmutable::parse($dateKey, $timezone)->startOfDay();
+    }
+
+    private function timezone(): string
+    {
+        return (string) config(
+            'synthetic_world.timezone',
+            config('app.timezone', 'UTC'),
+        );
     }
 }

@@ -14,6 +14,14 @@ final class SyntheticDailyActivityPlannerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        config([
+            'app.timezone' => 'UTC',
+            'synthetic_world.timezone' => 'UTC',
+            'synthetic_world.activity_start_hour' => 7,
+            'synthetic_world.activity_end_hour' => 18,
+        ]);
+
         $this->planner = new SyntheticDailyActivityPlanner();
     }
 
@@ -143,11 +151,20 @@ final class SyntheticDailyActivityPlannerTest extends TestCase
         );
     }
 
-    public function test_uses_application_timezone_for_local_day(): void
+    public function test_uses_synthetic_world_timezone_for_local_day(): void
     {
-        config(['app.timezone' => 'Europe/Warsaw']);
+        config([
+            'app.timezone' => 'UTC',
+            'synthetic_world.timezone' => 'Europe/Warsaw',
+        ]);
 
-        $scheduled = $this->planner->scheduledStartAt(1, '2026-07-18', 1, 1);
+        $scheduled = $this->planner->scheduledStartAt(
+            1,
+            '2026-07-18',
+            1,
+            1,
+        );
+
         $this->assertSame('Europe/Warsaw', $scheduled->timezoneName);
         $this->assertSame('2026-07-18', $scheduled->toDateString());
     }

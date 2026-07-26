@@ -24,8 +24,10 @@ class TickSyntheticWorldAction
     ) {
     }
 
-    public function execute(?int $userLimit = null, ?int $sessionLimit = null): SyntheticWorldTickResult
-    {
+    public function execute(
+        ?int $userLimit = null,
+        ?int $sessionLimit = null,
+    ): SyntheticWorldTickResult {
         $result = new SyntheticWorldTickResult();
         $startedAt = microtime(true);
 
@@ -36,23 +38,50 @@ class TickSyntheticWorldAction
         $this->runtime->markTickStarted();
 
         try {
-            $userLimit = max(1, $userLimit ?? self::DEFAULT_USER_LIMIT);
-            $sessionLimit = max(1, $sessionLimit ?? self::DEFAULT_SESSION_LIMIT);
+            $userLimit = max(
+                1,
+                $userLimit ?? self::DEFAULT_USER_LIMIT,
+            );
+
+            $sessionLimit = max(
+                1,
+                $sessionLimit ?? self::DEFAULT_SESSION_LIMIT,
+            );
+
+            $timezone = (string) config(
+                'synthetic_world.timezone',
+                config('app.timezone', 'UTC'),
+            );
 
             $now = now();
-            $activityDate = $now->copy()->timezone((string) config('app.timezone', 'UTC'))->toDateString();
+
+            $activityDate = $now
+                ->copy()
+                ->timezone($timezone)
+                ->toDateString();
 
             if ($this->runtime->allowsStartingSessions()) {
-                $this->planAndStartSessions($result, $activityDate, $userLimit, $now);
+                $this->planAndStartSessions(
+                    $result,
+                    $activityDate,
+                    $userLimit,
+                    $now,
+                );
             }
 
             if ($this->runtime->allowsAdvancingSessions()) {
-                $this->advanceDueSessions($result, $sessionLimit);
+                $this->advanceDueSessions(
+                    $result,
+                    $sessionLimit,
+                );
             }
 
-            $this->runtime->markTickFinished((int) round((microtime(true) - $startedAt) * 1000));
+            $this->runtime->markTickFinished(
+                (int) round((microtime(true) - $startedAt) * 1000),
+            );
         } catch (Throwable $exception) {
             $this->runtime->markTickFailed($exception->getMessage());
+
             throw $exception;
         }
 
@@ -90,9 +119,15 @@ class TickSyntheticWorldAction
                     $result->usersConsidered++;
 
                     try {
-                        $this->maybeStartWorldSessionForUser($user, $activityDate, $now, $result);
+                        $this->maybeStartWorldSessionForUser(
+                            $user,
+                            $activityDate,
+                            $now,
+                            $result,
+                        );
                     } catch (Throwable $exception) {
                         $result->errors++;
+
                         Log::error('synthetic.world.unexpected_error', [
                             'phase' => 'planning',
                             'user_id' => $user->id,
@@ -114,8 +149,10 @@ class TickSyntheticWorldAction
         SyntheticWorldTickResult $result,
     ): void {
         $profile = $user->syntheticProfile;
+
         if ($profile === null) {
             $result->errors++;
+
             Log::warning('synthetic.world.invalid_profile', [
                 'user_id' => $user->id,
                 'reason' => 'missing_profile',
@@ -140,6 +177,7 @@ class TickSyntheticWorldAction
             ]);
         } catch (DomainException $exception) {
             $result->errors++;
+
             Log::warning('synthetic.world.invalid_profile', [
                 'user_id' => $user->id,
                 'reason' => $exception->getMessage(),
@@ -170,9 +208,11 @@ class TickSyntheticWorldAction
             ->all();
 
         $nextIndex = null;
+
         for ($index = 1; $index <= $target; $index++) {
             if (! in_array($index, $existingIndexes, true)) {
                 $nextIndex = $index;
+
                 break;
             }
         }
@@ -214,12 +254,14 @@ class TickSyntheticWorldAction
                 'scheduled_start_at' => $scheduledStartAt,
                 'session_seed' => $sessionSeed,
             ]);
+
             $result->sessionsStarted++;
             $this->runtime->markProgress();
         } catch (UniqueConstraintViolationException) {
             $result->sessionStartConflicts++;
         } catch (DomainException $exception) {
             $result->errors++;
+
             Log::warning('synthetic.world.session_start_rejected', [
                 'phase' => 'start',
                 'user_id' => $user->id,
@@ -233,6 +275,7 @@ class TickSyntheticWorldAction
             }
 
             $result->errors++;
+
             Log::error('synthetic.world.unexpected_error', [
                 'phase' => 'start',
                 'user_id' => $user->id,
@@ -243,8 +286,10 @@ class TickSyntheticWorldAction
         }
     }
 
-    private function advanceDueSessions(SyntheticWorldTickResult $result, int $sessionLimit): void
-    {
+    private function advanceDueSessions(
+        SyntheticWorldTickResult $result,
+        int $sessionLimit,
+    ): void {
         $dueSessionIds = SyntheticUserSession::query()
             ->where('status', SyntheticSessionStatuses::ACTIVE)
             ->whereNotNull('next_action_at')
@@ -259,14 +304,23 @@ class TickSyntheticWorldAction
 
         foreach ($dueSessionIds as $sessionId) {
             try {
-                $advanceResult = $this->advanceSyntheticUserSessionAction->execute((int) $sessionId);
+                $advanceResult = $this->advanceSyntheticUserSessionAction
+                    ->execute((int) $sessionId);
+
                 $result->sessionsAdvanced++;
 
                 $action = $advanceResult->action;
-                if ($action->status === 'ok' && $action->decision === 'vote') {
+
+                if (
+                    $action->status === 'ok'
+                    && $action->decision === 'vote'
+                ) {
                     $result->votes++;
                     $this->runtime->markProgress();
-                } elseif ($action->status === 'ok' && $action->decision === 'skip') {
+                } elseif (
+                    $action->status === 'ok'
+                    && $action->decision === 'skip'
+                ) {
                     $result->skips++;
                     $this->runtime->markProgress();
                 } elseif ($action->status === 'failure') {
@@ -274,6 +328,7 @@ class TickSyntheticWorldAction
                 }
 
                 $session = $advanceResult->session;
+
                 if ($session->isCompleted()) {
                     $result->completedSessions++;
                     $this->runtime->markProgress();
@@ -286,6 +341,7 @@ class TickSyntheticWorldAction
             } catch (Throwable $exception) {
                 $result->errors++;
                 $result->failedSessions++;
+
                 Log::error('synthetic.world.unexpected_error', [
                     'phase' => 'advance',
                     'user_id' => null,
@@ -305,7 +361,10 @@ class TickSyntheticWorldAction
 
         $message = $exception->getMessage();
 
-        return str_contains($message, 'synthetic_user_sessions_daily_unique')
+        return str_contains(
+                $message,
+                'synthetic_user_sessions_daily_unique',
+            )
             || str_contains($message, 'Unique violation')
             || str_contains($message, 'duplicate key');
     }
