@@ -69,4 +69,27 @@ class ResolveVoterIdentityActionTest extends TestCase
         $this->assertSame(400, $result->status);
         $this->assertSame('Missing voter id.', $result->message);
     }
+
+    public function test_it_resolves_authenticated_voter_without_anon_header(): void
+    {
+        $user = User::factory()->create([
+            'role' => UserRole::USER,
+            'influence_profile' => InfluenceProfile::USER_DEFAULT,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $request = Request::create('/api/votes', 'POST');
+
+        $identity = app(ResolveVoterIdentityAction::class)->execute($request);
+
+        $this->assertSame($user->id, $identity->userId);
+        $this->assertTrue($identity->isAuthenticated);
+        $this->assertSame(['user:'.$user->id], $identity->lockKeys);
+        $this->assertSame('user:'.$user->id, $identity->lockKey);
+        $this->assertSame(
+            hash_hmac('sha256', 'user:'.$user->id, (string) config('app.key')),
+            $identity->voterHash,
+        );
+    }
 }

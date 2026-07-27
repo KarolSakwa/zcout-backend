@@ -82,22 +82,40 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/scout-reports', [VoteController::class, 'submitScoutReport']);
 
     Route::post('/auth/claim-anon', function (Request $request) {
-        $anonId = trim((string) $request->header('X-Zcout-Anon'));
+        $primaryAnonId = trim((string) $request->header('X-Zcout-Anon'));
+        $legacyHeader = trim((string) $request->header('X-Zcout-Anon-Legacy'));
 
-        if ($anonId === '') {
+        if ($primaryAnonId === '') {
             return response()->json([
                 'message' => 'Missing X-Zcout-Anon header.',
             ], 422);
         }
 
-        $voterHash = hash_hmac('sha256', $anonId, (string) config('app.key'));
+        $anonIds = [$primaryAnonId];
 
-        $claimed = DB::table('votes')
-            ->whereNull('user_id')
-            ->where('voter_hash', $voterHash)
-            ->update([
-                'user_id' => $request->user()->id,
-            ]);
+        if ($legacyHeader !== '') {
+            foreach (explode(',', $legacyHeader) as $legacyId) {
+                $legacyId = trim($legacyId);
+                if ($legacyId !== '') {
+                    $anonIds[] = $legacyId;
+                }
+            }
+        }
+
+        $anonIds = array_values(array_unique($anonIds));
+
+        $claimed = 0;
+
+        foreach ($anonIds as $anonId) {
+            $voterHash = hash_hmac('sha256', $anonId, (string) config('app.key'));
+
+            $claimed += DB::table('votes')
+                ->whereNull('user_id')
+                ->where('voter_hash', $voterHash)
+                ->update([
+                    'user_id' => $request->user()->id,
+                ]);
+        }
 
         return response()->json([
             'claimed' => (int) $claimed,
