@@ -169,8 +169,9 @@ final class BuildRankingAttributeAction
             if ($positionId === null) {
                 $playersQuery->whereRaw('1 = 0');
             } else {
+                // Match Player::effectivePositionId (manual → position_id → fd_position_id).
                 $playersQuery->whereRaw(
-                    'COALESCE(players.manual_position_id, players.fd_position_id, players.position_id) = ?',
+                    'COALESCE(players.manual_position_id, players.position_id, players.fd_position_id) = ?',
                     [$positionId]
                 );
             }
