@@ -354,36 +354,10 @@ class PremierLeagueSeasonSynchronizer
         }
 
         // Squad validation across all teams
-        $apiPlayersByExt = [];
-        foreach ($squads as $clubExtId => $squad) {
-            foreach ($squad as $player) {
-                $playerExt = (int) ($player['external_id'] ?? 0);
-                $playerName = trim((string) ($player['name'] ?? ''));
-
-                if ($playerExt <= 0) {
-                    $errors[] = "Squad for club external_id={$clubExtId} contains player with empty external_id.";
-                    continue;
-                }
-                if ($playerName === '') {
-                    $errors[] = "Squad for club external_id={$clubExtId} contains player external_id={$playerExt} with empty name.";
-                    continue;
-                }
-                if (isset($apiPlayersByExt[$playerExt])) {
-                    $errors[] = "Player external_id={$playerExt} appears in multiple squads (clubs {$apiPlayersByExt[$playerExt]['club_external_id']} and {$clubExtId}). Aborting.";
-                    continue;
-                }
-
-                $apiPlayersByExt[$playerExt] = [
-                    'external_id' => $playerExt,
-                    'name' => $playerName,
-                    'club_external_id' => (int) $clubExtId,
-                    'date_of_birth' => $player['date_of_birth'] ?? null,
-                    'position' => $player['position'] ?? null,
-                    'nationality' => $player['nationality'] ?? null,
-                    'shirt_number' => $player['shirt_number'] ?? null,
-                ];
-            }
-        }
+        $squadResolution = $this->resolveApiPlayersFromSquads($squads, $activeExternalIds);
+        $errors = array_merge($errors, $squadResolution['errors']);
+        $warnings = array_merge($warnings, $squadResolution['warnings']);
+        $apiPlayersByExt = $squadResolution['apiPlayersByExt'];
 
         $posIdByLabel = [];
         foreach (DB::table('positions')->select('id', 'label')->get() as $row) {
@@ -921,6 +895,137 @@ class PremierLeagueSeasonSynchronizer
                 DB::table('players')->where('id', $op['player_id'])->update($update);
             }
         }
+    }
+
+    /**
+     * @param  array<int, list<array<string, mixed>>>  $squads
+     * @param  array<int, true>  $activeExternalIds
+     * @return array{apiPlayersByExt: array<int, array<string, mixed>>, errors: list<string>, warnings: list<string>}
+     */
+    private function resolveApiPlayersFromSquads(array $squads, array $activeExternalIds): array
+    {
+        $errors = [];
+        $warnings = [];
+        $apiPlayerOccurrences = [];
+
+        foreach ($squads as $clubExtId => $squad) {
+            foreach ($squad as $player) {
+                $playerExt = (int) ($player['external_id'] ?? 0);
+                $playerName = trim((string) ($player['name'] ?? ''));
+
+                if ($playerExt <= 0) {
+                    $errors[] = "Squad for club external_id={$clubExtId} contains player with empty external_id.";
+                    continue;
+                }
+                if ($playerName === '') {
+                    $errors[] = "Squad for club external_id={$clubExtId} contains player external_id={$playerExt} with empty name.";
+                    continue;
+                }
+
+                $apiPlayerOccurrences[$playerExt][] = [
+                    'external_id' => $playerExt,
+                    'name' => $playerName,
+                    'club_external_id' => (int) $clubExtId,
+                    'date_of_birth' => $player['date_of_birth'] ?? null,
+                    'position' => $player['position'] ?? null,
+                    'nationality' => $player['nationality'] ?? null,
+                    'shirt_number' => $player['shirt_number'] ?? null,
+                ];
+            }
+        }
+
+        $overrideResolution = $this->resolvePlayerClubOverrides();
+        $errors = array_merge($errors, $overrideResolution['errors']);
+        $playerClubOverrides = $overrideResolution['overrides'];
+
+        $apiPlayersByExt = [];
+
+        foreach ($apiPlayerOccurrences as $playerExt => $occurrences) {
+            if (count($occurrences) === 1) {
+                $apiPlayersByExt[$playerExt] = $occurrences[0];
+
+                continue;
+            }
+
+            $conflictClubExtIds = array_values(array_unique(array_map(
+                fn (array $occurrence) => $occurrence['club_external_id'],
+                $occurrences,
+            )));
+            sort($conflictClubExtIds);
+
+            $overrideTarget = $playerClubOverrides[$playerExt] ?? null;
+
+            if ($overrideTarget === null) {
+                $errors[] = "Player external_id={$playerExt} appears in multiple squads (clubs ".implode(', ', $conflictClubExtIds)."). No player_club_overrides entry. Aborting.";
+
+                continue;
+            }
+
+            if (! isset($activeExternalIds[$overrideTarget])) {
+                $errors[] = "player_club_overrides: player external_id={$playerExt} override target club external_id={$overrideTarget} is not among the current API Premier League clubs. Aborting.";
+
+                continue;
+            }
+
+            $selected = null;
+            foreach ($occurrences as $occurrence) {
+                if ($occurrence['club_external_id'] === $overrideTarget) {
+                    $selected = $occurrence;
+                    break;
+                }
+            }
+
+            if ($selected === null) {
+                $errors[] = "player_club_overrides: player external_id={$playerExt} override target club external_id={$overrideTarget} is not among squads containing the player (clubs ".implode(', ', $conflictClubExtIds)."). Aborting.";
+
+                continue;
+            }
+
+            $warnings[] = "Player external_id={$playerExt} multi-squad conflict resolved via player_club_overrides: conflicting clubs [".implode(', ', $conflictClubExtIds)."], selected override club external_id={$overrideTarget}.";
+
+            $apiPlayersByExt[$playerExt] = $selected;
+        }
+
+        return [
+            'apiPlayersByExt' => $apiPlayersByExt,
+            'errors' => $errors,
+            'warnings' => $warnings,
+        ];
+    }
+
+    /**
+     * @return array{overrides: array<int, int>, errors: list<string>}
+     */
+    private function resolvePlayerClubOverrides(): array
+    {
+        $configured = config('zcout_premier_league.player_club_overrides', []);
+        $errors = [];
+        $overrides = [];
+
+        if (! is_array($configured)) {
+            return [
+                'overrides' => [],
+                'errors' => ['player_club_overrides must be an array.'],
+            ];
+        }
+
+        foreach ($configured as $playerExternalId => $clubExternalId) {
+            $playerExt = (int) $playerExternalId;
+            $clubExt = (int) $clubExternalId;
+
+            if ($playerExt <= 0 || $clubExt <= 0) {
+                $errors[] = "Invalid player_club_overrides entry: {$playerExternalId} => {$clubExternalId}.";
+
+                continue;
+            }
+
+            $overrides[$playerExt] = $clubExt;
+        }
+
+        return [
+            'overrides' => $overrides,
+            'errors' => $errors,
+        ];
     }
 
     /**

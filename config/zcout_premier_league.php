@@ -18,4 +18,9 @@ return [
         176852 => 191140, // Lewis Hall
         180389 => 191396, // Adam Wharton
     ],
+    'player_club_overrides' => [
+        82140 => 61,   // Morgan Rogers -> Chelsea FC
+        181901 => 58,  // Alejandro Garnacho -> Aston Villa FC
+        8296 => 349,   // Issa Diop -> Ipswich Town FC
+    ],
 ];
