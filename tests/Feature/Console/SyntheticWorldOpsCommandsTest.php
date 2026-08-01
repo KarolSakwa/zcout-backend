@@ -303,6 +303,10 @@ final class SyntheticWorldOpsCommandsTest extends TestCase
     {
         Carbon::setTestNow('2026-07-18 12:00:00');
         $user = User::factory()->synthetic()->create();
+        $user->syntheticProfile->update([
+            'sessions_per_day_min' => 2,
+            'sessions_per_day_max' => 2,
+        ]);
         SyntheticUserSession::factory()->for($user)->world('2026-07-18', 1)->due()->create([
             'next_action_at' => '2026-07-18 11:50:00',
         ]);
@@ -318,6 +322,7 @@ final class SyntheticWorldOpsCommandsTest extends TestCase
         );
 
         $status = app(GetSyntheticWorldStatusAction::class)->execute();
+        $this->assertFalse($status->daily_plan['daily_plan_exhausted']);
         $this->assertContains('no_progress', array_column($status->warnings, 'code'));
         $this->assertNotContains('daily_plan_exhausted', array_column($status->warnings, 'code'));
     }
