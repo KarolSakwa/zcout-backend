@@ -36,7 +36,6 @@ class SearchController extends Controller
         $contains = '%' . $needle . '%';
 
         $playerRows = Player::query()
-            ->inCurrentPremierLeague()
             ->select(
                 'players.id',
                 'players.name',
@@ -59,6 +58,11 @@ class SearchController extends Controller
                 [$needle, $prefix, $prefix]
             )
             ->leftJoin('clubs', 'clubs.id', '=', 'players.club_id')
+            ->where(function ($query) {
+                $query
+                    ->whereNull('players.club_id')
+                    ->orWhere('clubs.is_current_premier_league', true);
+            })
             ->leftJoin('positions as base_pos', 'base_pos.id', '=', 'players.position_id')
             ->leftJoin('positions as fd_pos', 'fd_pos.id', '=', 'players.fd_position_id')
             ->leftJoin('positions as manual_pos', 'manual_pos.id', '=', 'players.manual_position_id')
@@ -143,7 +147,6 @@ class SearchController extends Controller
 
                 $persistedOverall = PlayerOverall::query()
                     ->where('player_id', $pid)
-                    ->where('position', $posCode)
                     ->first();
 
                 $overall = $persistedOverall
