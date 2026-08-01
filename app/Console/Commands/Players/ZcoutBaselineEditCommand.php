@@ -114,15 +114,17 @@ class ZcoutBaselineEditCommand extends Command
     protected function loadPlayers()
     {
         return DB::table('players as p')
-            ->join('clubs as c', 'c.id', '=', 'p.club_id')
+            ->leftJoin('clubs as c', 'c.id', '=', 'p.club_id')
             ->leftJoin('player_reputation_stats as prs', 'prs.player_id', '=', 'p.id')
             ->leftJoin('positions as pos', 'pos.id', '=', 'p.position_id')
-            ->whereNotNull('p.club_id')
-            ->where('c.is_current_premier_league', true)
+            ->where(function ($query) {
+                $query->whereNull('p.club_id')
+                    ->orWhere('c.is_current_premier_league', true);
+            })
             ->select([
                 'p.id',
                 'p.name',
-                'c.name as club_name',
+                DB::raw('CASE WHEN p.club_id IS NULL THEN \'Without club\' ELSE c.name END as club_name'),
                 'pos.short_label as position',
                 'prs.player_rep',
             ])
