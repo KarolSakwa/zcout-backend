@@ -29,5 +29,7 @@
         <env name="BROADCAST_DRIVER" value="null"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="SYNTHETIC_WORLD_ENABLED" value="false"/>
+        <env name="SCOUTING_MY_SCOUTING_UNLOCK" value="25"/>
+        <env name="SCOUTING_YOUR_IMPACT_UNLOCK" value="125"/>
     </php>
 </phpunit>

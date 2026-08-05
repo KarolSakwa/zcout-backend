@@ -6,9 +6,13 @@ use App\Actions\ScoutReports\GetScoutReportAttributesAction;
 use App\Actions\Ratings\StoreDirectVoteAction;
 use App\Actions\Duels\StoreDuelVoteAction;
 use App\Actions\ScoutReports\SubmitScoutReportAction;
+use App\Actions\Scouting\ResolveScoutingVoterScopeAction;
+use App\Data\ActionFailure;
+use App\Exceptions\ScoutReportSubmitFailedException;
 use App\Http\Controllers\Controller;
 use App\Requests\StoreDirectVoteRequest;
 use App\Requests\StoreDuelVoteRequest;
+use App\Services\Scouting\ScoutingProgressService;
 use App\Support\VoteRequestPayloadResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -19,10 +23,20 @@ class VoteController extends Controller
     public function store(
         StoreDuelVoteRequest $request,
         StoreDuelVoteAction $storeDuelVoteAction,
+        ResolveScoutingVoterScopeAction $resolveScoutingVoterScopeAction,
+        ScoutingProgressService $scoutingProgressService,
     ) {
         $validated = $request->validated();
 
         $result = $storeDuelVoteAction->execute($validated, $request);
+
+        if (($result['ok'] ?? false) === true) {
+            $scope = $resolveScoutingVoterScopeAction->execute($request);
+
+            if (! $scope instanceof ActionFailure) {
+                $result['body']['scouting_progress'] = $scoutingProgressService->progressArray($scope);
+            }
+        }
 
         return response()->json($result['body'], $result['status']);
     }
@@ -56,6 +70,8 @@ class VoteController extends Controller
         Request $request,
         VoteRequestPayloadResolver $voteRequestPayloadResolver,
         SubmitScoutReportAction $submitScoutReportAction,
+        ResolveScoutingVoterScopeAction $resolveScoutingVoterScopeAction,
+        ScoutingProgressService $scoutingProgressService,
     ) {
         $payload = $voteRequestPayloadResolver->resolve($request);
 
@@ -127,23 +143,32 @@ class VoteController extends Controller
             ], 422);
         }
 
-        $result = $submitScoutReportAction->execute(
-            (int) auth()->id(),
-            $v->validated(),
-        );
-
-        if (($result['status'] ?? 500) >= 400) {
+        try {
+            $result = $submitScoutReportAction->execute(
+                (int) auth()->id(),
+                $v->validated(),
+            );
+        } catch (ScoutReportSubmitFailedException $exception) {
             Log::warning('scout_report.submit_failed', [
                 'user_id' => auth()->id(),
                 'player_id' => $payload['player_id'] ?? null,
                 'votes_count' => count($payload['votes'] ?? []),
                 'skips_count' => count($payload['skipped_attribute_ids'] ?? []),
-                'status' => $result['status'] ?? null,
-                'body' => $result['body'] ?? null,
+                'status' => $exception->status,
+                'body' => $exception->body,
             ]);
+
+            return response()->json($exception->body, $exception->status);
         }
 
-        return response()->json($result['body'], $result['status']);
+        $body = $result['body'];
+        $scope = $resolveScoutingVoterScopeAction->execute($request);
+
+        if (! $scope instanceof ActionFailure) {
+            $body['scouting_progress'] = $scoutingProgressService->progressArray($scope);
+        }
+
+        return response()->json($body, $result['status']);
     }
 
     public function scoutReportAttributes(

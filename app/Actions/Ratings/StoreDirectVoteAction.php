@@ -80,6 +80,7 @@ final class StoreDirectVoteAction
             $vote->winner_id = null;
             $vote->user_id = $userId;
             $vote->voter_hash = null;
+            $vote->scout_report_submission_id = $data['scout_report_submission_id'] ?? null;
             $vote->weight_applied = $weightApplied;
             $vote->confidence_weight_applied = $confidenceWeightApplied;
             $vote->weight_version = 1;

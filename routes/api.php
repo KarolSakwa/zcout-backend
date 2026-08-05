@@ -9,10 +9,10 @@ use App\Http\Controllers\Api\HomepageController;
 use App\Http\Controllers\Api\LiveFeedController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\RankingController;
+use App\Http\Controllers\Api\ScoutingController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\VoteController;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
@@ -76,49 +76,13 @@ Route::prefix('homepage')->group(function () {
 
 Route::get('/search', [SearchController::class, 'index']);
 
+Route::get('/scouting/progress', [ScoutingController::class, 'progress']);
+Route::get('/my-scouting', [ScoutingController::class, 'myScouting']);
+
 Route::post('/log-event', [EventLogController::class, 'store']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/scout-reports', [VoteController::class, 'submitScoutReport']);
 
-    Route::post('/auth/claim-anon', function (Request $request) {
-        $primaryAnonId = trim((string) $request->header('X-Zcout-Anon'));
-        $legacyHeader = trim((string) $request->header('X-Zcout-Anon-Legacy'));
-
-        if ($primaryAnonId === '') {
-            return response()->json([
-                'message' => 'Missing X-Zcout-Anon header.',
-            ], 422);
-        }
-
-        $anonIds = [$primaryAnonId];
-
-        if ($legacyHeader !== '') {
-            foreach (explode(',', $legacyHeader) as $legacyId) {
-                $legacyId = trim($legacyId);
-                if ($legacyId !== '') {
-                    $anonIds[] = $legacyId;
-                }
-            }
-        }
-
-        $anonIds = array_values(array_unique($anonIds));
-
-        $claimed = 0;
-
-        foreach ($anonIds as $anonId) {
-            $voterHash = hash_hmac('sha256', $anonId, (string) config('app.key'));
-
-            $claimed += DB::table('votes')
-                ->whereNull('user_id')
-                ->where('voter_hash', $voterHash)
-                ->update([
-                    'user_id' => $request->user()->id,
-                ]);
-        }
-
-        return response()->json([
-            'claimed' => (int) $claimed,
-        ]);
-    });
+    Route::post('/auth/claim-anon', [ScoutingController::class, 'claimAnon']);
 });
