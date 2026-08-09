@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Rankings\BuildAttributeTopPlayersAction;
 use App\Http\Controllers\Controller;
 use App\Support\Live\TopMoverItem;
 use Illuminate\Http\JsonResponse;
@@ -167,24 +168,51 @@ class LiveFeedController extends Controller
         ]);
     }
 
+    public function attributeTop(Request $request, BuildAttributeTopPlayersAction $action): JsonResponse
+    {
+        $attributeKey = trim((string) $request->query('attribute_key', ''));
+
+        if ($attributeKey === '') {
+            return response()->json([
+                'attribute' => null,
+                'players' => [],
+            ], 422);
+        }
+
+        $excludeRaw = trim((string) $request->query('exclude', ''));
+        $excludeIds = $excludeRaw === ''
+            ? []
+            : array_values(array_filter(
+                array_map(static fn (string $part): int => (int) trim($part), explode(',', $excludeRaw)),
+                static fn (int $id): bool => $id > 0,
+            ));
+
+        return response()->json($action->execute($attributeKey, $excludeIds));
+    }
+
     public function topMoversSummary(Request $request): JsonResponse
     {
         $period = $request->query('period', '7d');
         $limit = max(1, min((int) $request->integer('limit', 5), 10));
+        $attributeKey = trim((string) $request->query('attribute_key', ''));
+        $attributeSuffix = $attributeKey !== '' ? ':' . $attributeKey : '';
 
-        $cacheKey = "live:top-movers-summary:{$period}:{$limit}";
+        $cacheKey = "live:top-movers-summary:{$period}:{$limit}{$attributeSuffix}";
 
-        $payload = Cache::remember($cacheKey, now()->addSeconds(5), function () use ($period, $limit) {
+        $payload = Cache::remember($cacheKey, now()->addSeconds(5), function () use ($period, $limit, $attributeKey) {
             $since = match ($period) {
                 '7d' => now()->subDays(7),
                 default => now()->subDays(7),
             };
 
             $baseRows = DB::query()
-                ->fromSub(function ($query) use ($since) {
+                ->fromSub(function ($query) use ($since, $attributeKey) {
                     $query->from('votes as v')
                         ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
                         ->where('v.created_at', '>=', $since)
+                        ->when($attributeKey !== '', function ($q) use ($attributeKey) {
+                            $q->where('a.key', $attributeKey);
+                        })
                         ->whereNotNull('v.pre_rating_a')
                         ->whereNotNull('v.post_rating_a')
                         ->whereNotNull('v.pre_rating_b')
@@ -194,6 +222,9 @@ class LiveFeedController extends Controller
                             DB::table('votes as v')
                                 ->join('attributes as a', 'a.id', '=', 'v.attribute_id')
                                 ->where('v.created_at', '>=', $since)
+                                ->when($attributeKey !== '', function ($q) use ($attributeKey) {
+                                    $q->where('a.key', $attributeKey);
+                                })
                                 ->whereNotNull('v.pre_rating_a')
                                 ->whereNotNull('v.post_rating_a')
                                 ->whereNotNull('v.pre_rating_b')

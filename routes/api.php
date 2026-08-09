@@ -67,6 +67,7 @@ Route::prefix('live')->group(function () {
     Route::get('/recent-votes', [LiveFeedController::class, 'recentVotes']);
     Route::get('/top-movers', [LiveFeedController::class, 'topMovers']);
     Route::get('/top-movers-summary', [LiveFeedController::class, 'topMoversSummary']);
+    Route::get('/attribute-top', [LiveFeedController::class, 'attributeTop']);
 });
 
 Route::prefix('homepage')->group(function () {

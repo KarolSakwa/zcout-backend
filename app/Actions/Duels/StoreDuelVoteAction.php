@@ -115,6 +115,9 @@ final class StoreDuelVoteAction
         }
 
         Cache::forget('live:top-movers-summary:7d:5');
+        if (isset($context->attribute->key)) {
+            Cache::forget('live:top-movers-summary:7d:5:' . $context->attribute->key);
+        }
         event(new TopMoversMaybeChanged());
     }
 

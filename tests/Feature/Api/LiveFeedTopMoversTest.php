@@ -346,6 +346,41 @@ $playerAId = DB::table('players')->insertGetId([
         }
     }
 
+    public function test_top_movers_summary_can_filter_by_attribute_key(): void
+    {
+        $clubId = $this->createCurrentPremierLeagueClub('Club '.uniqid('pl', true), 'club-'.uniqid('pl', true));
+        $dummyPlayerId = $this->createPlayer($clubId, 'Dummy Player');
+
+        $creativityId = DB::table('attributes')->insertGetId([
+            'key' => 'creativity',
+            'label' => 'Creativity',
+            'group' => 'TECHNIQUE',
+        ]);
+
+        $paceId = DB::table('attributes')->insertGetId([
+            'key' => 'pace',
+            'label' => 'Pace',
+            'group' => 'PHYSICAL',
+        ]);
+
+        $creativityRiserId = $this->createPlayer($clubId, 'Creativity Riser');
+        $paceRiserId = $this->createPlayer($clubId, 'Pace Riser');
+
+        $this->insertMoverVote($creativityId, $creativityRiserId, $dummyPlayerId, 4.5);
+        $this->insertMoverVote($paceId, $paceRiserId, $dummyPlayerId, 8.0);
+
+        $response = $this->getJson('/api/live/top-movers-summary?period=7d&limit=5&attribute_key=creativity');
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(1, 'risers')
+            ->assertJsonPath('risers.0.playerId', $creativityRiserId)
+            ->assertJsonPath('risers.0.attributeKey', 'creativity');
+
+        $riserPlayerIds = collect($response->json('risers'))->pluck('playerId')->all();
+        $this->assertNotContains($paceRiserId, $riserPlayerIds);
+    }
+
     private function createInactiveClub(): int
     {
         return (int) DB::table('clubs')->insertGetId([
