@@ -47,14 +47,22 @@ class ZcoutBaselineEditCommand extends Command
 
         for ($playerIndex = $startIndex; $playerIndex < $players->count(); $playerIndex++) {
             $player = $players[$playerIndex];
+
+            if (! $this->option('review') && $this->isPlayerComplete($player, $baseline)) {
+                continue;
+            }
+
             $definitions = $this->promptDefinitionsForPlayer($player, $baseline);
 
             if ($definitions === []) {
-                $playerIndex++;
                 continue;
             }
 
             $attributeIndex = $this->resolveStartingAttributeIndex($player, $baseline);
+
+            if ($attributeIndex >= count($definitions)) {
+                continue;
+            }
 
             while ($attributeIndex < count($definitions)) {
                 $definition = $definitions[$attributeIndex];
@@ -445,6 +453,11 @@ class ZcoutBaselineEditCommand extends Command
     protected function resolveStartingAttributeIndex(array $player, array $baseline): int
     {
         $definitions = $this->promptDefinitionsForPlayer($player, $baseline);
+
+        if ($this->option('review')) {
+            return 0;
+        }
+
         $attributes = $baseline['players'][(string) $player['id']]['attributes'] ?? [];
 
         foreach ($definitions as $index => $definition) {
@@ -455,7 +468,7 @@ class ZcoutBaselineEditCommand extends Command
             }
         }
 
-        return 0;
+        return count($definitions);
     }
 
     protected function promptDefinitionsForPlayer(array $player, array $baseline): array

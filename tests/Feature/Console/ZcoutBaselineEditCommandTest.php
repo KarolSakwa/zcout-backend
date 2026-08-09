@@ -84,6 +84,135 @@ class ZcoutBaselineEditCommandTest extends TestCase
         $this->assertSame(2, $players->count());
     }
 
+    public function test_complete_player_is_skipped_after_incomplete_player_is_finished(): void
+    {
+        $clubId = $this->createClub('Active PL', true);
+        $positionId = $this->createPosition();
+        $incompletePlayerId = $this->createPlayer('Incomplete Player', 'incomplete-player', $clubId, $positionId);
+        $completePlayerId = $this->createPlayer('Later Complete Player', 'later-complete-player', $clubId, $positionId);
+
+        $baseline = $this->emptyBaseline();
+        $baseline['players'][(string) $incompletePlayerId] = $this->playerEntryMissingLastAttribute('Incomplete Player', 'RB', 'Active PL');
+        $baseline['players'][(string) $completePlayerId] = $this->completePlayerEntry('Later Complete Player', 'RB', 'Active PL');
+        $completePlayerPaceBefore = $baseline['players'][(string) $completePlayerId]['attributes']['pace'];
+
+        $filePath = $this->writeTempBaseline($baseline);
+        $output = $this->runCommandWithInputs(
+            ['--file' => $filePath],
+            ['77', 'q'],
+        );
+
+        $updated = json_decode((string) file_get_contents(base_path($filePath)), true);
+        $this->assertSame(77, $updated['players'][(string) $incompletePlayerId]['attributes']['free_kicks']);
+        $this->assertSame($completePlayerPaceBefore, $updated['players'][(string) $completePlayerId]['attributes']['pace']);
+        $this->assertStringNotContainsString('Later Complete Player', $output);
+    }
+
+    public function test_complete_player_is_not_re_rated_after_club_change(): void
+    {
+        $clubId = $this->createClub('New Club', true);
+        $positionId = $this->createPosition();
+        $incompletePlayerId = $this->createPlayer('Incomplete Player', 'incomplete-player', $clubId, $positionId);
+        $completePlayerId = $this->createPlayer('Later Complete Player', 'later-complete-player', $clubId, $positionId);
+
+        $baseline = $this->emptyBaseline();
+        $baseline['players'][(string) $incompletePlayerId] = $this->playerEntryMissingLastAttribute('Incomplete Player', 'RB', 'New Club');
+        $baseline['players'][(string) $completePlayerId] = $this->completePlayerEntry('Later Complete Player', 'RB', 'Old Club');
+        $completePlayerAttributesBefore = $baseline['players'][(string) $completePlayerId]['attributes'];
+
+        $filePath = $this->writeTempBaseline($baseline);
+        $output = $this->runCommandWithInputs(
+            ['--file' => $filePath],
+            ['66', 'q'],
+        );
+
+        $updated = json_decode((string) file_get_contents(base_path($filePath)), true);
+        $this->assertSame($completePlayerAttributesBefore, $updated['players'][(string) $completePlayerId]['attributes']);
+        $this->assertStringNotContainsString('Later Complete Player', $output);
+    }
+
+    public function test_complete_player_without_club_is_not_re_rated(): void
+    {
+        $clubId = $this->createClub('Active PL', true);
+        $positionId = $this->createPosition();
+        $incompletePlayerId = $this->createPlayer('Incomplete Player', 'incomplete-player', $clubId, $positionId);
+        $noClubPlayerId = $this->createPlayer('Later No Club Player', 'later-no-club-player', null, $positionId);
+
+        $baseline = $this->emptyBaseline();
+        $baseline['players'][(string) $incompletePlayerId] = $this->playerEntryMissingLastAttribute('Incomplete Player', 'RB', 'Active PL');
+        $baseline['players'][(string) $noClubPlayerId] = $this->completePlayerEntry('Later No Club Player', 'RB', 'Without club');
+        $noClubAttributesBefore = $baseline['players'][(string) $noClubPlayerId]['attributes'];
+
+        $filePath = $this->writeTempBaseline($baseline);
+        $output = $this->runCommandWithInputs(
+            ['--file' => $filePath],
+            ['88', 'q'],
+        );
+
+        $updated = json_decode((string) file_get_contents(base_path($filePath)), true);
+        $this->assertSame($noClubAttributesBefore, $updated['players'][(string) $noClubPlayerId]['attributes']);
+        $this->assertStringNotContainsString('Later No Club Player', $output);
+    }
+
+    public function test_resolve_starting_attribute_index_returns_definition_count_for_complete_player(): void
+    {
+        $clubId = $this->createClub('Active PL', true);
+        $positionId = $this->createPosition();
+        $playerId = $this->createPlayer('Complete Player', 'complete-player', $clubId, $positionId);
+
+        $players = $this->loadPlayers();
+        $player = $players->firstWhere('id', $playerId);
+        $baseline = $this->emptyBaseline();
+        $baseline['players'][(string) $playerId] = $this->completePlayerEntry('Complete Player', 'RB', 'Active PL');
+
+        $command = $this->makeCommand();
+        $definitions = $this->invokeProtected($command, 'promptDefinitionsForPlayer', [$player, $baseline]);
+        $index = $this->invokeProtected($command, 'resolveStartingAttributeIndex', [$player, $baseline]);
+
+        $this->assertSame(count($definitions), $index);
+    }
+
+    public function test_resolve_starting_attribute_index_starts_at_first_missing_attribute(): void
+    {
+        $clubId = $this->createClub('Active PL', true);
+        $positionId = $this->createPosition();
+        $playerId = $this->createPlayer('Partial Player', 'partial-player', $clubId, $positionId);
+
+        $players = $this->loadPlayers();
+        $player = $players->firstWhere('id', $playerId);
+        $baseline = $this->emptyBaseline();
+        $baseline['players'][(string) $playerId] = $this->playerEntryMissingAttribute('Partial Player', 'RB', 'Active PL', 'acceleration');
+
+        $command = $this->makeCommand();
+        $index = $this->invokeProtected($command, 'resolveStartingAttributeIndex', [$player, $baseline]);
+
+        $this->assertSame(1, $index);
+    }
+
+    public function test_review_mode_does_not_skip_next_player_when_current_has_no_review_attributes(): void
+    {
+        $clubId = $this->createClub('Active PL', true);
+        $positionId = $this->createPosition();
+        $playerOneId = $this->createPlayer('Player One', 'player-one', $clubId, $positionId);
+        $playerTwoId = $this->createPlayer('Player Two', 'player-two', $clubId, $positionId);
+
+        $baseline = $this->emptyBaseline();
+        $baseline['players'][(string) $playerOneId] = $this->completePlayerEntry('Player One', 'RB', 'Active PL');
+        $baseline['players'][(string) $playerTwoId] = $this->completePlayerEntry('Player Two', 'RB', 'Active PL');
+        $baseline['players'][(string) $playerTwoId]['review_attributes'] = ['pace'];
+
+        $filePath = $this->writeTempBaseline($baseline);
+        $output = $this->runCommandWithInputs(
+            ['--file' => $filePath, '--review' => true, '--player' => (string) $playerOneId],
+            ['55', 'q'],
+        );
+
+        $updated = json_decode((string) file_get_contents(base_path($filePath)), true);
+        $this->assertStringContainsString('Player Two', $output);
+        $this->assertSame(55, $updated['players'][(string) $playerTwoId]['attributes']['pace']);
+        $this->assertSame([], $updated['players'][(string) $playerTwoId]['review_attributes']);
+    }
+
     private function loadPlayers()
     {
         $command = app(ZcoutBaselineEditCommand::class);
@@ -139,6 +268,68 @@ class ZcoutBaselineEditCommandTest extends TestCase
             'attributes' => $attributes,
             'review_attributes' => [],
         ];
+    }
+
+    private function playerEntryMissingLastAttribute(string $name, string $position, string $club): array
+    {
+        $entry = $this->completePlayerEntry($name, $position, $club);
+        $definitions = config('zcout_attributes.outfield', []);
+        $lastKey = (string) end($definitions)['key'];
+        unset($entry['attributes'][$lastKey]);
+
+        return $entry;
+    }
+
+    private function playerEntryMissingAttribute(string $name, string $position, string $club, string $attributeKey): array
+    {
+        $entry = $this->completePlayerEntry($name, $position, $club);
+        unset($entry['attributes'][$attributeKey]);
+
+        return $entry;
+    }
+
+    private function writeTempBaseline(array $baseline): string
+    {
+        $relativePath = 'storage/framework/testing/baseline_'.uniqid('', true).'.json';
+        $filePath = base_path($relativePath);
+        $directory = dirname($filePath);
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        file_put_contents($filePath, json_encode($baseline, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+
+        return $relativePath;
+    }
+
+    private function runCommandWithInputs(array $options, array $inputs): string
+    {
+        $command = new class($inputs) extends ZcoutBaselineEditCommand {
+            private array $inputs;
+
+            private int $inputIndex = 0;
+
+            public function __construct(array $inputs)
+            {
+                parent::__construct();
+                $this->inputs = $inputs;
+            }
+
+            protected function readInput(): string
+            {
+                return $this->inputs[$this->inputIndex++] ?? 'q';
+            }
+        };
+
+        $input = new ArrayInput($options, $command->getDefinition());
+        $output = new BufferedOutput();
+        $command->setLaravel($this->app);
+        $command->setInput($input);
+        $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+        $command->handle();
+
+        return $output->fetch();
     }
 
     private function createClub(string $name, bool $isCurrentPremierLeague): int
