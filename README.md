@@ -17,8 +17,8 @@ The system transforms these micro-decisions into evolving player profiles, ranki
 - Matchmaking system with exposure balancing
 - Scout reports (direct attribute ratings)
 - Live rankings and player profiles
-- Anti-troll foundations
 - Simulation laboratory for large-scale testing
+- Scouting progression (My Scouting unlock)
 
 ---
 
@@ -38,38 +38,25 @@ Architecture highlights:
 - Materialized state for fast reads
 - Domain-oriented matchmaking layer
 - Simulation-based tuning workflow
-- Event-driven ranking projections (RabbitMQ + Redis)
+- Ranking projections via Redis (+ RabbitMQ events; see docs for sync vs async paths)
 
-### Event-Driven Projections
+### Ranking projections (Redis + RabbitMQ)
 
-Zcout uses asynchronous projection pipelines for ranking generation.
+PostgreSQL is the source of truth. Redis holds ranking ZSETs for fast reads (rebuildable from PG).
 
-Player rating updates emit domain events which are published to RabbitMQ.
+**As-built write path (important):**
 
-Dedicated projection consumers process these events and maintain Redis sorted sets used for fast ranking lookups.
+- **Attribute** rating updates upsert Redis **synchronously** in the domain event listener, then publish to RabbitMQ (attribute consumer is largely redundant for correctness).
+- **Overall** updates publish to RabbitMQ; Redis `ranking:overall` is updated by the overall projection consumer **or** by a full rebuild (no sync Redis write in the overall listener).
 
-Flow:
-
-```text
-Vote / Scout Report
-        ↓
-Domain Event
-        ↓
-RabbitMQ
-        ↓
-Projection Consumers
-        ↓
-Redis Sorted Sets
-        ↓
-Fast Rank Queries
-```
+See `docs/rankings-events-realtime.md` for the authoritative description. Do not assume “consumers only” for attribute rankings.
 
 Current projections:
 
 - Overall player rankings
-- Attribute-specific rankings (Pace, Dribbling, Passing, etc.)
+- Attribute-specific rankings
 
-Redis projections can be rebuilt at any time from PostgreSQL source-of-truth data using dedicated rebuild commands.
+Technical docs: [`docs/README.md`](docs/README.md) · As-built status: see workspace `zcout-private-docs/STATUS.md`.
 
 ---
 
@@ -273,42 +260,49 @@ docker compose exec laravel.test php artisan test
 
 # API Overview
 
-Example endpoints:
+Example endpoints (see `docs/api-surface.md` for the full map):
 
 ```text
 GET    /api/duels/next
 POST   /api/votes
-POST   /api/duels/{id}/skip
+POST   /api/duels/skip          # body: duel_id (not /duels/{id}/skip)
 
-GET    /api/rankings
-GET    /api/players/{slug}
+GET    /api/rankings/{attributeKey}
+GET    /api/players/{player}
 
 POST   /api/scout-reports
+GET    /api/search?q=
 ```
+
+---
+
+# Documentation
+
+- Technical docs: [`docs/README.md`](docs/README.md)
+- AI entrypoint: [`AI_CONTEXT.md`](AI_CONTEXT.md)
+- Workspace as-built status: `zcout-private-docs/STATUS.md` (canonical IMPLEMENTED / PARTIAL / PLANNED / UNCERTAIN map)
 
 ---
 
 # Current MVP Scope
 
-Implemented / in progress:
+Implemented (high level):
 
-- Duel flow
-- Crowd reveal system
-- Matchmaking v1
-- Rankings
-- Player profiles
-- Scout reports
-- Simulation lab
-- Confidence system
-- Anti-troll foundations
+- Duel flow, reveal, skip, anonymous voting + claim
+- Matchmaking v1, rating + confidence, overall
+- Rankings (Redis projections), player profiles, scout reports
+- Simulation lab, scouting progression (My Scouting)
+- Live feed endpoints + Soketi events
 
-Planned expansions:
+Schema stubs only / not runtime-scored:
 
-- Player comparison
-- Advanced freshness resurfacing
-- Richer calibration buckets
-- Trust & integrity expansion
-- Advanced live widgets
-- Historical rating timelines
+- Trust Score, Integrity, anti-troll weight factors (see STATUS — **PLANNED/DEFERRED**)
+
+Planned / deferred examples:
+
+- Elasticsearch (current search is SQL)
+- Freshness resurfacing, attribute-aware matchmaking
+- Trust & integrity engines, Your Impact content
+- Player comparison, historical timelines
 
 ---
