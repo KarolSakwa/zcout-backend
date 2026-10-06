@@ -27,10 +27,11 @@ The system transforms these micro-decisions into evolving player profiles, ranki
 - Laravel 12
 - PostgreSQL
 - Docker / Docker Compose
+- Redis (ranking projections)
+- RabbitMQ (overall ranking projection events)
 - Soketi (Pusher-compatible WebSockets)
 - REST API
 - PHPUnit
-- Nginx
 
 Architecture highlights:
 
@@ -97,6 +98,9 @@ VPS image pull
     ↓
 Docker Compose deployment
 ```
+
+Backend image CI: [`.github/workflows/backend-image.yml`](.github/workflows/backend-image.yml).
+
 ---
 
 # Product Philosophy
@@ -205,13 +209,17 @@ Core player ratings, rankings and attribute evolution are generated internally b
 app/
 ├── Actions/
 ├── Console/
+├── Data/              # DTOs / value objects (votes, scouting)
 ├── Enums/
 ├── Events/
 ├── Exceptions/
 ├── Http/
+├── Listeners/         # domain events → Redis / RabbitMQ
 ├── Matchmaking/
 ├── Models/
+├── PremierLeague/     # external PL sync helpers (not core rating math)
 ├── Providers/
+├── Requests/
 ├── Services/
 ├── Simulation/
 └── Support/
@@ -238,17 +246,20 @@ Persistence Layer
 - Docker
 - Docker Compose
 
-## Start containers
+## First-time setup
 
 ```bash
+cp .env.example .env   # if missing; DB_* already targets Sail/pgsql
 docker compose up -d --build
-```
-
-## Run migrations
-
-```bash
+docker compose exec laravel.test php artisan key:generate   # if APP_KEY is empty
 docker compose exec laravel.test php artisan migrate --seed
 ```
+
+App URL: **http://localhost:8080** (`laravel.test` maps host port 8080).
+
+`compose.yaml` also runs **pgsql**, **redis**, **rabbitmq** (5672; management UI 15672), **soketi** (6001), and **scheduler** (`php artisan schedule:work`).
+
+For rankings, WebSockets, RabbitMQ topology, and projection consumers in dev, see [`docs/local-dev-and-ops.md`](docs/local-dev-and-ops.md).
 
 ## Run tests
 
@@ -263,24 +274,32 @@ docker compose exec laravel.test php artisan test
 Example endpoints (see `docs/api-surface.md` for the full map):
 
 ```text
+GET    /api/health
 GET    /api/duels/next
 POST   /api/votes
 POST   /api/duels/skip          # body: duel_id (not /duels/{id}/skip)
+POST   /api/votes/direct        # sanctum — direct attribute rating
 
 GET    /api/rankings/{attributeKey}
 GET    /api/players/{player}
 
-POST   /api/scout-reports
+POST   /api/scout-reports       # sanctum
 GET    /api/search?q=
+
+GET    /api/scouting/progress
+GET    /api/my-scouting
+POST   /api/auth/claim-anon     # sanctum
 ```
+
+Live feed, database clubs, and homepage widgets: [`docs/api-surface.md`](docs/api-surface.md).
 
 ---
 
 # Documentation
 
 - Technical docs: [`docs/README.md`](docs/README.md)
-- AI entrypoint: [`AI_CONTEXT.md`](AI_CONTEXT.md)
-- Workspace as-built status: `zcout-private-docs/STATUS.md` (canonical IMPLEMENTED / PARTIAL / PLANNED / UNCERTAIN map)
+- AI / agent entrypoint: [`AI_CONTEXT.md`](AI_CONTEXT.md)
+- Workspace as-built status: [`zcout-private-docs/STATUS.md`](../zcout-private-docs/STATUS.md) (sibling repo in the Zcout workspace; optional for backend-only clones)
 
 ---
 
@@ -291,7 +310,7 @@ Implemented (high level):
 - Duel flow, reveal, skip, anonymous voting + claim
 - Matchmaking v1, rating + confidence, overall
 - Rankings (Redis projections), player profiles, scout reports
-- Simulation lab, scouting progression (My Scouting)
+- Simulation lab, scouting progression (My Scouting dashboard + progress APIs; **Your Impact** content still **PLANNED** — stage-2 progress only)
 - Live feed endpoints + Soketi events
 
 Schema stubs only / not runtime-scored:
