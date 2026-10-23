@@ -56,7 +56,7 @@ class LiveFeedAttributeTopTest extends TestCase
         $clubId = $this->createCurrentPremierLeagueClub('Club '.uniqid('pl', true), 'club-'.uniqid('pl', true));
 
         $playerIds = [];
-        foreach (['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'] as $name) {
+        foreach (['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta'] as $name) {
             $playerIds[$name] = (int) DB::table('players')->insertGetId([
                 'name' => $name,
                 'slug' => str($name)->slug()->toString().'-'.uniqid(),
@@ -77,6 +77,7 @@ class LiveFeedAttributeTopTest extends TestCase
         Redis::zadd('ranking:creativity', 89.0, (string) $playerIds['Delta']);
         Redis::zadd('ranking:creativity', 87.0, (string) $playerIds['Epsilon']);
         Redis::zadd('ranking:creativity', 85.0, (string) $playerIds['Zeta']);
+        Redis::zadd('ranking:creativity', 83.0, (string) $playerIds['Eta']);
 
         $exclude = $playerIds['Alpha'].','.$playerIds['Beta'];
 
@@ -86,7 +87,8 @@ class LiveFeedAttributeTopTest extends TestCase
             ->assertOk()
             ->assertJsonCount(5, 'players')
             ->assertJsonPath('players.0.playerId', $playerIds['Gamma'])
-            ->assertJsonPath('players.1.playerId', $playerIds['Delta']);
+            ->assertJsonPath('players.1.playerId', $playerIds['Delta'])
+            ->assertJsonPath('players.4.playerId', $playerIds['Eta']);
 
         $returnedIds = collect($response->json('players'))->pluck('playerId')->all();
         $this->assertNotContains($playerIds['Alpha'], $returnedIds);
