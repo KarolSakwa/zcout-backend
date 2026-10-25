@@ -55,9 +55,9 @@ class VoteController extends Controller
         if (($result['status'] ?? 500) >= 400) {
             Log::warning('direct_vote.submit_failed', [
                 'user_id' => auth()->id(),
-                'player_id' => $payload['player_id'] ?? null,
-                'attribute_key' => $payload['attribute_key'] ?? null,
-                'value' => $payload['value'] ?? null,
+                'player_id' => $validated['player_id'] ?? null,
+                'attribute_key' => $validated['attribute_key'] ?? null,
+                'value' => $validated['value'] ?? null,
                 'status' => $result['status'] ?? null,
                 'body' => $result['body'] ?? null,
             ]);

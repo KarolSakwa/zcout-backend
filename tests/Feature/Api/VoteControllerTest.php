@@ -11,7 +11,11 @@ use App\Services\Ranking\AttributeRankingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\Sanctum;
+use Monolog\Handler\TestHandler;
+use Monolog\Level;
+use Monolog\LogRecord;
 use Tests\TestCase;
 
 class VoteControllerTest extends TestCase
@@ -383,6 +387,39 @@ class VoteControllerTest extends TestCase
         $this->postJson('/api/votes/direct', $payload)
             ->assertStatus(409)
             ->assertJsonPath('message', 'Direct vote already exists for this player and attribute.');
+    }
+
+    public function test_store_direct_failure_log_reads_validated_input(): void
+    {
+        Sanctum::actingAs($this->createUser());
+
+        $fixture = $this->createPlayerFixture();
+
+        $payload = [
+            'attribute_key' => 'passing',
+            'player_id' => $fixture['player_id'],
+            'value' => 90,
+        ];
+
+        $this->postJson('/api/votes/direct', $payload)->assertCreated();
+
+        $handler = new TestHandler();
+        Log::getLogger()->pushHandler($handler);
+
+        $this->postJson('/api/votes/direct', $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Direct vote already exists for this player and attribute.');
+
+        $this->assertTrue($handler->hasRecordThatPasses(
+            function (LogRecord $record) use ($fixture): bool {
+                return $record->message === 'direct_vote.submit_failed'
+                    && ($record->context['player_id'] ?? null) === $fixture['player_id']
+                    && ($record->context['attribute_key'] ?? null) === 'passing'
+                    && ($record->context['value'] ?? null) === 90
+                    && ($record->context['status'] ?? null) === 409;
+            },
+            Level::Warning,
+        ));
     }
 
     public function test_submit_scout_report_returns_expected_contract(): void
